@@ -1,0 +1,5 @@
+{
+  "name": "OOEDN Tracker",
+  "description": "A high-performance content management and creator tracking application for OOEDN. Features AI-powered data entry, payment tracking, and a 'Blackburn' archive system.",
+  "requestFramePermissions": []
+}

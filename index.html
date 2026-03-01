@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
+  <title>OOEDN Tracker v4.31</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@900&family=Raleway:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Raleway', 'sans-serif'],
+            heading: ['Poppins', 'sans-serif'],
+          },
+          colors: {
+            ooedn: {
+              black: '#0a0a0a',
+              dark: '#171717',
+              gray: '#262626',
+              accent: '#ffffff',
+              danger: '#ef4444',
+            }
+          },
+          fontWeight: {
+            black: '900',
+          }
+        },
+      },
+    }
+  </script>
+  <style>
+    body {
+      background-color: #0a0a0a;
+      color: #ffffff;
+      font-family: 'Raleway', sans-serif;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    .font-heading {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+    }
+
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #171717;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #404040;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #525252;
+    }
+
+    /* === LIGHT MODE === */
+    .light-mode body,
+    body.light-mode {
+      background-color: #f5f5f5 !important;
+      color: #1a1a1a !important;
+    }
+
+    .light-mode .bg-ooedn-black,
+    .light-mode .bg-black {
+      background-color: #ffffff !important;
+    }
+
+    .light-mode .bg-ooedn-dark {
+      background-color: #f9f9f9 !important;
+    }
+
+    .light-mode .bg-ooedn-gray {
+      background-color: #f0f0f0 !important;
+    }
+
+    .light-mode .bg-black\/40,
+    .light-mode .bg-black\/60 {
+      background-color: rgba(0, 0, 0, 0.03) !important;
+    }
+
+    .light-mode .border-neutral-800 {
+      border-color: #e5e5e5 !important;
+    }
+
+    .light-mode .border-neutral-700 {
+      border-color: #d4d4d4 !important;
+    }
+
+    .light-mode .text-white {
+      color: #1a1a1a !important;
+    }
+
+    .light-mode .text-neutral-400 {
+      color: #737373 !important;
+    }
+
+    .light-mode .text-neutral-500 {
+      color: #525252 !important;
+    }
+
+    .light-mode .text-neutral-600 {
+      color: #404040 !important;
+    }
+
+    .light-mode .text-neutral-700 {
+      color: #525252 !important;
+    }
+
+    .light-mode .bg-neutral-900 {
+      background-color: #e5e5e5 !important;
+    }
+
+    .light-mode .bg-neutral-800 {
+      background-color: #ebebeb !important;
+    }
+
+    .light-mode .hover\:bg-neutral-800:hover {
+      background-color: #e0e0e0 !important;
+    }
+
+    .light-mode .hover\:bg-neutral-900:hover {
+      background-color: #d4d4d4 !important;
+    }
+
+    .light-mode .hover\:text-white:hover {
+      color: #000000 !important;
+    }
+
+    .light-mode .bg-ooedn-dark\/80 {
+      background-color: rgba(249, 249, 249, 0.9) !important;
+    }
+
+    .light-mode .border-white\/5,
+    .light-mode .border-white\/10 {
+      border-color: rgba(0, 0, 0, 0.06) !important;
+    }
+
+    .light-mode ::-webkit-scrollbar-track {
+      background: #f0f0f0;
+    }
+
+    .light-mode ::-webkit-scrollbar-thumb {
+      background: #c0c0c0;
+    }
+
+    .light-mode .placeholder-neutral-700::placeholder {
+      color: #a3a3a3 !important;
+    }
+
+    .light-mode .placeholder\:text-neutral-700::placeholder {
+      color: #a3a3a3 !important;
+    }
+
+    .light-mode input,
+    .light-mode textarea,
+    .light-mode select {
+      color: #1a1a1a !important;
+    }
+
+    .light-mode .bg-transparent {
+      background-color: transparent !important;
+    }
+
+    /* === MOBILE RESPONSIVE === */
+    @media (max-width: 768px) {
+      .mobile-sidebar {
+        display: none !important;
+      }
+
+      .mobile-header {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        height: 56px !important;
+      }
+
+      .mobile-main {
+        padding: 1rem !important;
+      }
+
+      .mobile-grid-1 {
+        grid-template-columns: 1fr !important;
+      }
+
+      .mobile-bottom-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 999;
+        background: #171717;
+        border-top: 1px solid #262626;
+        display: flex;
+        justify-content: space-around;
+        padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+      }
+
+      .light-mode .mobile-bottom-nav {
+        background: #ffffff;
+        border-color: #e5e5e5;
+      }
+
+      .mobile-bottom-nav button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        padding: 4px 8px;
+      }
+
+      .mobile-bottom-nav .nav-label {
+        font-size: 9px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .desktop-only {
+        display: flex;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .desktop-only {
+        display: none !important;
+      }
+    }
+  </style>
+  <!--ENV_INJECTION-->
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
+    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
+    "vite": "https://esm.sh/vite@^7.3.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "path": "https://esm.sh/path@^0.12.7",
+    "express": "https://esm.sh/express@^5.2.1",
+    "fs": "https://esm.sh/fs@^0.0.1-security",
+    "url": "https://esm.sh/url@^0.11.4"
+  }
+}
+</script>
+  <link rel="stylesheet" href="/index.css">
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+
+</html>
