@@ -837,6 +837,51 @@ app.post('/api/creator/migrate-passwords', async (req, res) => {
   }
 });
 
+// --- POST /api/creator/reset-password --- (admin utility)
+app.post('/api/creator/reset-password', async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword) return res.status(400).json({ error: 'email and newPassword required' });
+
+    const db = await readMasterDB();
+    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
+
+    const accounts = db.creatorAccounts || [];
+    const account = accounts.find(a => a.email.toLowerCase() === email.toLowerCase().trim());
+    if (!account) return res.status(404).json({ error: `No account found for ${email}` });
+
+    account.password = await bcrypt.hash(newPassword.trim(), BCRYPT_ROUNDS);
+    db.creatorAccounts = accounts.map(a => a.id === account.id ? account : a);
+    db.lastUpdated = new Date().toISOString();
+    db.version = Date.now();
+
+    const saved = await writeMasterDB(db);
+    if (!saved) return res.status(500).json({ error: 'Failed to save' });
+
+    console.log(`[CreatorAuth] ✅ Password reset for: ${email}`);
+    res.json({ success: true, email, accountId: account.id });
+  } catch (e) {
+    console.error('[CreatorAuth] Reset password error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// --- GET /api/creator/accounts-check --- (admin debug - no passwords)
+app.get('/api/creator/accounts-check', async (req, res) => {
+  try {
+    const db = await readMasterDB();
+    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
+    const accounts = (db.creatorAccounts || []).map(a => ({
+      id: a.id, email: a.email, displayName: a.displayName, createdAt: a.createdAt,
+      linkedCreatorId: a.linkedCreatorId, invitedByTeam: a.invitedByTeam,
+      hasHashedPassword: a.password?.startsWith('$2') || false
+    }));
+    res.json({ count: accounts.length, accounts });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to check accounts' });
+  }
+});
+
 // --- POST /api/creator/save --- (JWT protected, creator writes their own changes)
 
 app.post('/api/creator/save', creatorAuthMiddleware, async (req, res) => {

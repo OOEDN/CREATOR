@@ -260,8 +260,9 @@ export const syncStateToCloud = async (
                 console.log(`[CloudSync] Preserving ${accountsToSave.length} creator accounts from existing DB`);
             }
         } catch (e) {
-            console.warn('[CloudSync] Could not read existing accounts, saving without them');
-            accountsToSave = [];
+            console.error('[CloudSync] ⛔ Could not read existing accounts — BLOCKING save to prevent data loss');
+            setSyncStatus('error', 'Cannot verify creator accounts — save blocked for safety');
+            return; // DO NOT save without accounts — this would wipe them
         }
     }
 
