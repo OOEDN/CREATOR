@@ -284,6 +284,25 @@ const CreatorEditModal: React.FC<CreatorEditModalProps> = ({
                 </div>
 
                 <div className="p-8 overflow-y-auto space-y-8 flex-1 custom-scrollbar">
+                    {/* Creator-entered data indicators */}
+                    {(creator as any).editedByCreator && (
+                        <div className="bg-teal-500/5 border border-teal-500/20 rounded-xl p-3 flex items-center gap-2">
+                            <span className="text-teal-400 text-sm">👤</span>
+                            <div>
+                                <p className="text-[10px] font-black text-teal-400 uppercase tracking-widest">Creator Self-Edited Profile</p>
+                                {(creator as any).lastEditedByCreatorAt && <p className="text-[9px] text-neutral-500">Last edited {new Date((creator as any).lastEditedByCreatorAt).toLocaleDateString()}</p>}
+                            </div>
+                        </div>
+                    )}
+                    {(creator as any).requestedBeta && (
+                        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3 flex items-center gap-2">
+                            <span className="text-emerald-400 text-sm">🧪</span>
+                            <div>
+                                <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Beta Program Requested</p>
+                                {(creator as any).requestedBetaAt && <p className="text-[9px] text-neutral-500">Requested {new Date((creator as any).requestedBetaAt).toLocaleDateString()}</p>}
+                            </div>
+                        </div>
+                    )}
                     {activeTab === 'content' ? (
                         <ContentLibrary items={content} creatorId={creator.id} creatorName={creator.name} onUpload={onContentUpload} onUpdate={onUpdateContent} onDelete={onDeleteContent} appSettings={appSettings} />
                     ) : activeTab === 'outreach' ? (
@@ -406,7 +425,13 @@ const CreatorEditModal: React.FC<CreatorEditModalProps> = ({
                                 </div>
                                 <div className="space-y-3">
                                     {(formData.paymentOptions || []).map((opt, idx) => (
-                                        <div key={idx} className="grid grid-cols-3 gap-3 animate-in fade-in slide-in-from-left-2 duration-200">
+                                        <div key={idx} className={`grid grid-cols-3 gap-3 animate-in fade-in slide-in-from-left-2 duration-200 ${(opt as any).addedByCreator ? 'border-l-2 border-teal-400 pl-3' : ''}`}>
+                                            {(opt as any).addedByCreator && (
+                                                <div className="col-span-3 flex items-center gap-1.5 mb-1">
+                                                    <span className="text-[8px] font-black text-teal-400 uppercase tracking-widest bg-teal-500/10 px-2 py-0.5 rounded-md border border-teal-500/20">👤 Creator-entered</span>
+                                                    {(opt as any).addedAt && <span className="text-[8px] text-neutral-600">{new Date((opt as any).addedAt).toLocaleDateString()}</span>}
+                                                </div>
+                                            )}
                                             <select value={opt.method} onChange={(e) => handleUpdatePaymentOption(idx, { method: e.target.value as PaymentMethod })} className="bg-black border border-neutral-800 rounded-xl p-3 text-xs text-white outline-none focus:border-emerald-500">
                                                 {Object.values(PaymentMethod).map(m => <option key={m} value={m}>{m}</option>)}
                                             </select>

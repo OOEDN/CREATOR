@@ -36,7 +36,7 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
     });
 
     const handleSave = () => {
-        onUpdate(form);
+        onUpdate({ ...form, editedByCreator: true, lastEditedByCreatorAt: new Date().toISOString() } as any);
         setEditMode(false);
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
@@ -44,7 +44,7 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
 
     const addPaymentMethod = () => {
         if (!newDetails.trim()) return;
-        const updated = [...form.paymentOptions, { method: newMethod, details: newDetails.trim() }];
+        const updated = [...form.paymentOptions, { method: newMethod, details: newDetails.trim(), addedByCreator: true, addedAt: new Date().toISOString() }];
         setForm(f => ({ ...f, paymentOptions: updated }));
         onUpdate({ paymentOptions: updated });
         setNewMethod(PaymentMethod.Venmo);
@@ -109,8 +109,8 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
                         <p className="text-sm text-neutral-400">{creator.handle} • {creator.platform}</p>
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
                             <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg ${creator.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                                    creator.status === 'Long Term' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                                        'bg-neutral-500/10 text-neutral-400 border border-neutral-700'
+                                creator.status === 'Long Term' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                                    'bg-neutral-500/10 text-neutral-400 border border-neutral-700'
                                 }`}>{creator.status === 'Active' ? '🟢' : '⚪'} {creator.status}</span>
                             {creator.rating && (
                                 <span className="text-[10px] font-black text-yellow-400 bg-yellow-500/10 px-2.5 py-1 rounded-lg border border-yellow-500/20 flex items-center gap-1">
@@ -258,8 +258,8 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
                                         key={method}
                                         onClick={() => setNewMethod(method)}
                                         className={`p-3 rounded-xl border text-center transition-all active:scale-95 ${isSelected
-                                                ? 'border-purple-500 bg-purple-500/10 shadow-lg shadow-purple-500/10'
-                                                : 'border-neutral-800 bg-neutral-900 hover:border-neutral-700'
+                                            ? 'border-purple-500 bg-purple-500/10 shadow-lg shadow-purple-500/10'
+                                            : 'border-neutral-800 bg-neutral-900 hover:border-neutral-700'
                                             }`}
                                     >
                                         <span className="text-xl block mb-1">{config.emoji}</span>
@@ -374,7 +374,7 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
                     <div className="bg-black/50 rounded-xl p-3 border border-neutral-800">
                         <p className="text-[9px] text-neutral-600 font-bold uppercase mb-0.5">Payment Status</p>
                         <p className={`text-xs font-bold ${creator.paymentStatus === 'Paid' ? 'text-emerald-400' :
-                                creator.paymentStatus === 'Processing' ? 'text-yellow-400' : 'text-neutral-400'
+                            creator.paymentStatus === 'Processing' ? 'text-yellow-400' : 'text-neutral-400'
                             }`}>{creator.paymentStatus === 'Paid' ? '✅' : creator.paymentStatus === 'Processing' ? '⏳' : '⬜'} {creator.paymentStatus}</p>
                     </div>
                     <div className="bg-black/50 rounded-xl p-3 border border-neutral-800">

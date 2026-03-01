@@ -41,7 +41,7 @@ interface CreatorNotification {
 
 function CreatorApp() {
     // --- Auth State ---
-    const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+
     const [isConnected, setIsConnected] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [loginError, setLoginError] = useState<string | null>(null);
@@ -50,7 +50,7 @@ function CreatorApp() {
     // Form fields
     const [formEmail, setFormEmail] = useState('');
     const [formPassword, setFormPassword] = useState('');
-    const [formName, setFormName] = useState('');
+
 
     // Signed-in state
     const [currentAccount, setCurrentAccount] = useState<CreatorAccount | null>(null);
@@ -148,31 +148,7 @@ function CreatorApp() {
         } catch (e) { console.error('[CreatorApp] Save failed:', e); }
     };
 
-    // --- AUTH: Sign Up (server-side) ---
-    const handleSignUp = async () => {
-        if (!formEmail || !formPassword || !formName) { setLoginError('Please fill in all fields.'); return; }
-        if (formPassword.length < 4) { setLoginError('Password must be at least 4 characters.'); return; }
-        setIsLoading(true); setLoginError(null);
-        try {
-            const resp = await fetch('/api/creator/signup', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: formEmail, password: formPassword, name: formName })
-            });
-            const data = await resp.json();
-            if (!resp.ok) { setLoginError(data.error || 'Signup failed'); setIsLoading(false); return; }
 
-            // Store JWT
-            setJwtToken(data.token);
-            localStorage.setItem('ooedn_creator_jwt', data.token);
-            localStorage.setItem('ooedn_creator_session', JSON.stringify({ accountId: data.account.id, email: data.account.email }));
-
-            applyServerData(data, data.account);
-            setIsConnected(true); initialLoadRef.current = true;
-            setShowOnboarding(true);
-        } catch (e: any) { setLoginError(`Sign up failed: ${e.message}`); }
-        finally { setIsLoading(false); }
-    };
 
     // --- AUTH: Sign In (server-side) ---
     const handleSignIn = async () => {
@@ -415,6 +391,17 @@ function CreatorApp() {
         saveMasterDB(undefined, undefined, undefined, undefined, undefined, updatedAccounts);
     };
 
+    // --- BETA REQUEST ---
+    const handleRequestBeta = () => {
+        if (!creatorRecord) return;
+        const updated = { ...creatorRecord, requestedBeta: true, requestedBetaAt: new Date().toISOString() } as any;
+        setCreatorRecord(updated);
+        const updatedCreators = creators.map(c => c.id === updated.id ? updated : c);
+        setCreators(updatedCreators);
+        saveMasterDB(updatedCreators);
+        addNotification('campaign', 'Beta Request Sent! 🧪', "You're on the waitlist. The team will assign you when a test is available.");
+    };
+
     // --- LOGIN / SIGN-UP SCREEN ---
     if (!isConnected) {
         return (
@@ -433,26 +420,7 @@ function CreatorApp() {
                     <h1 className="text-2xl font-black text-white text-center mb-1 uppercase tracking-tighter">Creator Portal</h1>
                     <p className="text-neutral-500 text-center mb-6 text-xs font-bold uppercase tracking-widest">OOEDN Partner Access</p>
 
-                    {/* Tab Toggle */}
-                    <div className="flex bg-black rounded-xl p-1 mb-6">
-                        <button onClick={() => { setAuthMode('login'); setLoginError(null); }}
-                            className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${authMode === 'login' ? 'bg-purple-500 text-black' : 'text-neutral-500 hover:text-white'}`}>
-                            Sign In
-                        </button>
-                        <button onClick={() => { setAuthMode('signup'); setLoginError(null); }}
-                            className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${authMode === 'signup' ? 'bg-purple-500 text-black' : 'text-neutral-500 hover:text-white'}`}>
-                            Create Account
-                        </button>
-                    </div>
-
                     <div className="space-y-3">
-                        {authMode === 'signup' && (
-                            <div className="relative">
-                                <User size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-600" />
-                                <input value={formName} onChange={e => setFormName(e.target.value)} placeholder="Your name"
-                                    className="w-full bg-black border border-neutral-800 rounded-xl pl-10 pr-4 py-3.5 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-purple-500/50" />
-                            </div>
-                        )}
                         <div className="relative">
                             <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-600" />
                             <input value={formEmail} onChange={e => setFormEmail(e.target.value)} placeholder="Email address" type="email"
@@ -462,16 +430,15 @@ function CreatorApp() {
                             <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-600" />
                             <input value={formPassword} onChange={e => setFormPassword(e.target.value)} placeholder="Password"
                                 type={showPassword ? 'text' : 'password'}
-                                onKeyDown={e => e.key === 'Enter' && (authMode === 'login' ? handleSignIn() : handleSignUp())}
+                                onKeyDown={e => e.key === 'Enter' && handleSignIn()}
                                 className="w-full bg-black border border-neutral-800 rounded-xl pl-10 pr-10 py-3.5 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-purple-500/50" />
                             <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-white" type="button">
                                 {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                             </button>
                         </div>
-                        <button onClick={authMode === 'login' ? handleSignIn : handleSignUp} disabled={isLoading}
+                        <button onClick={handleSignIn} disabled={isLoading}
                             className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3.5 rounded-xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 hover:from-purple-400 hover:to-pink-400 transition-all shadow-xl shadow-purple-500/20 active:scale-95 disabled:opacity-50 mt-2">
-                            {isLoading ? <Loader2 className="animate-spin" size={16} /> :
-                                authMode === 'login' ? <><ArrowRight size={14} /> Sign In</> : <><UserPlus size={14} /> Create Account</>}
+                            {isLoading ? <Loader2 className="animate-spin" size={16} /> : <><ArrowRight size={14} /> Sign In</>}
                         </button>
                     </div>
 
@@ -723,6 +690,7 @@ function CreatorApp() {
                             onSignRelease={handleSignBetaRelease}
                             onMarkSampleReceived={handleMarkSampleReceived}
                             onSubmitReview={handleSubmitBetaReview}
+                            onRequestBeta={handleRequestBeta}
                             onNavigate={(v: string) => setView(v as CreatorView)}
                             onDismissIntro={handleBetaLabIntroDismiss}
                         />

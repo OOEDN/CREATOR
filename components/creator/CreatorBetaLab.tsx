@@ -3,7 +3,7 @@ import { Creator, BetaTest, BetaRelease, CreatorAccount } from '../../types';
 import {
     FlaskConical, FileText, Package, Star, CheckCircle, Lock,
     Calendar, Camera, Clock, AlertTriangle, Shield, Sparkles, Eye, X,
-    Zap, Rocket, Gift, Heart, ArrowRight, TestTubes
+    Zap, Rocket, Gift, Heart, ArrowRight, TestTubes, HandMetal
 } from 'lucide-react';
 
 interface Props {
@@ -14,6 +14,7 @@ interface Props {
     onSignRelease: (betaTestId: string) => void;
     onMarkSampleReceived: (betaTestId: string) => void;
     onSubmitReview: (betaTestId: string, rating: number, text: string) => void;
+    onRequestBeta: () => void;
     onNavigate: (view: string) => void;
     onDismissIntro: () => void;
 }
@@ -34,7 +35,7 @@ By participating in the OOEDN Beta Testing Program, you agree to:
 
 6. TERMINATION — OOEDN reserves the right to remove you from the beta program if terms are violated.`;
 
-const CreatorBetaLab: React.FC<Props> = ({ creator, account, betaTests, betaReleases, onSignRelease, onMarkSampleReceived, onSubmitReview, onNavigate, onDismissIntro }) => {
+const CreatorBetaLab: React.FC<Props> = ({ creator, account, betaTests, betaReleases, onSignRelease, onMarkSampleReceived, onSubmitReview, onRequestBeta, onNavigate, onDismissIntro }) => {
     // Only show launched tests assigned to this creator
     const myTests = betaTests.filter(t => t.launched && t.assignedCreatorIds?.includes(creator.id));
     const [selectedTestId, setSelectedTestId] = useState<string | null>(null);
@@ -185,9 +186,9 @@ const CreatorBetaLab: React.FC<Props> = ({ creator, account, betaTests, betaRele
         <div className="max-w-2xl mx-auto space-y-6">
             <div className="text-center mb-2">
                 <h2 className="text-2xl font-black text-white uppercase tracking-tight flex items-center justify-center gap-2">
-                    <FlaskConical size={24} className="text-emerald-400" /> Beta Lab
+                    <FlaskConical size={24} className="text-emerald-400" /> Beta Requests
                 </h2>
-                <p className="text-neutral-500 text-xs mt-1">Test exclusive products before they launch. Content subject to embargo.</p>
+                <p className="text-neutral-500 text-xs mt-1">Request access to test exclusive products before they launch.</p>
             </div>
 
             {/* Info Banner */}
@@ -201,12 +202,28 @@ const CreatorBetaLab: React.FC<Props> = ({ creator, account, betaTests, betaRele
 
             {myTests.length === 0 ? (
                 <div className="bg-neutral-900/80 border border-neutral-800 rounded-2xl p-12 text-center">
-                    <div className="text-5xl mb-3">🧪</div>
-                    <p className="text-neutral-400 text-sm font-bold">No beta tests available yet</p>
-                    <p className="text-neutral-600 text-[10px] mt-1">When the team launches a new test for you, it'll show up here 🔬</p>
-                    <div className="mt-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3">
-                        <p className="text-[10px] text-emerald-400">💡 You're opted in! The team will invite you when the next test drops.</p>
-                    </div>
+                    {(creator as any).requestedBeta ? (
+                        <>
+                            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 rounded-2xl flex items-center justify-center">
+                                <CheckCircle size={28} className="text-emerald-400" />
+                            </div>
+                            <p className="text-emerald-400 text-sm font-black uppercase">You're on the waitlist! ✅</p>
+                            <p className="text-neutral-500 text-[10px] mt-2">Requested {(creator as any).requestedBetaAt ? new Date((creator as any).requestedBetaAt).toLocaleDateString() : 'recently'}</p>
+                            <div className="mt-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3">
+                                <p className="text-[10px] text-emerald-400">🔬 The team will assign you to a test when one becomes available. Sit tight!</p>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="text-5xl mb-3">🧪</div>
+                            <p className="text-white text-sm font-black uppercase">Want to test products before they drop?</p>
+                            <p className="text-neutral-500 text-[10px] mt-1">Request access to the beta program and get exclusive early access 🔬</p>
+                            <button onClick={onRequestBeta}
+                                className="mt-5 bg-gradient-to-r from-emerald-500 to-teal-500 text-black px-6 py-3 rounded-xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 hover:from-emerald-400 hover:to-teal-400 transition-all active:scale-95 shadow-lg shadow-emerald-500/20 mx-auto">
+                                <HandMetal size={16} /> Request to Join
+                            </button>
+                        </>
+                    )}
                 </div>
             ) : (
                 <div className="space-y-4">
