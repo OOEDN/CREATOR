@@ -838,10 +838,15 @@ app.post('/api/creator/save', creatorAuthMiddleware, async (req, res) => {
 
 console.log('[CreatorAuth] Creator Portal auth endpoints registered');
 
+// --- CREATOR_MODE: serve creator-only build or full admin build ---
+const CREATOR_MODE = process.env.CREATOR_MODE === 'true';
+const DIST_DIR = CREATOR_MODE ? 'dist-creator' : 'dist';
+const INDEX_HTML = CREATOR_MODE ? 'creator-index.html' : 'index.html';
+
 // --- Static File Serving ---
 app.set('etag', false);
 
-app.use(express.static(path.join(__dirname, 'dist'), {
+app.use(express.static(path.join(__dirname, DIST_DIR), {
   index: false,
   maxAge: '0',
   setHeaders: (res, filePath) => {
@@ -853,13 +858,12 @@ app.use(express.static(path.join(__dirname, 'dist'), {
 
 // Serve service worker from root path (must be at root for scope)
 app.get('/sw.js', (req, res) => {
-  const swPath = path.join(__dirname, 'dist', 'sw.js');
+  const swPath = path.join(__dirname, DIST_DIR, 'sw.js');
   if (fs.existsSync(swPath)) {
     res.setHeader('Content-Type', 'application/javascript');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.sendFile(swPath);
   } else {
-    // Fallback to public folder during dev
     const devPath = path.join(__dirname, 'public', 'sw.js');
     if (fs.existsSync(devPath)) {
       res.setHeader('Content-Type', 'application/javascript');
@@ -870,15 +874,22 @@ app.get('/sw.js', (req, res) => {
   }
 });
 
+// In creator mode, redirect root to /creator
+if (CREATOR_MODE) {
+  app.get('/', (req, res) => {
+    res.redirect('/creator');
+  });
+}
+
 app.get('*', (req, res) => {
-  const indexPath = path.join(__dirname, 'dist', 'index.html');
+  const indexPath = path.join(__dirname, DIST_DIR, INDEX_HTML);
 
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
   res.set('Pragma', 'no-cache');
   res.set('Expires', '0');
 
   if (!fs.existsSync(indexPath)) {
-    console.error("Dist folder not found!");
+    console.error(`${DIST_DIR} folder not found!`);
     return res.status(500).send('Server Error: App build not found. Container build failed.');
   }
 
@@ -893,7 +904,6 @@ app.get('*', (req, res) => {
         };
         window.APP_VERSION = "4.32";
         
-        // AUTO-FIX: If the version changed, clear legacy settings to pick up new defaults
         const currentV = localStorage.getItem('ooedn_version');
         if (currentV !== '4.32') {
             console.log('Detected version upgrade to 4.32. Clearing legacy config to restore correct bucket.');
@@ -901,9 +911,8 @@ app.get('*', (req, res) => {
             localStorage.setItem('ooedn_version', '4.32');
         }
         
-        console.log("OOEDN Tracker v4.32 Loaded");
+        console.log("${CREATOR_MODE ? 'OOEDN Creator Portal' : 'OOEDN Tracker'} v4.32 Loaded");
 
-        // Register Service Worker for Push Notifications
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js')
                 .then(reg => console.log('[Push] Service Worker registered:', reg.scope))
@@ -918,6 +927,10 @@ app.get('*', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`OOEDN Tracker v4.32 listening on port ${port}`);
-  console.log(`[Push] ${pushSubscriptions.length} active push subscriptions`);
+  console.log(`${CREATOR_MODE ? 'OOEDN Creator Portal' : 'OOEDN Tracker'} v4.32 listening on port ${port}`);
+  if (!CREATOR_MODE) {
+    console.log(`[Push] ${pushSubscriptions.length} active push subscriptions`);
+  }
 });
+
+

@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:creator": "vite --config vite.creator.config.ts",
     "build": "vite build",
+    "build:creator": "vite build --config vite.creator.config.ts",
     "gcp-build": "npm run build",
     "start": "node server.js",
     "deploy": "gcloud run deploy ooedn-tracker --source . --region us-west1"
