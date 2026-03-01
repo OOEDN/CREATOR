@@ -9,9 +9,13 @@ import { Creator, Campaign, ContentItem, AppSettings, TeamMessage, TeamTask } fr
 
 const TEAM_EMAIL = 'create@ooedn.com';
 
-// Gmail API user identifier — use the shared mailbox so all team members
-// read from / manage the same inbox via Google Workspace delegation.
-const GMAIL_USER = encodeURIComponent(TEAM_EMAIL);
+// Gmail API user identifier — 'me' resolves to the authenticated user's mailbox.
+// This works because the OAuth token belongs to the logged-in admin (daniel@ooedn.com).
+// The From header still uses TEAM_EMAIL for branding.
+const GMAIL_USER = 'me';
+
+// Direct Gmail API base URL — no proxy needed, calls go straight to Google
+const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1';
 
 export interface EmailMessage {
     id: string;
@@ -94,11 +98,18 @@ export const sendEmail = async (
     fromEmail: string = TEAM_EMAIL
 ): Promise<{ id: string; threadId: string }> => {
     // Send as plain text so it's not truncated by Gmail's automatic snippet generation
+    // RFC 2047: MIME-encode subject if it contains non-ASCII characters (e.g. emoji)
+    const hasNonAscii = /[^\x00-\x7F]/.test(subject);
+    const encodedSubject = hasNonAscii
+        ? `=?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`
+        : subject;
+
     const headers = [
         `From: OOEDN Creative Team <${fromEmail}>`,
         `To: ${to}`,
-        `Subject: ${subject}`,
+        `Subject: ${encodedSubject}`,
         `Content-Type: text/plain; charset=utf-8`,
+        `MIME-Version: 1.0`,
     ];
     if (inReplyTo) {
         headers.push(`In-Reply-To: ${inReplyTo}`);
@@ -114,7 +125,7 @@ export const sendEmail = async (
     const payload: any = { raw: encoded };
     if (threadId) payload.threadId = threadId;
 
-    const resp = await fetch(`/api/gmail/v1/users/${GMAIL_USER}/messages/send`, {
+    const resp = await fetch(`${GMAIL_API_BASE}/users/${GMAIL_USER}/messages/send`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${token}`,
@@ -230,7 +241,7 @@ export const getThreadsForContact = async (
         `(from:${contactEmail} to:${teamEmail}) OR (from:${teamEmail} to:${contactEmail})`
     );
     const resp = await fetch(
-        `/api/gmail/v1/users/${GMAIL_USER}/threads?q=${query}&maxResults=${maxResults}`,
+        `${GMAIL_API_BASE}/users/${GMAIL_USER}/threads?q=${query}&maxResults=${maxResults}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
     );
 
@@ -265,7 +276,7 @@ export const getThread = async (
     teamEmail: string = TEAM_EMAIL
 ): Promise<EmailThread | null> => {
     const resp = await fetch(
-        `/api/gmail/v1/users/${GMAIL_USER}/threads/${threadId}?format=full`,
+        `${GMAIL_API_BASE}/users/${GMAIL_USER}/threads/${threadId}?format=full`,
         { headers: { 'Authorization': `Bearer ${token}` } }
     );
 
@@ -300,7 +311,7 @@ export const getInboxSummary = async (
     // Filter to ONLY show emails involving the team email address
     const query = encodeURIComponent(`to:${teamEmail} OR from:${teamEmail}`);
     const resp = await fetch(
-        `/api/gmail/v1/users/${GMAIL_USER}/threads?q=${query}&maxResults=${maxResults}`,
+        `${GMAIL_API_BASE}/users/${GMAIL_USER}/threads?q=${query}&maxResults=${maxResults}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
     );
 
@@ -335,7 +346,7 @@ export const searchEmails = async (
     // Scope search to team email conversations
     const scopedQuery = encodeURIComponent(`(to:${teamEmail} OR from:${teamEmail}) ${query}`);
     const resp = await fetch(
-        `/api/gmail/v1/users/${GMAIL_USER}/threads?q=${scopedQuery}&maxResults=${maxResults}`,
+        `${GMAIL_API_BASE}/users/${GMAIL_USER}/threads?q=${scopedQuery}&maxResults=${maxResults}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
     );
 
@@ -362,7 +373,7 @@ export const markThreadAsRead = async (
 ): Promise<boolean> => {
     try {
         const resp = await fetch(
-            `/api/gmail/v1/users/${GMAIL_USER}/threads/${threadId}/modify`,
+            `${GMAIL_API_BASE}/users/${GMAIL_USER}/threads/${threadId}/modify`,
             {
                 method: 'POST',
                 headers: {
@@ -391,7 +402,7 @@ export const trashThread = async (
 ): Promise<boolean> => {
     try {
         const resp = await fetch(
-            `/api/gmail/v1/users/${GMAIL_USER}/threads/${threadId}/trash`,
+            `${GMAIL_API_BASE}/users/${GMAIL_USER}/threads/${threadId}/trash`,
             {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -416,7 +427,7 @@ export const archiveThread = async (
 ): Promise<boolean> => {
     try {
         const resp = await fetch(
-            `/api/gmail/v1/users/${GMAIL_USER}/threads/${threadId}/modify`,
+            `${GMAIL_API_BASE}/users/${GMAIL_USER}/threads/${threadId}/modify`,
             {
                 method: 'POST',
                 headers: {

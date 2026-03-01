@@ -86,6 +86,14 @@ export interface AppSettings {
   teamEmailToken?: string;    // OAuth token for the team email account
 }
 
+export interface ContentNote {
+  id: string;
+  user: string;
+  text: string;
+  date: string;
+  isCreatorReply?: boolean;
+}
+
 export interface ContentItem {
   id: string;
   creatorId?: string;
@@ -96,7 +104,7 @@ export interface ContentItem {
   status: ContentStatus;
   platform: Platform;
   fileUrl: string;
-  thumbnail?: string; // Base64 lightweight preview
+  thumbnail?: string;
   fileBlob?: Blob;
   storageType: 'local' | 'cloud';
   uploadDate: string;
@@ -104,9 +112,13 @@ export interface ContentItem {
   scheduledDate?: string;
   caption?: string;
   tags?: string[];
-  isUsed?: boolean; // Track if content has been used in a campaign
-  aiData?: any; // Store raw AI response for future proofing
-  driveBackedUp?: boolean; // Track if file has been backed up to Google Drive
+  isUsed?: boolean;
+  aiData?: any;
+  driveBackedUp?: boolean;
+  // Video feedback
+  teamNotes?: ContentNote[];       // Team notes / feedback on this video
+  paymentRequested?: boolean;       // Creator flagged this for payment
+  paymentAmount?: number;           // Per-video payment amount
 }
 
 export interface CampaignTask {
@@ -122,6 +134,14 @@ export interface CampaignComment {
   date: string;
 }
 
+export interface MoodboardItem {
+  id: string;
+  imageUrl: string;            // GCS or external URL
+  caption?: string;
+  addedBy: string;             // Team member name
+  addedAt: string;
+}
+
 export interface Campaign {
   id: string;
   title: string;
@@ -131,6 +151,12 @@ export interface Campaign {
   lastUpdated: string;
   tasks?: CampaignTask[];
   comments?: CampaignComment[];
+  deadline?: string;               // Due date for deliverables
+  creatorNotified?: boolean;        // Whether creators have been notified
+  acceptedByCreatorIds?: string[];  // Creators who accepted the campaign
+  moodboard?: MoodboardItem[];     // Visual direction images
+  styleNotes?: string;             // Tone, mood, colors, aesthetic guidance
+  referenceLinks?: string[];       // Inspiration URLs
 }
 
 export interface Shipment {
@@ -198,6 +224,14 @@ export interface Creator {
   shipmentStatus: ShipmentStatus;
   trackingNumber?: string;
   carrier?: string;
+
+  // Creator Portal fields
+  role?: 'team' | 'creator';
+  portalEmail?: string;
+  paymentRequestDate?: string;
+  notificationsEnabled?: boolean;       // Browser push notifications
+  totalEarned?: number;                 // Lifetime earnings tracker
+  lastActiveDate?: string;              // For streak tracking
 }
 
 export interface TeamMember {
@@ -205,6 +239,52 @@ export interface TeamMember {
   role: string;
   addedAt: string;
 }
+
+// Beta Testing Platform
+export interface BetaTest {
+  id: string;
+  title: string;
+  description: string;
+  status: 'draft' | 'open' | 'in-progress' | 'complete';
+  launched?: boolean; // Team must launch before creators can see it
+  sampleImageUrl?: string;
+  createdAt: string;
+  embargoDate?: string;
+  embargoConfirmedByTeam?: boolean;
+  assignedCreatorIds: string[];
+  styleNotes?: string;
+}
+
+export interface BetaRelease {
+  id: string;
+  betaTestId: string;
+  creatorId: string;
+  signedAt: string;
+  agreed: boolean;
+  releaseText: string;
+  sampleShipped?: boolean;
+  sampleReceived?: boolean;
+  reviewSubmitted?: boolean;
+  reviewText?: string;
+  reviewRating?: number;
+  contentApprovedByTeam?: boolean;
+  contentPostDate?: string;
+}
+
+// Creator Portal — self-registration accounts
+export interface CreatorAccount {
+  id: string;
+  email: string;
+  password: string;            // Simple password (hashed in production)
+  displayName: string;
+  createdAt: string;
+  linkedCreatorId?: string;    // Links to a Creator record once team approves
+  invitedByTeam?: boolean;     // True if team created the account
+  inviteEmailSent?: boolean;   // True if welcome email was sent
+  onboardingComplete?: boolean; // True after creator finishes walkthrough
+  betaLabIntroSeen?: boolean;   // True after creator sees Beta Lab intro
+}
+
 
 declare global {
   interface Window {

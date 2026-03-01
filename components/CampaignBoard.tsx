@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Campaign, CampaignStatus, ContentItem, Creator, AppSettings, CreatorStatus, ContentType, CampaignTask, CampaignComment } from '../types';
-import { Plus, X, Layout, FileText, CheckCircle2, MoreHorizontal, Save, Users, ImageIcon, Sparkles, Loader2, BrainCircuit, Film, HardDrive, Printer, CheckSquare, MessageSquare, Trash2, ListTodo, Send, GripHorizontal, Eye, Edit3, PenTool, Mail } from 'lucide-react';
+import { Campaign, CampaignStatus, ContentItem, Creator, AppSettings, CreatorStatus, ContentType, CampaignTask, CampaignComment, MoodboardItem } from '../types';
+import { Plus, X, Layout, FileText, CheckCircle2, MoreHorizontal, Save, Users, ImageIcon, Sparkles, Loader2, BrainCircuit, Film, HardDrive, Printer, CheckSquare, MessageSquare, Trash2, ListTodo, Send, GripHorizontal, Eye, Edit3, PenTool, Mail, Palette, LinkIcon, ExternalLink } from 'lucide-react';
 import ContentLibrary from './ContentLibrary';
 import { generateCampaignBrief, generateCampaignTasks, generateViralScript } from '../services/geminiService';
 import { createDriveFolder, uploadToGoogleDrive } from '../services/googleDriveService';
@@ -546,20 +546,147 @@ Use "Negative Assumption": Stop doing X if you want Y.
                                     <div className="flex flex-wrap gap-2 mb-4">
                                         {creators.filter(c => editingCampaign.assignedCreatorIds.includes(c.id)).map(c => (
                                             <div key={c.id} className="flex items-center gap-2 bg-neutral-900 border border-neutral-800 rounded-full pr-3 p-1">
-                                                <div className="w-6 h-6 rounded-full bg-neutral-800 overflow-hidden">{c.profileImage ? <img src={c.profileImage} className="w-full h-full object-cover" /> : null}</div>
+                                                <div className="w-6 h-6 rounded-full bg-neutral-800 overflow-hidden">{c.profileImage ? <img src={c.profileImage} alt={c.name} className="w-full h-full object-cover" /> : null}</div>
                                                 <span className="text-[9px] font-bold text-white">{c.name}</span>
+                                                <button
+                                                    onClick={() => {
+                                                        const updated = { ...editingCampaign, assignedCreatorIds: editingCampaign.assignedCreatorIds.filter(id => id !== c.id) };
+                                                        setEditingCampaign(updated);
+                                                        onSaveCampaign(updated);
+                                                    }}
+                                                    className="text-neutral-600 hover:text-red-400 ml-1"
+                                                ><X size={10} /></button>
                                             </div>
                                         ))}
-                                        <button className="w-8 h-8 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center hover:bg-white hover:text-black transition-all"><Plus size={14} /></button>
                                     </div>
-                                    <div className="h-32 bg-neutral-900/50 rounded-xl border border-neutral-800 flex items-center justify-center">
-                                        <ContentLibrary
-                                            items={content.filter(c => c.campaignId === editingCampaign.id)}
-                                            onUpload={(item) => onContentUpload({ ...item, campaignId: editingCampaign.id, creatorId: undefined, creatorName: 'MoodBoard' })}
-                                            onUpdate={onContentUpdate}
-                                            onDelete={onContentDelete}
-                                            appSettings={appSettings}
+
+                                    {/* SEND TO CREATOR */}
+                                    <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-4 mb-4">
+                                        <h5 className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                            <Send size={12} /> Assign to Creator Portal
+                                        </h5>
+                                        <select
+                                            onChange={(e) => {
+                                                const creatorId = e.target.value;
+                                                if (!creatorId || editingCampaign.assignedCreatorIds.includes(creatorId)) return;
+                                                const updated = {
+                                                    ...editingCampaign,
+                                                    assignedCreatorIds: [...editingCampaign.assignedCreatorIds, creatorId],
+                                                    creatorNotified: true,
+                                                };
+                                                setEditingCampaign(updated);
+                                                onSaveCampaign(updated);
+                                                e.target.value = '';
+                                            }}
+                                            className="w-full bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-purple-500 outline-none mb-2"
+                                            defaultValue=""
+                                            title="Select a creator"
+                                        >
+                                            <option value="" disabled>Select a creator...</option>
+                                            {creators
+                                                .filter(c => !editingCampaign.assignedCreatorIds.includes(c.id))
+                                                .map(c => <option key={c.id} value={c.id}>{c.name} ({c.handle})</option>)}
+                                        </select>
+                                        <p className="text-[9px] text-neutral-500">Selected creators will see this campaign in their portal</p>
+                                    </div>
+
+                                    {/* DEADLINE */}
+                                    <div className="mb-4">
+                                        <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest block mb-1" htmlFor="campaign-deadline">Deadline</label>
+                                        <input
+                                            id="campaign-deadline"
+                                            type="date"
+                                            value={editingCampaign.deadline?.split('T')[0] || ''}
+                                            onChange={(e) => {
+                                                const updated = { ...editingCampaign, deadline: e.target.value ? new Date(e.target.value).toISOString() : undefined };
+                                                setEditingCampaign(updated);
+                                                onSaveCampaign(updated);
+                                            }}
+                                            className="w-full bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none"
                                         />
+                                    </div>
+
+                                    {/* MOODBOARD & VISUAL DIRECTION */}
+                                    <div className="border-t border-neutral-800 pt-6 mt-4">
+                                        <h4 className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Palette size={14} /> Moodboard & Visual Direction</h4>
+
+                                        {/* Style Notes */}
+                                        <div className="mb-4">
+                                            <label className="text-[9px] font-black text-neutral-500 uppercase tracking-widest block mb-1" htmlFor="style-notes">Style Notes & Tone</label>
+                                            <textarea
+                                                id="style-notes"
+                                                value={editingCampaign.styleNotes || ''}
+                                                onChange={(e) => {
+                                                    const updated = { ...editingCampaign, styleNotes: e.target.value };
+                                                    setEditingCampaign(updated);
+                                                }}
+                                                onBlur={() => onSaveCampaign(editingCampaign)}
+                                                placeholder="Describe the mood, tone, colors, aesthetic, energy... e.g. 'Warm earth tones, cozy lifestyle vibes, natural lighting, soft transitions'"
+                                                className="w-full bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-purple-500 outline-none h-20 resize-none leading-relaxed"
+                                            />
+                                        </div>
+
+                                        {/* Reference Links */}
+                                        <div className="mb-4">
+                                            <label className="text-[9px] font-black text-neutral-500 uppercase tracking-widest block mb-1">Reference / Inspiration Links</label>
+                                            <div className="space-y-1.5 mb-2">
+                                                {(editingCampaign.referenceLinks || []).map((link, idx) => (
+                                                    <div key={idx} className="flex items-center gap-2 group">
+                                                        <LinkIcon size={10} className="text-purple-400 flex-shrink-0" />
+                                                        <a href={link} target="_blank" rel="noopener noreferrer" className="text-[10px] text-purple-400 hover:text-purple-300 truncate flex-1">{link}</a>
+                                                        <button
+                                                            onClick={() => {
+                                                                const updated = { ...editingCampaign, referenceLinks: (editingCampaign.referenceLinks || []).filter((_, i) => i !== idx) };
+                                                                setEditingCampaign(updated);
+                                                                onSaveCampaign(updated);
+                                                            }}
+                                                            className="text-neutral-600 hover:text-red-400 opacity-0 group-hover:opacity-100"
+                                                            title="Remove link"
+                                                        ><X size={10} /></button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    placeholder="Paste a reference URL..."
+                                                    className="flex-1 bg-black border border-neutral-800 rounded-lg px-3 py-1.5 text-[10px] text-white focus:border-purple-500 outline-none"
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && (e.target as HTMLInputElement).value.trim()) {
+                                                            const url = (e.target as HTMLInputElement).value.trim();
+                                                            const updated = { ...editingCampaign, referenceLinks: [...(editingCampaign.referenceLinks || []), url] };
+                                                            setEditingCampaign(updated);
+                                                            onSaveCampaign(updated);
+                                                            (e.target as HTMLInputElement).value = '';
+                                                        }
+                                                    }}
+                                                />
+                                                <button
+                                                    onClick={() => {
+                                                        const inputEl = document.querySelector('#ref-link-input') as HTMLInputElement;
+                                                        if (inputEl?.value.trim()) {
+                                                            const updated = { ...editingCampaign, referenceLinks: [...(editingCampaign.referenceLinks || []), inputEl.value.trim()] };
+                                                            setEditingCampaign(updated);
+                                                            onSaveCampaign(updated);
+                                                            inputEl.value = '';
+                                                        }
+                                                    }}
+                                                    className="bg-purple-500/10 text-purple-400 px-2 py-1.5 rounded-lg hover:bg-purple-500/20 text-[10px] font-bold"
+                                                    title="Add link"
+                                                ><Plus size={12} /></button>
+                                            </div>
+                                        </div>
+
+                                        {/* Moodboard Assets */}
+                                        <label className="text-[9px] font-black text-neutral-500 uppercase tracking-widest block mb-2">Moodboard Images & Assets</label>
+                                        <div className="bg-neutral-900/50 rounded-xl border border-neutral-800">
+                                            <ContentLibrary
+                                                items={content.filter(c => c.campaignId === editingCampaign.id)}
+                                                onUpload={(item) => onContentUpload({ ...item, campaignId: editingCampaign.id, creatorId: undefined, creatorName: 'MoodBoard' })}
+                                                onUpdate={onContentUpdate}
+                                                onDelete={onContentDelete}
+                                                appSettings={appSettings}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
 

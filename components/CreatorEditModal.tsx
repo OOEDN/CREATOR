@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Creator, CreatorStatus, PaymentMethod, Platform, CreatorRating, ContentItem, AppSettings, ShipmentStatus, PaymentOption, ReachPlatform, Shipment } from '../types';
-import { X, Flag, Save, Trash2, LayoutGrid, FileImage, Truck, Camera, Sparkles, Loader2, Plus, CreditCard, MapPin, Mail, User, Link, Send, DownloadCloud, FileCheck, DollarSign } from 'lucide-react';
+import { Creator, CreatorStatus, PaymentMethod, Platform, CreatorRating, ContentItem, AppSettings, ShipmentStatus, PaymentOption, ReachPlatform, Shipment, CreatorAccount } from '../types';
+import { X, Flag, Save, Trash2, LayoutGrid, FileImage, Truck, Camera, Sparkles, Loader2, Plus, CreditCard, MapPin, Mail, User, Link, Send, DownloadCloud, FileCheck, DollarSign, UserPlus, CheckCircle } from 'lucide-react';
 import { RATING_COLORS, SHIPMENT_STATUS_COLORS, REACH_PLATFORM_COLORS } from '../constants';
 import ContentLibrary from './ContentLibrary';
 import { draftCreatorOutreach } from '../services/geminiService';
@@ -8,6 +8,9 @@ import { createGmailDraft } from '../services/googleWorkspaceService';
 import { analyzeSentiment } from '../services/analysisService';
 import ShipmentManager from './ShipmentManager';
 import { sendPushNotification } from '../services/pushService';
+import { sendEmail } from '../services/gmailService';
+import { loadRemoteState, MasterDB } from '../services/cloudSync';
+import { uploadJSONToGoogleCloud } from '../services/googleCloudStorage';
 
 interface CreatorEditModalProps {
     creator: Creator;
@@ -34,6 +37,13 @@ const CreatorEditModal: React.FC<CreatorEditModalProps> = ({
     const [isDrafting, setIsDrafting] = useState(false);
     const [isSending, setIsSending] = useState(false);
     const [sentiment, setSentiment] = useState<{ label: string, color: string } | null>(null);
+
+    // Invite to Portal state
+    const [isInviting, setIsInviting] = useState(false);
+    const [inviteSent, setInviteSent] = useState(false);
+    const [inviteError, setInviteError] = useState<string | null>(null);
+    const [inviteEmail, setInviteEmail] = useState(creator.email || '');
+    const [showInviteSection, setShowInviteSection] = useState(false);
 
     // Auto-analyze sentiment on mount if notes exist
     useEffect(() => {
@@ -172,6 +182,96 @@ const CreatorEditModal: React.FC<CreatorEditModalProps> = ({
         } catch (e) { /* fire-and-forget */ }
 
         alert(`✅ Payment request sent!\n\nCreator: ${creator.name}\nAmount: $${rate}\nMethod: ${paymentMethods}\n\nYour team has been notified.`);
+    };
+
+    // --- INVITE TO PORTAL ---
+    const handleInviteToPortal = async () => {
+        const creatorEmail = inviteEmail.trim() || formData.email || creator.email;
+        if (!creatorEmail) { setInviteError('Enter the creator\'s email address.'); return; }
+        if (!appSettings.googleCloudToken) { setInviteError('Please log in to sync.'); return; }
+
+        setIsInviting(true); setInviteError(null);
+        // Also save the email to the creator record
+        handleChange('email', creatorEmail.toLowerCase().trim());
+        try {
+            // Load current DB to check for existing accounts
+            const db = await loadRemoteState({ ...appSettings, googleCloudToken: appSettings.googleCloudToken! });
+            const existingAccounts = db?.creatorAccounts || [];
+
+            // Check if already invited
+            const existing = existingAccounts.find(a => a.email.toLowerCase() === creatorEmail.toLowerCase());
+            if (existing) {
+                setInviteError(`Already invited (${creatorEmail}). Account exists.`);
+                setIsInviting(false); return;
+            }
+
+            // Generate a random password
+            const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+            const password = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+
+            // Create the account
+            const newAccount: CreatorAccount = {
+                id: crypto.randomUUID(),
+                email: creatorEmail.toLowerCase().trim(),
+                password,
+                displayName: creator.name,
+                createdAt: new Date().toISOString(),
+                linkedCreatorId: creator.id,
+                invitedByTeam: true,
+                inviteEmailSent: false,
+            };
+
+            // Save to GCS
+            const updatedAccounts = [...existingAccounts, newAccount];
+            const updatedCreators = (db?.creators || []).map(c =>
+                c.id === creator.id ? { ...c, portalEmail: creatorEmail.toLowerCase().trim() } : c
+            );
+
+            const dbPayload: MasterDB = {
+                ...db!,
+                lastUpdated: new Date().toISOString(),
+                creators: updatedCreators,
+                creatorAccounts: updatedAccounts,
+                version: Date.now(),
+            };
+
+            await uploadJSONToGoogleCloud(
+                dbPayload, appSettings.googleCloudBucket!, appSettings.googleCloudToken!, 'ooedn_master_db.json', appSettings.googleProjectId
+            );
+
+            // Email credentials via Gmail
+            const portalUrl = window.location.origin + '/creator';
+            const emailBody = `Hey ${creator.name}! 🎉\n\nYou've been invited to the OOEDN Creator Portal!\n\nHere are your login credentials:\n\n📧 Email: ${creatorEmail}\n🔑 Password: ${password}\n\n🔗 Portal Link: ${portalUrl}\n\nLog in to view your campaigns, upload content, request payments, and chat with the team.\n\nWelcome aboard! 🚀\n\n— The OOEDN Creative Team`;
+
+            try {
+                await sendEmail(
+                    appSettings.googleCloudToken!,
+                    creatorEmail,
+                    '🎉 Welcome to the OOEDN Creator Portal!',
+                    emailBody
+                );
+                newAccount.inviteEmailSent = true;
+                // Re-save with email sent flag
+                const finalAccounts = updatedAccounts.map(a => a.id === newAccount.id ? newAccount : a);
+                await uploadJSONToGoogleCloud(
+                    { ...dbPayload, creatorAccounts: finalAccounts },
+                    appSettings.googleCloudBucket!, appSettings.googleCloudToken!, 'ooedn_master_db.json', appSettings.googleProjectId
+                );
+            } catch (emailErr: any) {
+                console.warn('[Invite] Email send failed, but account was created:', emailErr);
+                setInviteError(`Account created but email failed to send: ${emailErr.message}. Share credentials manually: ${creatorEmail} / ${password}`);
+            }
+
+            // Update local form data
+            handleChange('portalEmail', creatorEmail.toLowerCase().trim());
+            setInviteSent(true);
+            setTimeout(() => setInviteSent(false), 5000);
+
+        } catch (e: any) {
+            setInviteError(`Invite failed: ${e.message}`);
+        } finally {
+            setIsInviting(false);
+        }
     };
 
     const ratings: CreatorRating[] = ['A+', 'A', 'B', 'C', 'D', 'F'];
@@ -403,12 +503,66 @@ const CreatorEditModal: React.FC<CreatorEditModalProps> = ({
                     )}
                 </div>
 
-                <div className="p-8 border-t border-neutral-800 bg-neutral-900/80 backdrop-blur flex justify-between items-center">
-                    <button onClick={() => { if (confirm('Blackburn this creator?')) onSave(creator.id, { status: CreatorStatus.Blackburn }); onClose(); }} className="flex items-center gap-2 px-6 py-4 rounded-xl bg-red-900/20 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">Move to Blackburn Archive</button>
-                    <button onClick={handleRequestPayment} className="flex items-center gap-2 px-6 py-4 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-black transition-all active:scale-95 shadow-lg shadow-amber-500/5">
-                        <DollarSign size={16} /> Request Payment
-                    </button>
-                    <button onClick={handleSave} className="flex items-center gap-2 px-12 py-4 rounded-xl bg-white text-black text-xs font-black uppercase tracking-widest hover:bg-neutral-200 transition-all shadow-2xl active:scale-95">Save Profile Metadata</button>
+                <div className="p-6 border-t border-neutral-800 bg-neutral-900/80 backdrop-blur space-y-3">
+                    {/* Invite to Portal Section */}
+                    {showInviteSection && (
+                        <div className="bg-purple-500/5 border border-purple-500/20 rounded-2xl p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <UserPlus size={14} className="text-purple-400" />
+                                    <span className="text-xs text-purple-400 font-black uppercase tracking-widest">Invite to Creator Portal</span>
+                                </div>
+                                <button onClick={() => setShowInviteSection(false)} className="text-neutral-500 hover:text-white" title="Close invite panel">
+                                    <X size={14} />
+                                </button>
+                            </div>
+                            <p className="text-[10px] text-neutral-400">This will create a login for the creator and email them their credentials. They can then sign in at <span className="text-purple-400 font-bold">/creator</span> to view campaigns, upload content, and chat with the team.</p>
+                            <div className="flex gap-2">
+                                <input
+                                    type="email"
+                                    value={inviteEmail}
+                                    onChange={e => setInviteEmail(e.target.value)}
+                                    placeholder="creator@email.com"
+                                    className="flex-1 bg-black border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-purple-500 outline-none"
+                                />
+                                <button
+                                    onClick={handleInviteToPortal}
+                                    disabled={isInviting || inviteSent || !inviteEmail.trim()}
+                                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] font-black uppercase tracking-widest hover:from-purple-400 hover:to-pink-400 transition-all active:scale-95 disabled:opacity-50 shadow-lg shadow-purple-500/20"
+                                >
+                                    {isInviting ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                                    {inviteSent ? '✓ Sent!' : 'Send Invite'}
+                                </button>
+                            </div>
+                            {inviteSent && (
+                                <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-emerald-400">
+                                    <CheckCircle size={14} />
+                                    <span className="text-[10px] font-black uppercase">✅ Invitation sent to {inviteEmail}! Credentials emailed.</span>
+                                </div>
+                            )}
+                            {inviteError && (
+                                <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-red-400">
+                                    <X size={14} />
+                                    <span className="text-[10px] font-black uppercase">{inviteError}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="flex justify-between items-center">
+                        <button onClick={() => { if (confirm('Blackburn this creator?')) onSave(creator.id, { status: CreatorStatus.Blackburn }); onClose(); }} className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-900/20 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">Blackburn</button>
+                        <button
+                            onClick={() => setShowInviteSection(!showInviteSection)}
+                            className={`flex items-center gap-2 px-5 py-3 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${showInviteSection ? 'bg-purple-500 text-white border-purple-500' : 'bg-purple-500/10 text-purple-400 border-purple-500/30 hover:bg-purple-500 hover:text-black'}`}
+                        >
+                            <UserPlus size={14} />
+                            Invite to Portal
+                        </button>
+                        <button onClick={handleRequestPayment} className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-black transition-all active:scale-95">
+                            <DollarSign size={14} /> Payment
+                        </button>
+                        <button onClick={handleSave} className="flex items-center gap-2 px-8 py-3 rounded-xl bg-white text-black text-xs font-black uppercase tracking-widest hover:bg-neutral-200 transition-all shadow-2xl active:scale-95">Save</button>
+                    </div>
                 </div>
 
             </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     LayoutDashboard, Users, Flame, Settings, Plus, Search, Menu, X, CreditCard, CalendarDays, Loader2, Briefcase, RefreshCw, Sparkles, Link, Database, Truck, Package, Library, Inbox, FolderLock, MapPin, Layers, Cloud, LogOut, AlertTriangle, ShieldCheck, Globe, Info, Terminal, UserPlus, CloudCog, Archive, Copy, KeyRound, ExternalLink, ArrowRight, Wrench, Trash2, Sun, Moon, Mail, Crown
 } from 'lucide-react';
-import { Creator, CreatorStatus, PaymentStatus, Platform, ContentItem, AppSettings, ShipmentStatus, Campaign, ContentStatus, PaymentOption, Shipment, TeamMessage, TeamTask } from './types';
+import { Creator, CreatorStatus, PaymentStatus, Platform, ContentItem, AppSettings, ShipmentStatus, Campaign, ContentStatus, PaymentOption, Shipment, TeamMessage, TeamTask, BetaTest, BetaRelease } from './types';
 import { syncTrackingWithAI } from './services/geminiService';
 import { syncStateToCloud, loadRemoteState, MasterDB, onSyncStatusChange, SyncStatus, getSyncStatus } from './services/cloudSync';
 import CreatorCard from './components/CreatorCard';
@@ -14,6 +14,7 @@ import ContentLibrary from './components/ContentLibrary';
 import MagicPaste from './components/MagicPaste';
 import BulkAdd from './components/BulkAdd';
 import CampaignBoard from './components/CampaignBoard';
+import BetaTestManager from './components/BetaTestManager';
 import PaymentHub from './components/PaymentHub';
 import TeamManager from './components/TeamManager';
 import TeamChatWidget from './components/TeamChatWidget';
@@ -93,6 +94,8 @@ function App() {
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [teamMessages, setTeamMessages] = useState<TeamMessage[]>([]);
     const [teamTasks, setTeamTasks] = useState<TeamTask[]>([]);
+    const [betaTests, setBetaTests] = useState<BetaTest[]>([]);
+    const [betaReleases, setBetaReleases] = useState<BetaRelease[]>([]);
     const [view, setView] = useState<'dashboard' | 'active' | 'inactive' | 'blackburn' | 'payments' | 'calendar' | 'campaigns' | 'asset-pool' | 'team-assets' | 'master-library' | 'team' | 'inbox' | 'partners'>('dashboard');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -366,6 +369,8 @@ function App() {
                     if (data.contentItems) setContentItems(data.contentItems);
                     if (data.teamMessages) setTeamMessages(data.teamMessages);
                     if (data.teamTasks) setTeamTasks(data.teamTasks);
+                    if (data.betaTests) setBetaTests(data.betaTests);
+                    if (data.betaReleases) setBetaReleases(data.betaReleases);
                     if (data.brandInfo) setSettings(s => ({ ...s, brandInfo: data.brandInfo }));
                     setLastSyncedTime(new Date().toLocaleTimeString());
                 }
@@ -391,11 +396,11 @@ function App() {
             }
             console.log(`[AutoSave] Saving: ${creators.length} creators, ${contentItems.length} content, ${campaigns.length} campaigns`);
             // Guard 3+4: cloudSync.ts has isSuspiciouslyEmpty check + save queue
-            syncStateToCloud(settings, creators, campaigns, contentItems, settings.brandInfo, teamMessages, teamTasks);
+            syncStateToCloud(settings, creators, campaigns, contentItems, settings.brandInfo, teamMessages, teamTasks, undefined, betaTests, betaReleases);
             setLastSyncedTime(new Date().toLocaleTimeString());
         }, 3000); // 3s debounce (was 5s — faster persistence)
         return () => clearTimeout(timer);
-    }, [creators, campaigns, contentItems, settings, isConnected, teamMessages, teamTasks]);
+    }, [creators, campaigns, contentItems, settings, isConnected, teamMessages, teamTasks, betaTests, betaReleases]);
 
     // Sync status listener
     useEffect(() => {
@@ -924,23 +929,43 @@ function App() {
 
                     {/* CAMPAIGNS */}
                     {view === 'campaigns' && (
-                        <CampaignBoard
-                            campaigns={campaigns}
-                            creators={creators}
-                            content={contentItems}
-                            onSaveCampaign={handleSaveCampaign}
-                            onDeleteCampaign={handleDeleteCampaign}
-                            onContentUpload={handleContentUpload}
-                            onContentUpdate={handleContentUpdate}
-                            onContentDelete={handleContentDelete}
-                            appSettings={settings}
-                            onEmailBrief={(to, subject, body) => {
-                                // Navigate to inbox compose with brief pre-filled
-                                setView('inbox');
-                                // Store in sessionStorage so CreatorInbox can pick it up
-                                sessionStorage.setItem('compose_prefill', JSON.stringify({ to, subject, body }));
-                            }}
-                        />
+                        <>
+                            <BetaTestManager
+                                betaTests={betaTests}
+                                betaReleases={betaReleases}
+                                creators={creators}
+                                onSaveBetaTest={(test) => {
+                                    setBetaTests(prev => {
+                                        const idx = prev.findIndex(t => t.id === test.id);
+                                        return idx >= 0 ? prev.map(t => t.id === test.id ? test : t) : [...prev, test];
+                                    });
+                                }}
+                                onDeleteBetaTest={(id) => setBetaTests(prev => prev.filter(t => t.id !== id))}
+                                onUpdateRelease={(release) => {
+                                    setBetaReleases(prev => {
+                                        const idx = prev.findIndex(r => r.id === release.id);
+                                        return idx >= 0 ? prev.map(r => r.id === release.id ? release : r) : [...prev, release];
+                                    });
+                                }}
+                            />
+                            <CampaignBoard
+                                campaigns={campaigns}
+                                creators={creators}
+                                content={contentItems}
+                                onSaveCampaign={handleSaveCampaign}
+                                onDeleteCampaign={handleDeleteCampaign}
+                                onContentUpload={handleContentUpload}
+                                onContentUpdate={handleContentUpdate}
+                                onContentDelete={handleContentDelete}
+                                appSettings={settings}
+                                onEmailBrief={(to, subject, body) => {
+                                    // Navigate to inbox compose with brief pre-filled
+                                    setView('inbox');
+                                    // Store in sessionStorage so CreatorInbox can pick it up
+                                    sessionStorage.setItem('compose_prefill', JSON.stringify({ to, subject, body }));
+                                }}
+                            />
+                        </>
                     )}
 
                     {/* CALENDAR */}

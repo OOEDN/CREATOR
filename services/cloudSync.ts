@@ -1,5 +1,5 @@
 
-import { Creator, Campaign, ContentItem, AppSettings, TeamMessage, TeamTask } from "../types";
+import { Creator, Campaign, ContentItem, AppSettings, TeamMessage, TeamTask, CreatorAccount, BetaTest, BetaRelease } from "../types";
 import { uploadJSONToGoogleCloud, fetchJSONFromGoogleCloud } from "./googleCloudStorage";
 
 const MASTER_DB_FILENAME = 'ooedn_master_db.json';
@@ -13,10 +13,14 @@ export interface MasterDB {
     contentItems: ContentItem[];
     teamMessages?: TeamMessage[];
     teamTasks?: TeamTask[];
+    creatorAccounts?: CreatorAccount[];
+    betaTests?: BetaTest[];
+    betaReleases?: BetaRelease[];
     brandInfo?: string;
     lastBackupDate?: string;
     version?: number;
 }
+
 
 // ===================================================================
 // SYNC STATUS — Observable by the UI
@@ -218,7 +222,10 @@ export const syncStateToCloud = async (
     brandInfo?: string,
     teamMessages?: TeamMessage[],
     teamTasks?: TeamTask[],
-    lastBackupDate?: string
+    lastBackupDate?: string,
+    betaTests?: BetaTest[],
+    betaReleases?: BetaRelease[],
+    creatorAccounts?: CreatorAccount[]
 ) => {
     if (!settings.useCloudStorage || !settings.googleCloudBucket || !settings.googleCloudToken) {
         return;
@@ -238,6 +245,26 @@ export const syncStateToCloud = async (
     // Update known counts 
     updateKnownCounts(creators.length, content.length, campaigns.length);
 
+    // ── PRESERVE CREATOR ACCOUNTS: If not provided, read from existing cloud DB ──
+    let accountsToSave = creatorAccounts;
+    if (!accountsToSave) {
+        try {
+            const existing = await fetchJSONFromGoogleCloud(
+                settings.googleCloudBucket,
+                settings.googleCloudToken,
+                MASTER_DB_FILENAME,
+                settings.googleProjectId
+            ) as MasterDB | null;
+            accountsToSave = existing?.creatorAccounts || [];
+            if (accountsToSave.length > 0) {
+                console.log(`[CloudSync] Preserving ${accountsToSave.length} creator accounts from existing DB`);
+            }
+        } catch (e) {
+            console.warn('[CloudSync] Could not read existing accounts, saving without them');
+            accountsToSave = [];
+        }
+    }
+
     const cleanContent = content.map(c => ({
         ...c,
         fileBlob: undefined,
@@ -252,6 +279,9 @@ export const syncStateToCloud = async (
         brandInfo,
         teamMessages,
         teamTasks,
+        betaTests,
+        betaReleases,
+        creatorAccounts: accountsToSave,
         lastBackupDate,
         version: Date.now()
     };
