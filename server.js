@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import webpush from 'web-push';
 import { google } from 'googleapis';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -373,6 +375,468 @@ app.use('/api/gmail/*', async (req, res) => {
     res.status(500).json({ error: error.message || 'Proxy failed' });
   }
 });
+
+// ===================================================================
+// CREATOR PORTAL AUTH — Phase 1 Server-Side Authentication
+// ===================================================================
+
+const JWT_SECRET = process.env.JWT_SECRET || 'ooedn-creator-portal-secret-' + Date.now();
+const JWT_EXPIRY = '24h';
+const BCRYPT_ROUNDS = 10;
+
+// --- GCS DB Helpers (server-side) ---
+
+async function readMasterDB() {
+  try {
+    const token = await getGCSAuthToken();
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    const url = `https://storage.googleapis.com/storage/v1/b/${MAIN_BUCKET}/o/${encodeURIComponent('ooedn_master_db.json')}?alt=media&t=${Date.now()}`;
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      console.error(`[CreatorAuth] Failed to read DB: ${res.status}`);
+      return null;
+    }
+    return await res.json();
+  } catch (e) {
+    console.error('[CreatorAuth] readMasterDB error:', e.message);
+    return null;
+  }
+}
+
+async function writeMasterDB(db) {
+  try {
+    const token = await getGCSAuthToken();
+    if (!token) { console.error('[CreatorAuth] No GCS token for writing'); return false; }
+    const url = `https://storage.googleapis.com/upload/storage/v1/b/${MAIN_BUCKET}/o?uploadType=media&name=${encodeURIComponent('ooedn_master_db.json')}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(db)
+    });
+    if (!res.ok) {
+      console.error(`[CreatorAuth] Failed to write DB: ${res.status}`);
+      return false;
+    }
+    console.log('[CreatorAuth] DB written successfully');
+    return true;
+  } catch (e) {
+    console.error('[CreatorAuth] writeMasterDB error:', e.message);
+    return false;
+  }
+}
+
+// --- JWT Auth Middleware ---
+
+function creatorAuthMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.creatorAccountId = decoded.accountId;
+    req.creatorEmail = decoded.email;
+    next();
+  } catch (e) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+// --- Helper: Scope data for a single creator ---
+
+function scopeDataForCreator(db, creatorRecord) {
+  if (!creatorRecord) return { creator: null, campaigns: [], contentItems: [], teamMessages: db.teamMessages || [], betaTests: db.betaTests || [], betaReleases: [] };
+
+  const myCampaigns = (db.campaigns || []).filter(c =>
+    c.assignedCreatorIds?.includes(creatorRecord.id)
+  );
+
+  const myContent = (db.contentItems || []).filter(c =>
+    c.creatorId === creatorRecord.id
+  );
+
+  const myBetaReleases = (db.betaReleases || []).filter(r =>
+    r.creatorId === creatorRecord.id
+  );
+
+  return {
+    creator: creatorRecord,
+    campaigns: myCampaigns,
+    contentItems: myContent,
+    teamMessages: db.teamMessages || [],
+    teamTasks: db.teamTasks || [],
+    betaTests: db.betaTests || [],
+    betaReleases: myBetaReleases,
+  };
+}
+
+// --- POST /api/creator/login ---
+
+app.post('/api/creator/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+
+    const db = await readMasterDB();
+    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
+
+    const accounts = db.creatorAccounts || [];
+    const inputEmail = email.toLowerCase().trim();
+    const inputPassword = password.trim();
+    const account = accounts.find(a => a.email.toLowerCase() === inputEmail);
+
+    if (!account) {
+      console.log(`[CreatorAuth] Login failed — no account for: ${inputEmail}`);
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Support both bcrypt hashed and legacy plain-text passwords
+    let passwordValid = false;
+    if (account.password.startsWith('$2a$') || account.password.startsWith('$2b$')) {
+      // Bcrypt hash — verify properly
+      passwordValid = await bcrypt.compare(inputPassword, account.password);
+    } else {
+      // Legacy plain-text — direct comparison
+      passwordValid = account.password === inputPassword;
+      // Auto-upgrade: hash the plain-text password on successful login
+      if (passwordValid) {
+        console.log(`[CreatorAuth] Auto-upgrading plain-text password for: ${inputEmail}`);
+        account.password = await bcrypt.hash(inputPassword, BCRYPT_ROUNDS);
+        db.creatorAccounts = accounts.map(a => a.id === account.id ? account : a);
+        db.lastUpdated = new Date().toISOString();
+        db.version = Date.now();
+        writeMasterDB(db).catch(e => console.warn('[CreatorAuth] Auto-upgrade write failed:', e));
+      }
+    }
+
+    if (!passwordValid) {
+      console.log(`[CreatorAuth] Login failed — wrong password for: ${inputEmail}`);
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Find the creator record
+    const creatorRecord = (db.creators || []).find(c =>
+      c.id === account.linkedCreatorId ||
+      c.email?.toLowerCase() === account.email.toLowerCase() ||
+      c.portalEmail?.toLowerCase() === account.email.toLowerCase()
+    );
+
+    // Sign JWT
+    const token = jwt.sign(
+      { accountId: account.id, email: account.email, creatorId: creatorRecord?.id },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRY }
+    );
+
+    console.log(`[CreatorAuth] ✅ Login success: ${inputEmail}`);
+
+    // Return scoped data — NEVER send other creators' info
+    const scopedData = scopeDataForCreator(db, creatorRecord);
+
+    res.json({
+      token,
+      account: { id: account.id, email: account.email, displayName: account.displayName, onboardingComplete: account.onboardingComplete, betaLabIntroSeen: account.betaLabIntroSeen, linkedCreatorId: account.linkedCreatorId },
+      ...scopedData
+    });
+  } catch (e) {
+    console.error('[CreatorAuth] Login error:', e);
+    res.status(500).json({ error: 'Server error during login' });
+  }
+});
+
+// --- POST /api/creator/signup ---
+
+app.post('/api/creator/signup', async (req, res) => {
+  try {
+    const { email, password, name } = req.body;
+    if (!email || !password || !name) return res.status(400).json({ error: 'Email, password, and name required' });
+    if (password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
+
+    const db = await readMasterDB();
+    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
+
+    const accounts = db.creatorAccounts || [];
+    const inputEmail = email.toLowerCase().trim();
+
+    if (accounts.find(a => a.email.toLowerCase() === inputEmail)) {
+      return res.status(409).json({ error: 'An account with this email already exists' });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password.trim(), BCRYPT_ROUNDS);
+
+    // Create account
+    const newAccount = {
+      id: crypto.randomUUID(),
+      email: inputEmail,
+      password: hashedPassword,
+      displayName: name.trim(),
+      createdAt: new Date().toISOString(),
+    };
+
+    // Create creator record
+    const newCreator = {
+      id: crypto.randomUUID(),
+      name: name.trim(),
+      handle: '@' + inputEmail.split('@')[0],
+      platform: 'Instagram',
+      profileImage: '',
+      notes: 'Self-registered via Creator Portal',
+      status: 'Active',
+      paymentStatus: 'Unpaid',
+      paymentOptions: [],
+      rate: 0,
+      email: inputEmail,
+      dateAdded: new Date().toISOString(),
+      rating: null,
+      flagged: false,
+      shipmentStatus: 'None',
+      role: 'creator',
+      portalEmail: inputEmail,
+      notificationsEnabled: false,
+      totalEarned: 0,
+      lastActiveDate: new Date().toISOString(),
+    };
+
+    newAccount.linkedCreatorId = newCreator.id;
+
+    db.creatorAccounts = [...accounts, newAccount];
+    db.creators = [...(db.creators || []), newCreator];
+    db.lastUpdated = new Date().toISOString();
+    db.version = Date.now();
+
+    const saved = await writeMasterDB(db);
+    if (!saved) return res.status(500).json({ error: 'Failed to save account' });
+
+    // Sign JWT
+    const token = jwt.sign(
+      { accountId: newAccount.id, email: newAccount.email, creatorId: newCreator.id },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRY }
+    );
+
+    console.log(`[CreatorAuth] ✅ Signup success: ${inputEmail}`);
+
+    const scopedData = scopeDataForCreator(db, newCreator);
+
+    res.status(201).json({
+      token,
+      account: { id: newAccount.id, email: newAccount.email, displayName: newAccount.displayName, onboardingComplete: false, linkedCreatorId: newCreator.id },
+      ...scopedData
+    });
+  } catch (e) {
+    console.error('[CreatorAuth] Signup error:', e);
+    res.status(500).json({ error: 'Server error during signup' });
+  }
+});
+
+// --- GET /api/creator/me --- (JWT protected)
+
+app.get('/api/creator/me', creatorAuthMiddleware, async (req, res) => {
+  try {
+    const db = await readMasterDB();
+    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
+
+    const accounts = db.creatorAccounts || [];
+    const account = accounts.find(a => a.id === req.creatorAccountId);
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+
+    const creatorRecord = (db.creators || []).find(c =>
+      c.id === account.linkedCreatorId ||
+      c.email?.toLowerCase() === account.email.toLowerCase() ||
+      c.portalEmail?.toLowerCase() === account.email.toLowerCase()
+    );
+
+    const scopedData = scopeDataForCreator(db, creatorRecord);
+
+    res.json({
+      account: { id: account.id, email: account.email, displayName: account.displayName, onboardingComplete: account.onboardingComplete, betaLabIntroSeen: account.betaLabIntroSeen, linkedCreatorId: account.linkedCreatorId },
+      ...scopedData
+    });
+  } catch (e) {
+    console.error('[CreatorAuth] /me error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// --- POST /api/creator/invite --- (used by admin to invite creators)
+
+app.post('/api/creator/invite', async (req, res) => {
+  try {
+    const { email, name, creatorId, plainPassword } = req.body;
+    if (!email || !name || !plainPassword) return res.status(400).json({ error: 'Email, name, and password required' });
+
+    const db = await readMasterDB();
+    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
+
+    const accounts = db.creatorAccounts || [];
+    const inputEmail = email.toLowerCase().trim();
+
+    if (accounts.find(a => a.email.toLowerCase() === inputEmail)) {
+      return res.status(409).json({ error: 'Account already exists for this email' });
+    }
+
+    // Hash password before storing
+    const hashedPassword = await bcrypt.hash(plainPassword, BCRYPT_ROUNDS);
+
+    const newAccount = {
+      id: crypto.randomUUID(),
+      email: inputEmail,
+      password: hashedPassword,
+      displayName: name,
+      createdAt: new Date().toISOString(),
+      linkedCreatorId: creatorId || undefined,
+      invitedByTeam: true,
+      inviteEmailSent: false,
+    };
+
+    db.creatorAccounts = [...accounts, newAccount];
+
+    // Also set portalEmail on the creator record if creatorId provided
+    if (creatorId) {
+      db.creators = (db.creators || []).map(c =>
+        c.id === creatorId ? { ...c, portalEmail: inputEmail } : c
+      );
+    }
+
+    db.lastUpdated = new Date().toISOString();
+    db.version = Date.now();
+
+    const saved = await writeMasterDB(db);
+    if (!saved) return res.status(500).json({ error: 'Failed to save account' });
+
+    console.log(`[CreatorAuth] ✅ Invite created for: ${inputEmail} (hashed)`);
+
+    res.status(201).json({ success: true, accountId: newAccount.id });
+  } catch (e) {
+    console.error('[CreatorAuth] Invite error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// --- POST /api/creator/migrate-passwords --- (one-time admin utility)
+
+app.post('/api/creator/migrate-passwords', async (req, res) => {
+  try {
+    const { adminKey } = req.body;
+    if (adminKey !== 'ooedn-migrate-2026') return res.status(403).json({ error: 'Unauthorized' });
+
+    const db = await readMasterDB();
+    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
+
+    const accounts = db.creatorAccounts || [];
+    let migrated = 0;
+
+    for (const account of accounts) {
+      if (!account.password.startsWith('$2a$') && !account.password.startsWith('$2b$')) {
+        account.password = await bcrypt.hash(account.password, BCRYPT_ROUNDS);
+        migrated++;
+      }
+    }
+
+    if (migrated > 0) {
+      db.creatorAccounts = accounts;
+      db.lastUpdated = new Date().toISOString();
+      db.version = Date.now();
+      await writeMasterDB(db);
+    }
+
+    console.log(`[CreatorAuth] Migrated ${migrated}/${accounts.length} passwords to bcrypt`);
+    res.json({ success: true, migrated, total: accounts.length });
+  } catch (e) {
+    console.error('[CreatorAuth] Migration error:', e);
+    res.status(500).json({ error: 'Migration failed' });
+  }
+});
+
+// --- POST /api/creator/save --- (JWT protected, creator writes their own changes)
+
+app.post('/api/creator/save', creatorAuthMiddleware, async (req, res) => {
+  try {
+    const { updates } = req.body; // { creator?, content?, messages?, campaigns?, betaReleases?, account? }
+    if (!updates) return res.status(400).json({ error: 'No updates provided' });
+
+    const db = await readMasterDB();
+    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
+
+    const accounts = db.creatorAccounts || [];
+    const account = accounts.find(a => a.id === req.creatorAccountId);
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+
+    // Only allow updating the creator's OWN data
+    if (updates.creator && account.linkedCreatorId) {
+      db.creators = (db.creators || []).map(c =>
+        c.id === account.linkedCreatorId ? { ...c, ...updates.creator } : c
+      );
+    }
+
+    // Content: only add/update items owned by this creator
+    if (updates.contentItems) {
+      const existingIds = new Set((db.contentItems || []).map(c => c.id));
+      for (const item of updates.contentItems) {
+        if (item.creatorId !== account.linkedCreatorId) continue; // Safety: only own content
+        if (existingIds.has(item.id)) {
+          db.contentItems = db.contentItems.map(c => c.id === item.id ? { ...c, ...item } : c);
+        } else {
+          db.contentItems = [...(db.contentItems || []), item];
+        }
+      }
+    }
+
+    // Messages: append new messages from this creator
+    if (updates.teamMessages) {
+      const existingMsgIds = new Set((db.teamMessages || []).map(m => m.id));
+      const newMessages = updates.teamMessages.filter(m => !existingMsgIds.has(m.id));
+      db.teamMessages = [...(db.teamMessages || []), ...newMessages];
+    }
+
+    // Beta releases: update only this creator's entries
+    if (updates.betaReleases) {
+      for (const release of updates.betaReleases) {
+        if (release.creatorId !== account.linkedCreatorId) continue;
+        const existing = (db.betaReleases || []).find(r => r.id === release.id);
+        if (existing) {
+          db.betaReleases = db.betaReleases.map(r => r.id === release.id ? { ...r, ...release } : r);
+        } else {
+          db.betaReleases = [...(db.betaReleases || []), release];
+        }
+      }
+    }
+
+    // Campaigns: only allow updating acceptedByCreatorIds (accepting a campaign)
+    if (updates.campaigns) {
+      for (const campaign of updates.campaigns) {
+        db.campaigns = (db.campaigns || []).map(c =>
+          c.id === campaign.id ? { ...c, acceptedByCreatorIds: campaign.acceptedByCreatorIds } : c
+        );
+      }
+    }
+
+    // Account updates (onboarding, betaLabIntro)
+    if (updates.account) {
+      db.creatorAccounts = (db.creatorAccounts || []).map(a =>
+        a.id === req.creatorAccountId ? { ...a, ...updates.account, password: a.password } : a
+      );
+    }
+
+    db.lastUpdated = new Date().toISOString();
+    db.version = Date.now();
+
+    const saved = await writeMasterDB(db);
+    if (!saved) return res.status(500).json({ error: 'Failed to save' });
+
+    res.json({ success: true });
+  } catch (e) {
+    console.error('[CreatorAuth] Save error:', e);
+    res.status(500).json({ error: 'Server error during save' });
+  }
+});
+
+console.log('[CreatorAuth] Creator Portal auth endpoints registered');
 
 // --- Static File Serving ---
 app.set('etag', false);

@@ -9,8 +9,6 @@ import {
     ShipmentStatus, Campaign, ContentStatus, TeamMessage, TeamTask, Shipment,
     CreatorAccount, ContentNote, BetaTest, BetaRelease
 } from './types';
-import { syncStateToCloud, loadRemoteState, MasterDB, onSyncStatusChange, SyncStatus } from './services/cloudSync';
-import { uploadJSONToGoogleCloud, fetchJSONFromGoogleCloud } from './services/googleCloudStorage';
 import CreatorDashboard from './components/creator/CreatorDashboard';
 import CreatorChat from './components/creator/CreatorChat';
 import CreatorUpload from './components/creator/CreatorUpload';
@@ -71,6 +69,11 @@ function CreatorApp() {
     const [betaReleases, setBetaReleases] = useState<BetaRelease[]>([]);
     const [showOnboarding, setShowOnboarding] = useState(false);
 
+    // JWT Token
+    const [jwtToken, setJwtToken] = useState<string | null>(() => {
+        try { return localStorage.getItem('ooedn_creator_jwt'); } catch { return null; }
+    });
+
     // Notifications
     const [notifications, setNotifications] = useState<CreatorNotification[]>([]);
     const [showNotifPanel, setShowNotifPanel] = useState(false);
@@ -96,24 +99,20 @@ function CreatorApp() {
         return GCS_SETTINGS;
     });
 
-    // --- Load master DB ---
-    const loadMasterDB = async (): Promise<MasterDB | null> => {
-        try {
-            const teamToken = localStorage.getItem('ooedn_settings');
-            let token = '';
-            if (teamToken) {
-                try { const parsed = JSON.parse(teamToken); token = parsed.googleCloudToken || ''; } catch { }
-            }
-            if (!token) token = localStorage.getItem('ooedn_creator_gcs_token') || '';
-            if (!token) return null;
-            const settingsWithToken = { ...settings, googleCloudToken: token };
-            return await loadRemoteState(settingsWithToken);
-        } catch (e) {
-            console.error('[CreatorApp] Failed to load DB:', e);
-            return null;
-        }
+    // --- Helper: apply server response data to state ---
+    const applyServerData = (data: any, account: any) => {
+        setCurrentAccount(account as CreatorAccount);
+        setCreatorRecord(data.creator || null);
+        setCreators(data.creator ? [data.creator] : []);
+        setCampaigns(data.campaigns || []);
+        setContentItems(data.contentItems || []);
+        setTeamMessages(data.teamMessages || []);
+        setTeamTasks(data.teamTasks || []);
+        setBetaTests(data.betaTests || []);
+        setBetaReleases(data.betaReleases || []);
     };
 
+    // --- Save via server API (JWT protected) ---
     const saveMasterDB = async (
         updatedCreators?: Creator[],
         updatedCampaigns?: Campaign[],
@@ -124,149 +123,121 @@ function CreatorApp() {
         updatedBetaTests?: BetaTest[],
         updatedBetaReleases?: BetaRelease[]
     ) => {
+        const token = jwtToken || localStorage.getItem('ooedn_creator_jwt');
+        if (!token) return;
         try {
-            let token = '';
-            const teamSettings = localStorage.getItem('ooedn_settings');
-            if (teamSettings) { try { token = JSON.parse(teamSettings).googleCloudToken || ''; } catch { } }
-            if (!token) token = localStorage.getItem('ooedn_creator_gcs_token') || '';
-            if (!token) return;
+            const updates: any = {};
+            if (updatedCreators && creatorRecord) {
+                const myUpdated = updatedCreators.find(c => c.id === creatorRecord.id);
+                if (myUpdated) updates.creator = myUpdated;
+            }
+            if (updatedContent) updates.contentItems = updatedContent;
+            if (updatedMessages) updates.teamMessages = updatedMessages;
+            if (updatedBetaReleases) updates.betaReleases = updatedBetaReleases;
+            if (updatedCampaigns) updates.campaigns = updatedCampaigns;
+            if (updatedAccounts && currentAccount) {
+                const myAccount = updatedAccounts.find(a => a.id === currentAccount.id);
+                if (myAccount) updates.account = { onboardingComplete: myAccount.onboardingComplete, betaLabIntroSeen: myAccount.betaLabIntroSeen };
+            }
 
-            const dbPayload: MasterDB = {
-                lastUpdated: new Date().toISOString(),
-                creators: updatedCreators || creators,
-                campaigns: updatedCampaigns || campaigns,
-                contentItems: (updatedContent || contentItems).map(c => ({ ...c, fileBlob: undefined, fileUrl: c.storageType === 'cloud' ? c.fileUrl : '' })),
-                teamMessages: updatedMessages || teamMessages,
-                teamTasks: updatedTasks || teamTasks,
-                creatorAccounts: updatedAccounts || creatorAccounts,
-                betaTests: updatedBetaTests || betaTests,
-                betaReleases: updatedBetaReleases || betaReleases,
-                brandInfo: settings.brandInfo,
-                version: Date.now(),
-            };
-
-            await uploadJSONToGoogleCloud(
-                dbPayload, settings.googleCloudBucket!, token, 'ooedn_master_db.json', settings.googleProjectId
-            );
+            await fetch('/api/creator/save', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ updates })
+            });
         } catch (e) { console.error('[CreatorApp] Save failed:', e); }
     };
 
-    // --- AUTH: Sign Up ---
+    // --- AUTH: Sign Up (server-side) ---
     const handleSignUp = async () => {
         if (!formEmail || !formPassword || !formName) { setLoginError('Please fill in all fields.'); return; }
         if (formPassword.length < 4) { setLoginError('Password must be at least 4 characters.'); return; }
         setIsLoading(true); setLoginError(null);
         try {
-            const db = await loadMasterDB();
-            const existingAccounts = db?.creatorAccounts || [];
-            if (existingAccounts.find(a => a.email.toLowerCase() === formEmail.toLowerCase())) {
-                setLoginError('An account with this email already exists. Try signing in.');
-                setIsLoading(false); return;
-            }
-            const newAccount: CreatorAccount = {
-                id: crypto.randomUUID(), email: formEmail.toLowerCase().trim(), password: formPassword,
-                displayName: formName.trim(), createdAt: new Date().toISOString(),
-            };
-            const newCreator: Creator = {
-                id: crypto.randomUUID(), name: formName.trim(), handle: '@' + formEmail.split('@')[0],
-                platform: Platform.Instagram, profileImage: '', notes: 'Self-registered via Creator Portal',
-                status: CreatorStatus.Active, paymentStatus: PaymentStatus.Unpaid, paymentOptions: [],
-                rate: 0, email: formEmail.toLowerCase().trim(), dateAdded: new Date().toISOString(),
-                rating: null, flagged: false, shipmentStatus: ShipmentStatus.None,
-                role: 'creator', portalEmail: formEmail.toLowerCase().trim(),
-                notificationsEnabled: false, totalEarned: 0, lastActiveDate: new Date().toISOString(),
-            };
-            newAccount.linkedCreatorId = newCreator.id;
-            const updatedAccounts = [...existingAccounts, newAccount];
-            const updatedCreators = [...(db?.creators || []), newCreator];
-            await saveMasterDB(updatedCreators, db?.campaigns || [], db?.contentItems || [], db?.teamMessages || [], db?.teamTasks || [], updatedAccounts);
-            setCurrentAccount(newAccount); setCreatorRecord(newCreator); setCreators(updatedCreators);
-            setCampaigns(db?.campaigns || []); setContentItems(db?.contentItems || []);
-            setTeamMessages(db?.teamMessages || []); setTeamTasks(db?.teamTasks || []);
-            setCreatorAccounts(updatedAccounts);
-            setBetaTests(db?.betaTests || []); setBetaReleases(db?.betaReleases || []);
-            localStorage.setItem('ooedn_creator_session', JSON.stringify({ accountId: newAccount.id, email: newAccount.email }));
+            const resp = await fetch('/api/creator/signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: formEmail, password: formPassword, name: formName })
+            });
+            const data = await resp.json();
+            if (!resp.ok) { setLoginError(data.error || 'Signup failed'); setIsLoading(false); return; }
+
+            // Store JWT
+            setJwtToken(data.token);
+            localStorage.setItem('ooedn_creator_jwt', data.token);
+            localStorage.setItem('ooedn_creator_session', JSON.stringify({ accountId: data.account.id, email: data.account.email }));
+
+            applyServerData(data, data.account);
             setIsConnected(true); initialLoadRef.current = true;
-            // New accounts always show onboarding
             setShowOnboarding(true);
         } catch (e: any) { setLoginError(`Sign up failed: ${e.message}`); }
         finally { setIsLoading(false); }
     };
 
-    // --- AUTH: Sign In ---
+    // --- AUTH: Sign In (server-side) ---
     const handleSignIn = async () => {
         if (!formEmail || !formPassword) { setLoginError('Please enter your email and password.'); return; }
         setIsLoading(true); setLoginError(null);
         try {
-            const db = await loadMasterDB();
-            if (!db) {
-                console.error('[CreatorApp] loadMasterDB returned null — no GCS token available');
-                setLoginError('Unable to connect to server. Please try again.');
+            const resp = await fetch('/api/creator/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: formEmail, password: formPassword })
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+                if (resp.status === 503) {
+                    setLoginError('Unable to connect to server. Please try again.');
+                } else {
+                    setLoginError(data.error || 'Invalid email or password.');
+                }
                 setIsLoading(false); return;
             }
-            const accounts = db?.creatorAccounts || [];
-            console.log(`[CreatorApp] Sign-in: Found ${accounts.length} accounts. Looking for: "${formEmail.toLowerCase().trim()}"`);
-            if (accounts.length > 0) {
-                console.log('[CreatorApp] Available emails:', accounts.map(a => a.email));
-            }
-            const inputEmail = formEmail.toLowerCase().trim();
-            const inputPassword = formPassword.trim();
-            const account = accounts.find(a => a.email.toLowerCase() === inputEmail && a.password === inputPassword);
-            if (!account) {
-                // Debug: check if email exists but password is wrong
-                const emailMatch = accounts.find(a => a.email.toLowerCase() === inputEmail);
-                if (emailMatch) {
-                    console.log('[CreatorApp] Email found but password mismatch. Expected:', emailMatch.password, 'Got:', inputPassword);
-                } else {
-                    console.log('[CreatorApp] No account found with email:', inputEmail);
-                }
-                setLoginError('Invalid email or password.'); setIsLoading(false); return;
-            }
-            const myCreator = db?.creators?.find(c => c.id === account.linkedCreatorId) ||
-                db?.creators?.find(c => c.email?.toLowerCase() === account.email.toLowerCase() || c.portalEmail?.toLowerCase() === account.email.toLowerCase());
-            setCurrentAccount(account); setCreatorRecord(myCreator || null); setCreators(db?.creators || []);
-            setCampaigns(db?.campaigns || []); setContentItems(db?.contentItems || []);
-            setTeamMessages(db?.teamMessages || []); setTeamTasks(db?.teamTasks || []);
-            setCreatorAccounts(accounts);
-            setBetaTests(db?.betaTests || []); setBetaReleases(db?.betaReleases || []);
-            localStorage.setItem('ooedn_creator_session', JSON.stringify({ accountId: account.id, email: account.email }));
+
+            // Store JWT
+            setJwtToken(data.token);
+            localStorage.setItem('ooedn_creator_jwt', data.token);
+            localStorage.setItem('ooedn_creator_session', JSON.stringify({ accountId: data.account.id, email: data.account.email }));
+
+            applyServerData(data, data.account);
             setIsConnected(true); initialLoadRef.current = true;
-            // Show onboarding if not completed
-            if (!account.onboardingComplete) setShowOnboarding(true);
+            if (!data.account.onboardingComplete) setShowOnboarding(true);
         } catch (e: any) { setLoginError(`Sign in failed: ${e.message}`); }
         finally { setIsLoading(false); }
     };
 
-    // --- Session restore ---
+    // --- Session restore (JWT-based) ---
     useEffect(() => {
-        const saved = localStorage.getItem('ooedn_creator_session');
-        if (saved && !isConnected) {
-            try {
-                const session = JSON.parse(saved);
-                setIsLoading(true);
-                loadMasterDB().then(db => {
-                    if (db) {
-                        const account = db.creatorAccounts?.find(a => a.id === session.accountId);
-                        if (account) {
-                            const myCreator = db.creators?.find(c => c.id === account.linkedCreatorId) ||
-                                db.creators?.find(c => c.email?.toLowerCase() === account.email.toLowerCase());
-                            setCurrentAccount(account); setCreatorRecord(myCreator || null); setCreators(db.creators || []);
-                            setCampaigns(db.campaigns || []); setContentItems(db.contentItems || []);
-                            setTeamMessages(db.teamMessages || []); setTeamTasks(db.teamTasks || []);
-                            setCreatorAccounts(db.creatorAccounts || []);
-                            setBetaTests(db.betaTests || []); setBetaReleases(db.betaReleases || []);
-                            setIsConnected(true); initialLoadRef.current = true;
-                            if (!account.onboardingComplete) setShowOnboarding(true);
-                        } else { localStorage.removeItem('ooedn_creator_session'); }
-                    }
-                    setIsLoading(false);
-                }).catch(() => { localStorage.removeItem('ooedn_creator_session'); setIsLoading(false); });
-            } catch { localStorage.removeItem('ooedn_creator_session'); }
+        const token = localStorage.getItem('ooedn_creator_jwt');
+        if (token && !isConnected) {
+            setIsLoading(true);
+            fetch('/api/creator/me', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            }).then(async resp => {
+                if (resp.ok) {
+                    const data = await resp.json();
+                    setJwtToken(token);
+                    applyServerData(data, data.account);
+                    setIsConnected(true); initialLoadRef.current = true;
+                    if (!data.account.onboardingComplete) setShowOnboarding(true);
+                } else {
+                    // Token expired or invalid — clear session
+                    localStorage.removeItem('ooedn_creator_jwt');
+                    localStorage.removeItem('ooedn_creator_session');
+                }
+                setIsLoading(false);
+            }).catch(() => {
+                localStorage.removeItem('ooedn_creator_jwt');
+                localStorage.removeItem('ooedn_creator_session');
+                setIsLoading(false);
+            });
         }
     }, []);
 
     const handleLogout = () => {
         localStorage.removeItem('ooedn_creator_session');
+        localStorage.removeItem('ooedn_creator_jwt');
+        setJwtToken(null);
         setIsConnected(false); setCurrentAccount(null); setCreatorRecord(null);
         setFormEmail(''); setFormPassword(''); setFormName('');
     };

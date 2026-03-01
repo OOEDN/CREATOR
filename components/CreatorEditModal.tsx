@@ -184,64 +184,39 @@ const CreatorEditModal: React.FC<CreatorEditModalProps> = ({
         alert(`✅ Payment request sent!\n\nCreator: ${creator.name}\nAmount: $${rate}\nMethod: ${paymentMethods}\n\nYour team has been notified.`);
     };
 
-    // --- INVITE TO PORTAL ---
+    // --- INVITE TO PORTAL (via server endpoint) ---
     const handleInviteToPortal = async () => {
         const creatorEmail = inviteEmail.trim() || formData.email || creator.email;
         if (!creatorEmail) { setInviteError('Enter the creator\'s email address.'); return; }
         if (!appSettings.googleCloudToken) { setInviteError('Please log in to sync.'); return; }
 
         setIsInviting(true); setInviteError(null);
-        // Also save the email to the creator record
         handleChange('email', creatorEmail.toLowerCase().trim());
         try {
-            // Load current DB to check for existing accounts
-            const db = await loadRemoteState({ ...appSettings, googleCloudToken: appSettings.googleCloudToken! });
-            const existingAccounts = db?.creatorAccounts || [];
-
-            // Check if already invited
-            const existing = existingAccounts.find(a => a.email.toLowerCase() === creatorEmail.toLowerCase());
-            if (existing) {
-                setInviteError(`Already invited (${creatorEmail}). Account exists.`);
-                setIsInviting(false); return;
-            }
-
-            // Generate a random password
+            // Generate a random password (emailed to creator in plain text)
             const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
             const password = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 
-            // Create the account
-            const newAccount: CreatorAccount = {
-                id: crypto.randomUUID(),
-                email: creatorEmail.toLowerCase().trim(),
-                password,
-                displayName: creator.name,
-                createdAt: new Date().toISOString(),
-                linkedCreatorId: creator.id,
-                invitedByTeam: true,
-                inviteEmailSent: false,
-            };
+            // Create account via server (password gets bcrypt-hashed server-side)
+            const inviteResp = await fetch('/api/creator/invite', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: creatorEmail.toLowerCase().trim(),
+                    name: creator.name,
+                    creatorId: creator.id,
+                    plainPassword: password,
+                })
+            });
+            const inviteData = await inviteResp.json();
+            if (!inviteResp.ok) {
+                setInviteError(inviteData.error || 'Invite failed');
+                setIsInviting(false); return;
+            }
 
-            // Save to GCS
-            const updatedAccounts = [...existingAccounts, newAccount];
-            const updatedCreators = (db?.creators || []).map(c =>
-                c.id === creator.id ? { ...c, portalEmail: creatorEmail.toLowerCase().trim() } : c
-            );
-
-            const dbPayload: MasterDB = {
-                ...db!,
-                lastUpdated: new Date().toISOString(),
-                creators: updatedCreators,
-                creatorAccounts: updatedAccounts,
-                version: Date.now(),
-            };
-
-            await uploadJSONToGoogleCloud(
-                dbPayload, appSettings.googleCloudBucket!, appSettings.googleCloudToken!, 'ooedn_master_db.json', appSettings.googleProjectId
-            );
-
-            // Email credentials via Gmail
+            // Email credentials via Gmail (using admin's OAuth token)
             const portalUrl = window.location.origin + '/creator';
-            const emailBody = `Hey ${creator.name}! 🎉\n\nYou've been invited to the OOEDN Creator Portal!\n\nHere are your login credentials:\n\n📧 Email: ${creatorEmail}\n🔑 Password: ${password}\n\n🔗 Portal Link: ${portalUrl}\n\nLog in to view your campaigns, upload content, request payments, and chat with the team.\n\nWelcome aboard! 🚀\n\n— The OOEDN Creative Team`;
+            const emailBody = `Hey ${creator.name}! 🎉\\n\\nYou've been invited to the OOEDN Creator Portal!\\n\\nHere are your login credentials:\\n\\n📧 Email: ${creatorEmail}\\n🔑 Password: ${password}\\n\\n🔗 Portal Link: ${portalUrl}\\n\\nLog in to view your campaigns, upload content, request payments, and chat with the team.\\n\\nWelcome aboard! 🚀\\n\\n— The OOEDN Creative Team`;
 
             try {
                 await sendEmail(
@@ -250,23 +225,14 @@ const CreatorEditModal: React.FC<CreatorEditModalProps> = ({
                     '🎉 Welcome to the OOEDN Creator Portal!',
                     emailBody
                 );
-                newAccount.inviteEmailSent = true;
-                // Re-save with email sent flag
-                const finalAccounts = updatedAccounts.map(a => a.id === newAccount.id ? newAccount : a);
-                await uploadJSONToGoogleCloud(
-                    { ...dbPayload, creatorAccounts: finalAccounts },
-                    appSettings.googleCloudBucket!, appSettings.googleCloudToken!, 'ooedn_master_db.json', appSettings.googleProjectId
-                );
             } catch (emailErr: any) {
                 console.warn('[Invite] Email send failed, but account was created:', emailErr);
                 setInviteError(`Account created but email failed to send: ${emailErr.message}. Share credentials manually: ${creatorEmail} / ${password}`);
             }
 
-            // Update local form data
             handleChange('portalEmail', creatorEmail.toLowerCase().trim());
             setInviteSent(true);
             setTimeout(() => setInviteSent(false), 5000);
-
         } catch (e: any) {
             setInviteError(`Invite failed: ${e.message}`);
         } finally {
