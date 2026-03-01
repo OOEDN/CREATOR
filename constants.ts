@@ -93,5 +93,6 @@ export const CONTENT_STATUS_COLORS: Record<ContentStatus, string> = {
   [ContentStatus.Raw]: 'bg-neutral-500/20 text-neutral-400',
   [ContentStatus.Editing]: 'bg-yellow-500/20 text-yellow-400',
   [ContentStatus.Ready]: 'bg-emerald-500/20 text-emerald-400',
+  [ContentStatus.Approved]: 'bg-teal-500/20 text-teal-400',
   [ContentStatus.Posted]: 'bg-blue-500/20 text-blue-400',
 };

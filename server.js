@@ -174,6 +174,90 @@ app.post('/api/push/send', async (req, res) => {
   }
 });
 
+// --- Creator Push Subscriptions ---
+let creatorPushSubscriptions = []; // { creatorId, subscription }
+
+// Register a creator's push subscription
+app.post('/api/push/subscribe-creator', (req, res) => {
+  try {
+    const { subscription, creatorId } = req.body;
+    if (!subscription || !creatorId) return res.status(400).json({ error: 'subscription and creatorId required' });
+    // Remove old subscription for this creator
+    creatorPushSubscriptions = creatorPushSubscriptions.filter(s => s.creatorId !== creatorId);
+    creatorPushSubscriptions.push({ creatorId, subscription });
+    console.log(`[Push] Creator ${creatorId} subscribed. Total creator subs: ${creatorPushSubscriptions.length}`);
+    res.status(201).json({ success: true });
+  } catch (e) {
+    console.error('[Push] Creator subscribe error:', e);
+    res.status(500).json({ error: 'Failed to subscribe' });
+  }
+});
+
+// Send push to specific creators
+app.post('/api/push/send-creators', async (req, res) => {
+  try {
+    const { creatorIds, title, body, url } = req.body;
+    if (!title || !body) return res.status(400).json({ error: 'title and body required' });
+    const payload = JSON.stringify({ title, body, url: url || '/creator', tag: 'ooedn-creator' });
+    let sent = 0, failed = 0;
+    const targets = creatorIds
+      ? creatorPushSubscriptions.filter(s => creatorIds.includes(s.creatorId))
+      : creatorPushSubscriptions;
+    await Promise.allSettled(
+      targets.map(s =>
+        webpush.sendNotification(s.subscription, payload).then(() => sent++).catch(err => {
+          failed++;
+          console.warn(`[Push] Creator send failed:`, err.statusCode || err.message);
+        })
+      )
+    );
+    console.log(`[Push] Creator push: sent=${sent}, failed=${failed}`);
+    res.json({ sent, failed });
+  } catch (e) {
+    console.error('[Push] Creator send error:', e);
+    res.status(500).json({ error: 'Failed to send' });
+  }
+});
+
+// Send email to creators
+app.post('/api/creator/send-email', async (req, res) => {
+  try {
+    const { emails, subject, body } = req.body;
+    if (!emails?.length || !subject || !body) return res.status(400).json({ error: 'emails, subject, and body required' });
+    // Use nodemailer with a simple transporter (configure with real SMTP in production)
+    let nodemailer;
+    try { nodemailer = await import('nodemailer'); } catch { return res.status(500).json({ error: 'nodemailer not available' }); }
+    const transporter = nodemailer.default.createTransport({
+      service: 'gmail',
+      auth: { user: process.env.SMTP_USER || 'noreply@ooedn.com', pass: process.env.SMTP_PASS || '' }
+    });
+    let sent = 0, failed = 0;
+    for (const email of emails) {
+      try {
+        await transporter.sendMail({
+          from: `"OOEDN" <${process.env.SMTP_USER || 'noreply@ooedn.com'}>`,
+          to: email, subject,
+          html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+            <div style="background:#000;padding:24px;border-radius:16px">
+              <h1 style="color:#a855f7;font-size:18px;margin:0 0 16px">OOEDN</h1>
+              <h2 style="color:#fff;font-size:16px;margin:0 0 12px">${subject}</h2>
+              <p style="color:#a3a3a3;font-size:14px;line-height:1.6">${body.replace(/\n/g, '<br>')}</p>
+              <hr style="border:1px solid #333;margin:20px 0">
+              <p style="color:#525252;font-size:10px">OOEDN Creator Portal</p>
+            </div>
+          </div>`
+        });
+        sent++;
+      } catch (err) { failed++; console.warn(`[Email] Failed to send to ${email}:`, err.message); }
+    }
+    console.log(`[Email] Sent: ${sent}, Failed: ${failed}`);
+    res.json({ sent, failed });
+  } catch (e) {
+    console.error('[Email] Send error:', e);
+    res.status(500).json({ error: 'Failed to send emails' });
+  }
+});
+
 // --- Morning Reminder (Google Chat Webhook) ---
 
 const GCHAT_WEBHOOK = 'https://chat.googleapis.com/v1/spaces/AAQA7pMfr0Y/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=xM_-nwUZ71vMuf9A0fJeOVF4pCfjwXlscULolyXpb1U';

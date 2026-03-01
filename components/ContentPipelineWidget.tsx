@@ -12,7 +12,8 @@ const PIPELINE_STAGES = [
     { status: ContentStatus.Raw, label: 'Raw', color: 'bg-neutral-600', textColor: 'text-neutral-400', emoji: '📦' },
     { status: ContentStatus.Editing, label: 'Editing', color: 'bg-amber-500', textColor: 'text-amber-400', emoji: '✂️' },
     { status: ContentStatus.Ready, label: 'Ready', color: 'bg-blue-500', textColor: 'text-blue-400', emoji: '✅' },
-    { status: ContentStatus.Posted, label: 'Posted', color: 'bg-emerald-500', textColor: 'text-emerald-400', emoji: '🚀' },
+    { status: ContentStatus.Approved, label: 'Approved', color: 'bg-emerald-500', textColor: 'text-emerald-400', emoji: '🟢' },
+    { status: ContentStatus.Posted, label: 'Posted', color: 'bg-purple-500', textColor: 'text-purple-400', emoji: '🚀' },
 ];
 
 const ContentPipelineWidget: React.FC<ContentPipelineWidgetProps> = ({ contentItems, onNavigate, onUpdateContent }) => {

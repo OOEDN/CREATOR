@@ -18,6 +18,7 @@ import BetaTestManager from './components/BetaTestManager';
 import PaymentHub from './components/PaymentHub';
 import TeamManager from './components/TeamManager';
 import TeamChatWidget from './components/TeamChatWidget';
+import CreatorCommsWidget from './components/CreatorCommsWidget';
 import ShipmentTrackerWidget from './components/ShipmentTrackerWidget';
 import TeamTaskListWidget from './components/TeamTaskListWidget';
 import DailyDigestWidget from './components/DailyDigestWidget';
@@ -881,6 +882,36 @@ function App() {
                                     }}
                                     currentUser={userEmail || 'Anonymous'}
                                     teamEmails={['daniel@ooedn.com', 'lauren@ooedn.com', 'jenna@ooedn.com']}
+                                />
+
+                                {/* CREATOR COMMS WIDGET */}
+                                <CreatorCommsWidget
+                                    teamMessages={teamMessages}
+                                    creators={creators}
+                                    currentUser={userEmail || 'Anonymous'}
+                                    onSendMessage={(msg) => {
+                                        setTeamMessages(prev => [...prev, msg]);
+                                        saveMasterDB();
+                                    }}
+                                    onPushNotify={async (creatorIds, title, body) => {
+                                        try {
+                                            await fetch('/api/push/send-creators', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ creatorIds, title, body })
+                                            });
+                                        } catch (e) { console.error('[Push] Creator notify failed:', e); }
+                                    }}
+                                    onEmailCreators={async (creatorIds, subject, body) => {
+                                        try {
+                                            const emails = creatorIds.map(id => creators.find(c => c.id === id)?.email).filter(Boolean);
+                                            await fetch('/api/creator/send-email', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ emails, subject, body })
+                                            });
+                                        } catch (e) { console.error('[Email] Creator email failed:', e); }
+                                    }}
                                 />
 
                                 {/* QUICK NOTES */}

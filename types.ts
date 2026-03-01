@@ -63,6 +63,7 @@ export enum ContentStatus {
   Raw = 'Raw Asset',
   Editing = 'Needs Editing',
   Ready = 'Ready to Post',
+  Approved = 'Approved',
   Posted = 'Posted',
 }
 
@@ -119,6 +120,10 @@ export interface ContentItem {
   teamNotes?: ContentNote[];       // Team notes / feedback on this video
   paymentRequested?: boolean;       // Creator flagged this for payment
   paymentAmount?: number;           // Per-video payment amount
+  // Approval gate
+  approvedByTeam?: boolean;         // Team approved content for posting/payment
+  approvedAt?: string;
+  approvedBy?: string;
 }
 
 export interface CampaignTask {
@@ -182,6 +187,10 @@ export interface TeamMessage {
   timestamp: string;
   isSystem?: boolean;
   mentions?: string[]; // @mentioned team member emails
+  // Creator comms fields
+  creatorId?: string;
+  creatorName?: string;
+  isCreatorMessage?: boolean;
 }
 
 export interface TeamTask {

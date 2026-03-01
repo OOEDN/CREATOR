@@ -215,7 +215,7 @@ function CreatorApp() {
         localStorage.removeItem('ooedn_creator_jwt');
         setJwtToken(null);
         setIsConnected(false); setCurrentAccount(null); setCreatorRecord(null);
-        setFormEmail(''); setFormPassword(''); setFormName('');
+        setFormEmail(''); setFormPassword('');
     };
 
     // --- NOTIFICATION SUPPORT ---
@@ -231,6 +231,23 @@ function CreatorApp() {
                     setCreators(updatedCreators);
                     saveMasterDB(updatedCreators);
                     addNotification('message', 'Notifications Enabled! 🔔', 'You\'ll now get alerts for campaigns, payments, and messages.');
+
+                    // Register push subscription with server
+                    try {
+                        const reg = await navigator.serviceWorker.ready;
+                        const vapidRes = await fetch('/api/push/vapid-key');
+                        const { key } = await vapidRes.json();
+                        const sub = await reg.pushManager.subscribe({
+                            userVisibleOnly: true,
+                            applicationServerKey: key
+                        });
+                        await fetch('/api/push/subscribe-creator', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ subscription: sub, creatorId: creatorRecord.id })
+                        });
+                        console.log('[Push] Creator push subscription registered');
+                    } catch (pushErr) { console.warn('[Push] Could not register push subscription:', pushErr); }
                 }
             }
         } catch (e) { console.error('Notification permission failed:', e); }
@@ -284,6 +301,7 @@ function CreatorApp() {
         if (!creatorRecord || !text.trim()) return;
         const msg: TeamMessage = {
             id: crypto.randomUUID(), sender: creatorRecord.name, text: text.trim(), timestamp: new Date().toISOString(),
+            creatorId: creatorRecord.id, creatorName: creatorRecord.name, isCreatorMessage: true,
         };
         const updatedMessages = [...teamMessages, msg];
         setTeamMessages(updatedMessages);
