@@ -417,10 +417,16 @@ function CreatorApp() {
     const handleOnboardingComplete = () => {
         if (!currentAccount) return;
         const updatedAccount = { ...currentAccount, onboardingComplete: true };
-        const updatedAccounts = creatorAccounts.map(a => a.id === updatedAccount.id ? updatedAccount : a);
         setCurrentAccount(updatedAccount);
-        setCreatorAccounts(updatedAccounts);
-        saveMasterDB(undefined, undefined, undefined, undefined, undefined, updatedAccounts);
+        // Save account update directly — don't rely on creatorAccounts array
+        const token = jwtToken || localStorage.getItem('ooedn_creator_jwt');
+        if (token) {
+            fetch('/api/creator/save', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ updates: { account: { onboardingComplete: true } } })
+            }).catch(e => console.error('[CreatorApp] Onboarding save failed:', e));
+        }
         setShowOnboarding(false);
     };
 

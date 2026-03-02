@@ -3,7 +3,7 @@ import { BetaTest, BetaRelease, Creator } from '../types';
 import {
     FlaskConical, Plus, X, Calendar, Users, Star, CheckCircle,
     Shield, Clock, Trash2, ChevronDown, ChevronUp, Package, FileText, Eye,
-    Rocket, Send, AlertTriangle, Zap, Play, Pause, BarChart3
+    Rocket, Send, AlertTriangle, Zap, Play, Pause, BarChart3, UserPlus
 } from 'lucide-react';
 
 interface Props {
@@ -73,6 +73,8 @@ const BetaTestManager: React.FC<Props> = ({ betaTests, betaReleases, creators, o
 
     const launchedCount = betaTests.filter(t => t.launched).length;
     const draftCount = betaTests.filter(t => !t.launched).length;
+    const waitlistCreators = creators.filter((c: any) => c.requestedBeta);
+    const waitlistCount = waitlistCreators.length;
 
     return (
         <div className="mb-6">
@@ -92,6 +94,11 @@ const BetaTestManager: React.FC<Props> = ({ betaTests, betaReleases, creators, o
                             <Rocket size={8} /> {launchedCount} live
                         </span>
                     )}
+                    {waitlistCount > 0 && (
+                        <span className="text-[10px] bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                            <UserPlus size={8} /> {waitlistCount} waiting
+                        </span>
+                    )}
                     {draftCount > 0 && (
                         <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full font-bold">
                             {draftCount} draft{draftCount !== 1 ? 's' : ''}
@@ -103,6 +110,36 @@ const BetaTestManager: React.FC<Props> = ({ betaTests, betaReleases, creators, o
 
             {isExpanded && (
                 <div className="mt-3 space-y-3">
+                    {/* Beta Waitlist */}
+                    {waitlistCreators.length > 0 && (
+                        <div className="bg-purple-500/5 border border-purple-500/20 rounded-2xl p-4">
+                            <div className="flex items-center gap-2 mb-3">
+                                <UserPlus size={14} className="text-purple-400" />
+                                <span className="text-xs font-black text-purple-400 uppercase tracking-widest">Beta Waitlist</span>
+                                <span className="text-[10px] bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full font-bold">{waitlistCreators.length}</span>
+                            </div>
+                            <div className="space-y-1.5">
+                                {waitlistCreators.map((c: any) => (
+                                    <div key={c.id} className="flex items-center justify-between bg-black/30 border border-neutral-800/50 rounded-xl px-3 py-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center text-[10px] font-black text-purple-400">
+                                                {(c.name || '?')[0]}
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-bold text-white">{c.name}</p>
+                                                {c.handle && <p className="text-[9px] text-neutral-500">{c.handle}</p>}
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[9px] text-purple-400 font-bold">Requested</p>
+                                            {c.requestedBetaAt && <p className="text-[8px] text-neutral-600">{formatDate(c.requestedBetaAt)}</p>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Create Button */}
                     <button onClick={handleCreate}
                         className="w-full flex items-center justify-center gap-2 p-3 border border-dashed border-emerald-500/30 rounded-xl text-emerald-400 text-xs font-bold hover:bg-emerald-500/5 transition-all">
@@ -139,9 +176,9 @@ const BetaTestManager: React.FC<Props> = ({ betaTests, betaReleases, creators, o
 
                                             {/* Status */}
                                             <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${test.status === 'complete' ? 'bg-emerald-500/10 text-emerald-400' :
-                                                    test.status === 'in-progress' ? 'bg-blue-500/10 text-blue-400' :
-                                                        test.status === 'open' ? 'bg-green-500/10 text-green-400' :
-                                                            'bg-neutral-800 text-neutral-500'
+                                                test.status === 'in-progress' ? 'bg-blue-500/10 text-blue-400' :
+                                                    test.status === 'open' ? 'bg-green-500/10 text-green-400' :
+                                                        'bg-neutral-800 text-neutral-500'
                                                 }`}>{test.status}</span>
                                         </div>
                                         <p className="text-neutral-500 text-[10px] line-clamp-1">{test.description || 'No description'}</p>
