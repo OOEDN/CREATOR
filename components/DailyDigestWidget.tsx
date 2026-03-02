@@ -77,7 +77,7 @@ const DailyDigestWidget: React.FC<DailyDigestWidgetProps> = ({
                 label: `${pendingReviewVideos.length} video${pendingReviewVideos.length !== 1 ? 's' : ''} pending review`,
                 color: 'text-fuchsia-400',
                 bgColor: 'bg-fuchsia-500/10 border-fuchsia-500/20',
-                action: () => onNavigate('asset-pool')
+                action: () => onNavigate('pending-review')
             },
             {
                 show: creatorMessages.length > 0,

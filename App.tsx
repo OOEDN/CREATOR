@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-    LayoutDashboard, Users, Flame, Settings, Plus, Search, Menu, X, CreditCard, CalendarDays, Loader2, Briefcase, RefreshCw, Sparkles, Link, Database, Truck, Package, Library, Inbox, FolderLock, MapPin, Layers, Cloud, LogOut, AlertTriangle, ShieldCheck, Globe, Info, Terminal, UserPlus, CloudCog, Archive, Copy, KeyRound, ExternalLink, ArrowRight, Wrench, Trash2, Sun, Moon, Mail, Crown
+    LayoutDashboard, Users, Flame, Settings, Plus, Search, Menu, X, CreditCard, CalendarDays, Loader2, Briefcase, RefreshCw, Sparkles, Link, Database, Truck, Package, Library, Inbox, FolderLock, MapPin, Layers, Cloud, LogOut, AlertTriangle, ShieldCheck, Globe, Info, Terminal, UserPlus, CloudCog, Archive, Copy, KeyRound, ExternalLink, ArrowRight, Wrench, Trash2, Sun, Moon, Mail, Crown, Eye
 } from 'lucide-react';
 import { Creator, CreatorStatus, PaymentStatus, Platform, ContentItem, AppSettings, ShipmentStatus, Campaign, ContentStatus, PaymentOption, Shipment, TeamMessage, TeamTask, BetaTest, BetaRelease, CreatorAccount } from './types';
 import { syncTrackingWithAI } from './services/geminiService';
@@ -26,6 +26,7 @@ import ContentPipelineWidget from './components/ContentPipelineWidget';
 import QuickNotesWidget from './components/QuickNotesWidget';
 import CreatorInbox from './components/CreatorInbox';
 import LongTermCreators from './components/LongTermCreators';
+import PendingReview from './components/PendingReview';
 import { subscribeToPush, sendPushNotification, getPermissionStatus, isSupported as isPushSupported } from './services/pushService';
 import { syncContentToDrive, ensureOOEDNMasterFolder } from './services/googleDriveService';
 import { getInboxSummary, EmailThread } from './services/gmailService';
@@ -98,7 +99,7 @@ function App() {
     const [betaTests, setBetaTests] = useState<BetaTest[]>([]);
     const [betaReleases, setBetaReleases] = useState<BetaRelease[]>([]);
     const [creatorAccounts, setCreatorAccounts] = useState<CreatorAccount[]>([]);
-    const [view, setView] = useState<'dashboard' | 'active' | 'inactive' | 'blackburn' | 'payments' | 'calendar' | 'campaigns' | 'asset-pool' | 'team-assets' | 'master-library' | 'team' | 'inbox' | 'partners'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'active' | 'inactive' | 'blackburn' | 'payments' | 'calendar' | 'campaigns' | 'pending-review' | 'asset-pool' | 'team-assets' | 'master-library' | 'team' | 'inbox' | 'partners'>('dashboard');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -642,6 +643,7 @@ function App() {
                         { id: 'campaigns', icon: Briefcase, label: 'Campaigns' },
                         { id: 'calendar', icon: CalendarDays, label: 'Calendar' },
                         { id: 'asset-pool', icon: Inbox, label: 'Asset Pool' },
+                        { id: 'pending-review', icon: Eye, label: 'Pending Review' },
                         { id: 'team-assets', icon: FolderLock, label: 'Team Assets' },
                         { id: 'master-library', icon: Database, label: 'Master Library' },
                         { id: 'inbox', icon: Mail, label: 'Creator Inbox' },
@@ -1048,13 +1050,28 @@ function App() {
                     {/* ASSET POOL (Unused / Available) */}
                     {view === 'asset-pool' && (
                         <ContentLibrary
-                            items={contentItems}
+                            items={contentItems.filter(c => {
+                                // Hide unapproved creator content from Asset Pool — it belongs in Pending Review
+                                if (c.creatorId && c.creatorId !== 'team' && (c.status === ContentStatus.Raw || c.status === ContentStatus.Editing)) {
+                                    return false;
+                                }
+                                return true;
+                            })}
                             onUpload={handleContentUpload}
                             onUpdate={handleContentUpdate}
                             onDelete={handleContentDelete}
                             appSettings={settings}
                             initialView="Available"
                             hideTabs={true}
+                        />
+                    )}
+
+                    {/* PENDING REVIEW */}
+                    {view === 'pending-review' && (
+                        <PendingReview
+                            contentItems={contentItems}
+                            onUpdateContent={handleContentUpdate}
+                            onNavigate={(v) => setView(v as any)}
                         />
                     )}
 
