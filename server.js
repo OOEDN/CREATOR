@@ -862,6 +862,35 @@ app.post('/api/creator/invite', async (req, res) => {
   }
 });
 
+// --- POST /api/creator/change-password --- (self-service, JWT protected)
+app.post('/api/creator/change-password', creatorAuthMiddleware, async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.trim().length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    const db = await readMasterDB();
+    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
+
+    const accounts = db.creatorAccounts || [];
+    const account = accounts.find(a => a.id === req.creatorAccountId);
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+
+    account.password = await bcrypt.hash(newPassword.trim(), BCRYPT_ROUNDS);
+    db.creatorAccounts = accounts.map(a => a.id === account.id ? account : a);
+    db.lastUpdated = new Date().toISOString();
+    db.version = Date.now();
+    await writeMasterDB(db);
+
+    console.log(`[CreatorAuth] ✅ Password changed by creator: ${account.email}`);
+    res.json({ success: true });
+  } catch (e) {
+    console.error('[CreatorAuth] Change password error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // --- POST /api/creator/migrate-passwords --- (one-time admin utility)
 
 app.post('/api/creator/migrate-passwords', async (req, res) => {

@@ -499,61 +499,79 @@ function CreatorApp() {
     }
 
     // --- WELCOME INTRO (first login only) ---
+    // Auto-dismiss after 3.5 seconds to prevent getting stuck
+    useEffect(() => {
+        if (showWelcomeIntro) {
+            const timer = setTimeout(() => setShowWelcomeIntro(false), 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [showWelcomeIntro]);
+
     if (showWelcomeIntro) {
         return (
-            <div className="fixed inset-0 z-[9999] bg-black flex flex-col items-center justify-center overflow-hidden"
-                style={{ animation: 'fadeOut 0.8s ease-in-out 4s forwards' }}>
-                {/* Animated gradient background */}
-                <div className="absolute inset-0">
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-900/40 via-black to-black" />
-                    <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-500/10 rounded-full blur-[120px]" style={{ animation: 'pulse 2s ease-in-out infinite' }} />
-                    <div className="absolute bottom-1/3 left-1/3 w-[400px] h-[400px] bg-pink-500/8 rounded-full blur-[100px]" style={{ animation: 'pulse 2.5s ease-in-out infinite', animationDelay: '0.5s' }} />
-                    <div className="absolute top-1/4 right-1/4 w-[300px] h-[300px] bg-cyan-500/5 rounded-full blur-[80px]" style={{ animation: 'pulse 3s ease-in-out infinite', animationDelay: '1s' }} />
+            <div className="fixed inset-0 z-[9999] bg-black flex flex-col items-center justify-center overflow-hidden cursor-pointer"
+                onClick={() => setShowWelcomeIntro(false)}>
+                {/* Cinematic flash */}
+                <div className="absolute inset-0 bg-white" style={{ animation: 'introFlash 0.6s ease-out forwards' }} />
+
+                {/* Gradient BG */}
+                <div className="absolute inset-0" style={{ animation: 'introFadeIn 0.5s ease-out 0.3s both' }}>
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-900/50 via-black to-black" />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-purple-600/15 rounded-full blur-[150px]" style={{ animation: 'introPulseGlow 2s ease-in-out infinite' }} />
                 </div>
 
-                {/* Content */}
-                <div className="relative z-10 flex flex-col items-center" style={{ animation: 'slideUp 1s ease-out' }}>
-                    {/* Logo */}
-                    <div style={{ animation: 'scaleIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
+                {/* SLAM Content */}
+                <div className="relative z-10 flex flex-col items-center px-6">
+                    {/* Logo — smashes in */}
+                    <div style={{ animation: 'introSlamIn 0.4s cubic-bezier(0, 0, 0.2, 1) 0.2s both' }}>
                         {settings.logoUrl
-                            ? <img src={settings.logoUrl} alt="OOEDN" className="h-16 object-contain mb-8 opacity-80" />
-                            : <Flame size={64} className="text-purple-500 mb-8" />}
+                            ? <img src={settings.logoUrl} alt="OOEDN" className="h-20 object-contain mb-6" />
+                            : <Flame size={80} className="text-purple-500 mb-6" />}
                     </div>
 
-                    {/* Welcome text */}
-                    <div className="text-center" style={{ animation: 'slideUp 1s ease-out 0.3s both' }}>
-                        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-purple-400/60 mb-3">Welcome to the</p>
-                        <h1 className="text-5xl md:text-6xl font-black text-white tracking-tighter mb-3"
-                            style={{ animation: 'slideUp 0.8s ease-out 0.5s both' }}>
-                            Creator Portal
-                        </h1>
-                        <div className="h-px w-32 mx-auto bg-gradient-to-r from-transparent via-purple-500/60 to-transparent my-6"
-                            style={{ animation: 'expandWidth 1s ease-out 0.8s both' }} />
-                        <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400"
-                            style={{ animation: 'slideUp 0.8s ease-out 0.8s both' }}>
-                            {creatorRecord?.name || currentAccount?.displayName || 'Creator'}
-                        </p>
-                        <p className="text-neutral-500 text-xs mt-3 font-bold uppercase tracking-widest"
-                            style={{ animation: 'slideUp 0.8s ease-out 1s both' }}>
-                            OOEDN × YOU
-                        </p>
-                    </div>
+                    {/* BIG TEXT — slams in with scale */}
+                    <h1 className="text-6xl md:text-8xl font-black text-white tracking-tighter text-center leading-none"
+                        style={{ animation: 'introSlamIn 0.3s cubic-bezier(0, 0, 0.2, 1) 0.4s both' }}>
+                        CREATOR<br />PORTAL
+                    </h1>
+
+                    {/* Divider line — snaps open */}
+                    <div className="h-1 w-0 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 rounded-full my-6"
+                        style={{ animation: 'introExpandLine 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.7s both' }} />
+
+                    {/* Creator name — slides up */}
+                    <p className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 text-center"
+                        style={{ animation: 'introSlideUp 0.6s ease-out 0.9s both' }}>
+                        {creatorRecord?.name || currentAccount?.displayName || 'Welcome'}
+                    </p>
+
+                    {/* Tagline */}
+                    <p className="text-neutral-500 text-xs font-black uppercase tracking-[0.5em] mt-4"
+                        style={{ animation: 'introSlideUp 0.5s ease-out 1.1s both' }}>
+                        OOEDN × YOU
+                    </p>
 
                     {/* Enter button */}
                     <button
-                        onClick={() => setShowWelcomeIntro(false)}
-                        className="mt-12 px-10 py-3.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl font-black text-sm uppercase tracking-widest text-white shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 active:scale-95 transition-all"
-                        style={{ animation: 'slideUp 0.8s ease-out 1.3s both' }}
-                    >
+                        onClick={(e) => { e.stopPropagation(); setShowWelcomeIntro(false); }}
+                        className="mt-10 px-12 py-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl font-black text-sm uppercase tracking-widest text-white shadow-2xl shadow-purple-500/40 hover:shadow-purple-500/60 hover:scale-110 active:scale-95 transition-all"
+                        style={{ animation: 'introSlideUp 0.5s ease-out 1.4s both' }}>
                         Enter →
                     </button>
+
+                    <p className="text-neutral-700 text-[9px] mt-6 uppercase tracking-widest"
+                        style={{ animation: 'introSlideUp 0.5s ease-out 1.6s both' }}>
+                        Tap anywhere to continue
+                    </p>
                 </div>
 
                 <style>{`
-                    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; pointer-events: none; } }
-                    @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
-                    @keyframes scaleIn { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
-                    @keyframes expandWidth { from { width: 0; opacity: 0; } to { width: 8rem; opacity: 1; } }
+                    @keyframes introFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
+                    @keyframes introFadeIn { from { opacity: 0; } to { opacity: 1; } }
+                    @keyframes introSlamIn { 0% { opacity: 0; transform: scale(3); } 100% { opacity: 1; transform: scale(1); } }
+                    @keyframes introSlideUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+                    @keyframes introExpandLine { from { width: 0; } to { width: 12rem; } }
+                    @keyframes introPulseGlow { 0%, 100% { opacity: 0.3; transform: translate(-50%, -50%) scale(1); } 50% { opacity: 0.6; transform: translate(-50%, -50%) scale(1.1); } }
                 `}</style>
             </div>
         );
@@ -606,6 +624,17 @@ function CreatorApp() {
                         saveMasterDB(updatedCreators);
                     }}
                     onEnableNotifications={handleEnableNotifications}
+                    onChangePassword={async (newPw: string) => {
+                        try {
+                            const token = jwtToken || localStorage.getItem('ooedn_creator_jwt');
+                            const resp = await fetch('/api/creator/change-password', {
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ newPassword: newPw })
+                            });
+                            return resp.ok;
+                        } catch { return false; }
+                    }}
                 />
             )}
             {/* SIDEBAR */}

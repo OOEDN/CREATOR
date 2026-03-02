@@ -4,7 +4,7 @@ import {
 } from '../../types';
 import {
     Sparkles, ArrowRight, ArrowLeft, CreditCard, Bell, User,
-    CheckCircle, Rocket, Flame, FlaskConical, PartyPopper
+    CheckCircle, Rocket, Flame, FlaskConical, PartyPopper, Lock, Eye, EyeOff, Shield
 } from 'lucide-react';
 
 interface Props {
@@ -13,10 +13,12 @@ interface Props {
     onComplete: () => void;
     onUpdateProfile: (updates: Partial<Creator>) => void;
     onEnableNotifications: () => void;
+    onChangePassword?: (newPassword: string) => Promise<boolean>;
 }
 
 const STEPS = [
     { emoji: '🎉', title: 'Welcome to OOEDN!' },
+    { emoji: '🔒', title: 'Secure Your Account' },
     { emoji: '👤', title: 'Your Profile' },
     { emoji: '💰', title: 'Get Paid' },
     { emoji: '🔔', title: 'Stay in the Loop' },
@@ -42,7 +44,7 @@ By opting into the OOEDN Beta Testing Program, you agree to the following terms:
 
 By clicking "I Agree," you acknowledge that you have read, understood, and agree to abide by these terms.`;
 
-const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUpdateProfile, onEnableNotifications }) => {
+const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUpdateProfile, onEnableNotifications, onChangePassword }) => {
     const [step, setStep] = useState(0);
     const [name, setName] = useState(creator.name || account.displayName || '');
     const [handle, setHandle] = useState(creator.handle || '');
@@ -52,16 +54,22 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
     const [betaOptIn, setBetaOptIn] = useState(false);
     const [releaseAgreed, setReleaseAgreed] = useState(false);
     const [showConfetti, setShowConfetti] = useState(false);
+    // Password change
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [showNewPw, setShowNewPw] = useState(false);
+    const [pwSaved, setPwSaved] = useState(false);
+    const [pwError, setPwError] = useState('');
 
     const progress = ((step + 1) / STEPS.length) * 100;
 
     const handleNext = () => {
-        // Save profile data on step 1
-        if (step === 1 && (name || handle)) {
+        // Save profile data on step 2
+        if (step === 2 && (name || handle)) {
             onUpdateProfile({ name, handle, platform });
         }
-        // Save payment on step 2
-        if (step === 2 && selectedPayment && paymentDetails) {
+        // Save payment on step 3
+        if (step === 3 && selectedPayment && paymentDetails) {
             onUpdateProfile({
                 paymentOptions: [
                     ...(creator.paymentOptions || []),
@@ -154,17 +162,23 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                             <div className="text-6xl mb-2">🎉</div>
                             <h2 className="text-3xl font-black text-white uppercase tracking-tight">Welcome, {account.displayName}!</h2>
                             <p className="text-neutral-400 text-sm leading-relaxed">
-                                You're now part of the <span className="text-purple-400 font-bold">OOEDN Creator Family</span>. This portal is your home for campaigns, payments, uploads, and more.
+                                You're now part of the <span className="text-purple-400 font-bold">OOEDN Creator Family</span>. This portal is your home base — let's walk through what's here.
                             </p>
-                            <div className="grid grid-cols-3 gap-3 pt-2">
+                            <div className="space-y-2 text-left">
                                 {[
-                                    { emoji: '📋', label: 'Campaigns' },
-                                    { emoji: '💰', label: 'Get Paid' },
-                                    { emoji: '📹', label: 'Upload Content' },
+                                    { emoji: '📊', label: 'Dashboard', desc: 'See stats, notifications, and your campaign timeline at a glance' },
+                                    { emoji: '📋', label: 'Campaigns', desc: 'View assigned campaigns, deadlines, and deliverables' },
+                                    { emoji: '📹', label: 'Content Hub', desc: 'Upload videos, photos, and manage revision requests' },
+                                    { emoji: '💬', label: 'Team Chat', desc: 'Message the OOEDN team directly from your portal' },
+                                    { emoji: '💰', label: 'Payments', desc: 'Track earnings, request payments, and upload receipts' },
+                                    { emoji: '🧪', label: 'Beta Lab', desc: 'Test unreleased products before anyone else' },
                                 ].map(f => (
-                                    <div key={f.label} className="bg-black/50 border border-neutral-800 rounded-xl p-3 text-center">
-                                        <div className="text-2xl mb-1">{f.emoji}</div>
-                                        <p className="text-[10px] font-bold text-neutral-400 uppercase">{f.label}</p>
+                                    <div key={f.label} className="flex items-start gap-3 bg-black/30 border border-neutral-800/50 rounded-xl p-3">
+                                        <span className="text-lg mt-0.5">{f.emoji}</span>
+                                        <div>
+                                            <p className="text-xs font-bold text-white">{f.label}</p>
+                                            <p className="text-[10px] text-neutral-500 leading-relaxed">{f.desc}</p>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -172,8 +186,60 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                         </div>
                     )}
 
-                    {/* STEP 1: Profile */}
+                    {/* STEP 1: Password */}
                     {step === 1 && (
+                        <div className="space-y-5">
+                            <div className="text-center mb-2">
+                                <div className="text-4xl mb-2">🔒</div>
+                                <h2 className="text-2xl font-black text-white">Secure Your Account</h2>
+                                <p className="text-neutral-500 text-xs mt-1">Your password was auto-generated — you can change it or keep it</p>
+                            </div>
+                            {pwSaved ? (
+                                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-5 text-center">
+                                    <Shield size={32} className="text-emerald-400 mx-auto mb-2" />
+                                    <p className="text-sm font-bold text-emerald-400">Password Updated! ✓</p>
+                                    <p className="text-[10px] text-neutral-500 mt-1">Your new password is saved</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div>
+                                        <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest block mb-1">New Password</label>
+                                        <div className="relative">
+                                            <input value={newPassword} onChange={e => { setNewPassword(e.target.value); setPwError(''); }}
+                                                type={showNewPw ? 'text' : 'password'} placeholder="Enter new password (min 6 characters)"
+                                                className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 pr-10 text-sm text-white focus:border-purple-500 outline-none" />
+                                            <button onClick={() => setShowNewPw(!showNewPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-white" type="button">
+                                                {showNewPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest block mb-1">Confirm Password</label>
+                                        <input value={confirmPassword} onChange={e => { setConfirmPassword(e.target.value); setPwError(''); }}
+                                            type="password" placeholder="Re-enter password"
+                                            className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 outline-none" />
+                                    </div>
+                                    {pwError && <p className="text-red-400 text-xs text-center">{pwError}</p>}
+                                    <button onClick={async () => {
+                                        if (newPassword.length < 6) { setPwError('Password must be at least 6 characters'); return; }
+                                        if (newPassword !== confirmPassword) { setPwError('Passwords do not match'); return; }
+                                        if (onChangePassword) {
+                                            const ok = await onChangePassword(newPassword);
+                                            if (ok) setPwSaved(true); else setPwError('Failed to save — try again');
+                                        }
+                                    }} className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 hover:from-purple-400 hover:to-pink-400 transition-all active:scale-95 shadow-lg shadow-purple-500/20">
+                                        <Lock size={14} /> Save New Password
+                                    </button>
+                                </>
+                            )}
+                            <button onClick={handleNext} className="text-neutral-500 text-xs hover:text-white transition-colors w-full text-center">
+                                {pwSaved ? 'Continue →' : 'Skip — keep current password →'}
+                            </button>
+                        </div>
+                    )}
+
+                    {/* STEP 2: Profile */}
+                    {step === 2 && (
                         <div className="space-y-5">
                             <div className="text-center mb-2">
                                 <div className="text-4xl mb-2">👤</div>
@@ -205,8 +271,8 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                         </div>
                     )}
 
-                    {/* STEP 2: Payment */}
-                    {step === 2 && (
+                    {/* STEP 3: Payment */}
+                    {step === 3 && (
                         <div className="space-y-5">
                             <div className="text-center mb-2">
                                 <div className="text-4xl mb-2">💰</div>
@@ -236,14 +302,27 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                         </div>
                     )}
 
-                    {/* STEP 3: Notifications */}
-                    {step === 3 && (
+                    {/* STEP 4: Notifications */}
+                    {step === 4 && (
                         <div className="text-center space-y-5">
                             <div className="text-5xl mb-2">🔔</div>
                             <h2 className="text-2xl font-black text-white">Stay in the Loop</h2>
                             <p className="text-neutral-400 text-sm leading-relaxed">
-                                Enable notifications to get alerted when you receive new campaigns, payment updates, and messages from the team.
+                                Enable notifications to get alerted when you receive new campaigns, payment updates, revision requests, and messages from the team.
                             </p>
+                            <div className="space-y-2 text-left text-xs">
+                                {[
+                                    { emoji: '📋', text: 'New campaign assignments' },
+                                    { emoji: '💰', text: 'Payment sent notifications' },
+                                    { emoji: '✂️', text: 'Revision requests on your content' },
+                                    { emoji: '💬', text: 'Direct messages from the team' },
+                                ].map((n, i) => (
+                                    <div key={i} className="flex items-center gap-2 bg-black/30 rounded-lg px-3 py-2">
+                                        <span>{n.emoji}</span>
+                                        <span className="text-neutral-400">{n.text}</span>
+                                    </div>
+                                ))}
+                            </div>
                             <button onClick={onEnableNotifications}
                                 className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 hover:from-purple-400 hover:to-pink-400 transition-all active:scale-95 shadow-lg shadow-purple-500/20">
                                 <Bell size={16} /> Enable Notifications
@@ -254,8 +333,8 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                         </div>
                     )}
 
-                    {/* STEP 4: Beta Lab */}
-                    {step === 4 && (
+                    {/* STEP 5: Beta Lab */}
+                    {step === 5 && (
                         <div className="space-y-5">
                             <div className="text-center mb-2">
                                 <div className="text-4xl mb-2">🧪</div>
@@ -292,24 +371,27 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                         </div>
                     )}
 
-                    {/* STEP 5: All Set! */}
-                    {step === 5 && (
+                    {/* STEP 6: All Set! */}
+                    {step === 6 && (
                         <div className="text-center space-y-6">
                             <div className="text-6xl mb-2">🚀</div>
                             <h2 className="text-3xl font-black text-white uppercase tracking-tight">You're All Set!</h2>
                             <p className="text-neutral-400 text-sm leading-relaxed">
-                                Your portal is ready. Start exploring campaigns, uploading content, and connecting with the team.
+                                Your portal is ready. Here's a quick cheat sheet:
                             </p>
-                            <div className="grid grid-cols-2 gap-3 pt-2">
+                            <div className="space-y-2 text-left">
                                 {[
-                                    { emoji: '🎯', label: 'View Campaigns' },
-                                    { emoji: '📹', label: 'Upload Content' },
-                                    { emoji: '💬', label: 'Chat with Team' },
-                                    { emoji: '🧪', label: 'Beta Lab' },
+                                    { emoji: '📊', label: 'Dashboard', tip: 'Check here daily for updates and revision requests' },
+                                    { emoji: '📹', label: 'Content Hub', tip: 'Upload videos/photos here. Named uploads match to campaigns' },
+                                    { emoji: '✂️', label: 'Revisions', tip: 'Orange banners = team wants changes. Re-upload in Content Hub' },
+                                    { emoji: '💬', label: 'Chat', tip: 'Message the team anytime — they\'ll see it immediately' },
                                 ].map(f => (
-                                    <div key={f.label} className="bg-gradient-to-br from-purple-500/5 to-pink-500/5 border border-purple-500/20 rounded-xl p-3 text-center">
-                                        <div className="text-xl mb-1">{f.emoji}</div>
-                                        <p className="text-[10px] font-bold text-purple-400 uppercase">{f.label}</p>
+                                    <div key={f.label} className="bg-gradient-to-br from-purple-500/5 to-pink-500/5 border border-purple-500/15 rounded-xl p-3">
+                                        <div className="flex items-center gap-2">
+                                            <span>{f.emoji}</span>
+                                            <p className="text-xs font-bold text-purple-400 uppercase">{f.label}</p>
+                                        </div>
+                                        <p className="text-[10px] text-neutral-500 mt-1 pl-7">{f.tip}</p>
                                     </div>
                                 ))}
                             </div>
@@ -324,12 +406,12 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                             </button>
                         ) : <div />}
 
-                        {step === 5 ? (
+                        {step === 6 ? (
                             <button onClick={handleFinish}
                                 className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-sm flex items-center gap-2 hover:from-purple-400 hover:to-pink-400 transition-all shadow-xl shadow-purple-500/20 active:scale-95">
                                 <Rocket size={16} /> Let's Go!
                             </button>
-                        ) : step === 3 ? (
+                        ) : step === 4 ? (
                             // Notifications step has its own "next" flow
                             <button onClick={handleNext}
                                 className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-black uppercase tracking-widest text-xs flex items-center gap-2 hover:from-purple-400 hover:to-pink-400 transition-all active:scale-95">
@@ -351,15 +433,15 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                             key={i}
                             onClick={() => i <= step && setStep(i)}
                             className={`transition-all rounded-full ${i === step ? 'w-8 h-2 bg-gradient-to-r from-purple-500 to-pink-500' :
-                                    i < step ? 'w-2 h-2 bg-purple-500/50' :
-                                        'w-2 h-2 bg-neutral-800'
+                                i < step ? 'w-2 h-2 bg-purple-500/50' :
+                                    'w-2 h-2 bg-neutral-800'
                                 }`}
                             title={s.title}
                         />
                     ))}
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 
