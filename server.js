@@ -1060,6 +1060,35 @@ app.post('/api/creator/upload-file', creatorAuthMiddleware, async (req, res) => 
   }
 });
 
+// --- GET /api/media-proxy --- Stream GCS files with proper CORS/Content-Type headers
+// Used by the video/image preview in Pending Review since <video> tags can't play cross-origin GCS files
+app.get('/api/media-proxy', async (req, res) => {
+  try {
+    const { url } = req.query;
+    if (!url || typeof url !== 'string') return res.status(400).send('url query param required');
+    // Only proxy our own GCS bucket URLs
+    if (!url.includes('storage.googleapis.com') && !url.includes(MAIN_BUCKET)) {
+      return res.status(403).send('Only GCS URLs allowed');
+    }
+    const token = await getGCSAuthToken();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const gcsRes = await fetch(url, { headers });
+    if (!gcsRes.ok) return res.status(gcsRes.status).send('GCS fetch failed');
+    const ct = gcsRes.headers.get('content-type') || 'application/octet-stream';
+    const cl = gcsRes.headers.get('content-length');
+    res.setHeader('Content-Type', ct);
+    if (cl) res.setHeader('Content-Length', cl);
+    res.setHeader('Accept-Ranges', 'bytes');
+    // Use node-fetch body as a readable stream
+    const arrayBuf = await gcsRes.arrayBuffer();
+    res.send(Buffer.from(arrayBuf));
+  } catch (e) {
+    console.error('[MediaProxy] Error:', e);
+    res.status(500).send('Proxy error');
+  }
+});
+
 // --- POST /api/creator/save --- (JWT protected, creator writes their own changes)
 
 app.post('/api/creator/save', creatorAuthMiddleware, async (req, res) => {

@@ -261,37 +261,51 @@ const PendingReview: React.FC<PendingReviewProps> = ({ contentItems, onUpdateCon
                                     )}
 
                                     {/* MEDIA PREVIEW */}
-                                    {item.fileUrl && (
-                                        <div className="bg-black/50 rounded-xl border border-neutral-800 overflow-hidden">
-                                            <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-800">
-                                                <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
-                                                    <Eye size={10} /> Quick Preview
-                                                </span>
-                                                {item.revisionCount && item.revisionCount > 0 && (
-                                                    <span className="text-[9px] font-bold bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded-lg">
-                                                        Revision #{item.revisionCount}
+                                    {item.fileUrl && (() => {
+                                        // Route GCS URLs through server proxy for CORS/ACL compat
+                                        const isGcs = item.fileUrl.includes('storage.googleapis.com');
+                                        const mediaSrc = isGcs
+                                            ? `/api/media-proxy?url=${encodeURIComponent(item.fileUrl)}`
+                                            : item.fileUrl;
+                                        return (
+                                            <div className="bg-black/50 rounded-xl border border-neutral-800 overflow-hidden">
+                                                <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-800">
+                                                    <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                        <Eye size={10} /> Quick Preview
                                                     </span>
+                                                    {item.revisionCount && item.revisionCount > 0 && (
+                                                        <span className="text-[9px] font-bold bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded-lg">
+                                                            Revision #{item.revisionCount}
+                                                        </span>
+                                                    )}
+                                                    <a
+                                                        href={item.fileUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-[9px] text-fuchsia-400 hover:text-fuchsia-300 font-bold flex items-center gap-1"
+                                                        onClick={e => e.stopPropagation()}
+                                                    >
+                                                        Open Full ↗
+                                                    </a>
+                                                </div>
+                                                {item.type === ContentType.Video ? (
+                                                    <video
+                                                        src={mediaSrc}
+                                                        controls
+                                                        preload="metadata"
+                                                        className="w-full max-h-[400px] bg-black"
+                                                        style={{ objectFit: 'contain' }}
+                                                    />
+                                                ) : (
+                                                    <img
+                                                        src={mediaSrc}
+                                                        alt={item.title}
+                                                        className="w-full max-h-[400px] object-contain bg-black"
+                                                    />
                                                 )}
                                             </div>
-                                            {item.type === ContentType.Video ? (
-                                                <video
-                                                    src={item.fileUrl}
-                                                    controls
-                                                    preload="metadata"
-                                                    className="w-full max-h-[400px] bg-black"
-                                                    style={{ objectFit: 'contain' }}
-                                                />
-                                            ) : (
-                                                <a href={item.fileUrl} target="_blank" rel="noopener noreferrer">
-                                                    <img
-                                                        src={item.fileUrl}
-                                                        alt={item.title}
-                                                        className="w-full max-h-[400px] object-contain bg-black cursor-pointer hover:opacity-90 transition-opacity"
-                                                    />
-                                                </a>
-                                            )}
-                                        </div>
-                                    )}
+                                        );
+                                    })()}
 
                                     {/* Note Input */}
                                     <div>
