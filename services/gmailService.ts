@@ -9,15 +9,13 @@ import { Creator, Campaign, ContentItem, AppSettings, TeamMessage, TeamTask } fr
 
 const TEAM_EMAIL = 'creator@ooedn.com';
 
-// Gmail API user identifier — 'me' resolves to the authenticated user's mailbox.
-// Emails are sent through the authenticated admin's account (daniel@ooedn.com)
-// but use TEAM_EMAIL in the From header as a send-as alias.
-// IMPORTANT: creator@ooedn.com must be configured as a send-as alias in Gmail settings
-// for the From header to be honored. Otherwise Gmail will override to the auth user's email.
-const GMAIL_USER = 'me';
+// Gmail API user identifier — use the shared team email for sending
+// In production, this routes through a server proxy that authenticates as create@ooedn.com
+const GMAIL_USER = 'create@ooedn.com';
 
-// Direct Gmail API base URL — no proxy needed, calls go straight to Google
-const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1';
+// Route Gmail API calls through our own server proxy
+// The server forwards to gmail.googleapis.com using create@ooedn.com credentials
+const GMAIL_API_BASE = '/api/gmail/v1';
 
 export interface EmailMessage {
     id: string;
