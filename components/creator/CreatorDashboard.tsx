@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Creator, Campaign, ContentItem, TeamMessage } from '../../types';
+import { Creator, Campaign, ContentItem, ContentStatus, TeamMessage } from '../../types';
 import {
     LayoutDashboard, MessageCircle, Upload, CreditCard, Package, Briefcase,
-    ArrowRight, Bell, BellOff, Zap, Trophy, TrendingUp, Calendar, Sparkles, Star
+    ArrowRight, Bell, BellOff, Zap, Trophy, TrendingUp, Calendar, Sparkles, Star, AlertTriangle
 } from 'lucide-react';
 
 interface Props {
@@ -69,6 +69,7 @@ const AnimatedNumber: React.FC<{ value: number; prefix?: string; duration?: numb
 const CreatorDashboard: React.FC<Props> = ({ creator, campaigns, contentItems, teamMessages, onNavigate, onEnableNotifications }) => {
     const myCampaigns = campaigns.filter(c => c.assignedCreatorIds?.includes(creator.id));
     const myContent = contentItems.filter(c => c.creatorId === creator.id || c.creatorName === creator.name);
+    const needsEditing = myContent.filter(c => c.status === ContentStatus.Editing);
     const pendingTasks = myCampaigns.flatMap(c => c.tasks?.filter(t => !t.isDone) || []);
     const allTasks = myCampaigns.flatMap(c => c.tasks || []);
     const completedTasks = allTasks.filter(t => t.isDone).length;
@@ -166,6 +167,45 @@ const CreatorDashboard: React.FC<Props> = ({ creator, campaigns, contentItems, t
                 </div>
             </div>
 
+            {/* REVISION REQUESTED BANNER */}
+            {needsEditing.length > 0 && (
+                <div className="space-y-3">
+                    {needsEditing.map(item => {
+                        const latestTeamNote = [...(item.teamNotes || [])].reverse().find(n => !n.isCreatorReply);
+                        return (
+                            <button
+                                key={item.id}
+                                onClick={() => onNavigate('upload')}
+                                className="w-full text-left bg-gradient-to-r from-orange-500/15 to-amber-500/10 border-2 border-orange-500/40 rounded-2xl p-5 hover:border-orange-500/60 transition-all group"
+                            >
+                                <div className="flex items-start gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <AlertTriangle size={18} className="text-orange-400" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-orange-400">
+                                                Revision Requested{item.revisionCount ? ` (Revision #${item.revisionCount})` : ''}
+                                            </span>
+                                        </div>
+                                        <p className="text-sm font-bold text-white mb-1">{item.title}</p>
+                                        {latestTeamNote && (
+                                            <div className="bg-black/30 rounded-lg px-3 py-2 border border-orange-500/10">
+                                                <p className="text-[10px] text-orange-300/80 font-bold uppercase tracking-widest mb-0.5">Team Notes:</p>
+                                                <p className="text-xs text-neutral-300 leading-relaxed">{latestTeamNote.text}</p>
+                                            </div>
+                                        )}
+                                        <p className="text-[10px] text-orange-400/60 mt-2 group-hover:text-orange-400 transition-colors flex items-center gap-1">
+                                            Tap to open Content Hub and re-upload <ArrowRight size={10} />
+                                        </p>
+                                    </div>
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+
             {/* NEW CAMPAIGNS ALERT */}
             {newCampaigns.length > 0 && (
                 <button
@@ -230,8 +270,8 @@ const CreatorDashboard: React.FC<Props> = ({ creator, campaigns, contentItems, t
                                     key={campaign.id}
                                     onClick={() => onNavigate('campaigns')}
                                     className={`w-full text-left p-4 rounded-xl border transition-all group hover:scale-[1.01] ${isComplete
-                                            ? 'bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/40'
-                                            : 'bg-black/50 border-neutral-800 hover:border-purple-500/30'
+                                        ? 'bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/40'
+                                        : 'bg-black/50 border-neutral-800 hover:border-purple-500/30'
                                         }`}
                                 >
                                     <div className="flex items-center justify-between mb-2">
@@ -242,8 +282,8 @@ const CreatorDashboard: React.FC<Props> = ({ creator, campaigns, contentItems, t
                                         <div className="flex items-center gap-2">
                                             {daysLeft !== null && !isComplete && (
                                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${daysLeft <= 2 ? 'bg-red-500/10 text-red-400' :
-                                                        daysLeft <= 5 ? 'bg-yellow-500/10 text-yellow-400' :
-                                                            'bg-neutral-500/10 text-neutral-400'
+                                                    daysLeft <= 5 ? 'bg-yellow-500/10 text-yellow-400' :
+                                                        'bg-neutral-500/10 text-neutral-400'
                                                     }`}>
                                                     <Calendar size={8} className="inline mr-1" />{daysLeft}d left
                                                 </span>
@@ -289,9 +329,9 @@ const CreatorDashboard: React.FC<Props> = ({ creator, campaigns, contentItems, t
                                     >
                                         <div className="flex items-center justify-between mb-1">
                                             <span className="text-xs font-bold text-white">{content.title}</span>
-                                            <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${content.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400' :
-                                                    content.status === 'Needs Changes' ? 'bg-orange-500/10 text-orange-400' :
-                                                        'bg-neutral-500/10 text-neutral-400'
+                                            <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${content.status === ContentStatus.Approved ? 'bg-emerald-500/10 text-emerald-400' :
+                                                content.status === ContentStatus.Editing ? 'bg-orange-500/10 text-orange-400' :
+                                                    'bg-neutral-500/10 text-neutral-400'
                                                 }`}>{content.status}</span>
                                         </div>
                                         <p className="text-[10px] text-neutral-400 truncate">💬 {latestNote.user}: {latestNote.text}</p>
@@ -316,8 +356,8 @@ const CreatorDashboard: React.FC<Props> = ({ creator, campaigns, contentItems, t
                                     <p className="text-[10px] text-neutral-500">{shipment.carrier} • {shipment.trackingNumber}</p>
                                 </div>
                                 <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-lg ${shipment.status === 'Delivered' ? 'bg-emerald-500/10 text-emerald-400' :
-                                        shipment.status === 'In Transit' ? 'bg-blue-500/10 text-blue-400' :
-                                            'bg-yellow-500/10 text-yellow-400'
+                                    shipment.status === 'In Transit' ? 'bg-blue-500/10 text-blue-400' :
+                                        'bg-yellow-500/10 text-yellow-400'
                                     }`}>
                                     {shipment.status === 'Delivered' ? '✅ ' : shipment.status === 'In Transit' ? '🚚 ' : '📦 '}{shipment.status}
                                 </span>

@@ -88,10 +88,7 @@ const extractTextFromHtml = (html: string) => {
     return decodeHtmlEntities(text);
 };
 
-
-// ── Send an email via server-side SMTP (creator@ooedn.com) ──
-// Routes through the server's nodemailer transporter instead of the Gmail API
-// so the email always comes from creator@ooedn.com, regardless of which team member is signed in.
+// ── Send an email FROM creator@ooedn.com ──
 export const sendEmail = async (
     token: string,
     to: string,
@@ -99,21 +96,50 @@ export const sendEmail = async (
     body: string,
     threadId?: string,
     inReplyTo?: string,
-    _fromEmail: string = TEAM_EMAIL
+    fromEmail: string = TEAM_EMAIL
 ): Promise<{ id: string; threadId: string }> => {
-    const resp = await fetch('/api/send-email', {
+    const hasNonAscii = /[^\x00-\x7F]/.test(subject);
+    const encodedSubject = hasNonAscii
+        ? `=?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`
+        : subject;
+
+    const headers = [
+        `From: OOEDN Creative Team <${fromEmail}>`,
+        `To: ${to}`,
+        `Subject: ${encodedSubject}`,
+        `Content-Type: text/plain; charset=utf-8`,
+        `MIME-Version: 1.0`,
+    ];
+    if (inReplyTo) {
+        headers.push(`In-Reply-To: ${inReplyTo}`);
+        headers.push(`References: ${inReplyTo}`);
+    }
+
+    const rawEmail = [...headers, '', body].join('\r\n');
+    const encoded = btoa(unescape(encodeURIComponent(rawEmail)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
+    const payload: any = { raw: encoded };
+    if (threadId) payload.threadId = threadId;
+
+    const resp = await fetch(`${GMAIL_API_BASE}/users/${GMAIL_USER}/messages/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to, subject, body, inReplyTo }),
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
     });
 
     if (!resp.ok) {
         const err = await resp.text();
-        throw new Error(`SMTP Send Failed (${resp.status}): ${err}`);
+        throw new Error(`Gmail Send Failed (${resp.status}): ${err}`);
     }
 
     const result = await resp.json();
-    console.log(`[Gmail→SMTP] Email sent to ${to}: ${subject}`);
+    console.log(`[Gmail] Email sent from ${fromEmail} to ${to}: ${subject}`);
     return { id: result.id, threadId: result.threadId };
 };
 
