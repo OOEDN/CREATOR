@@ -124,6 +124,9 @@ export interface ContentItem {
   approvedByTeam?: boolean;         // Team approved content for posting/payment
   approvedAt?: string;
   approvedBy?: string;
+  // Review tracking
+  reviewedAt?: string;              // When the content was last reviewed
+  reviewedBy?: string;              // Who reviewed it
 }
 
 export interface CampaignTask {

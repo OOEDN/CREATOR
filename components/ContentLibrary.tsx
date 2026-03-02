@@ -3,7 +3,8 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { ContentItem, ContentStatus, ContentType, Platform, AppSettings } from '../types';
 import {
   Upload, Trash2, X, Loader2, Play, Search,
-  Sparkles, DownloadCloud, Copy, CheckCircle2, Maximize2, Film, Image as ImageIcon, Tag, HardDrive, Filter, CheckCircle, Circle, ChevronRight
+  Sparkles, DownloadCloud, Copy, CheckCircle2, Maximize2, Film, Image as ImageIcon, Tag, HardDrive, Filter, CheckCircle, Circle, ChevronRight,
+  Eye, Edit3, Send, MessageSquare
 } from 'lucide-react';
 import { CONTENT_STATUS_COLORS, PLATFORM_ICONS, PLATFORM_COLORS } from '../constants';
 import { uploadToGoogleCloud } from '../services/googleCloudStorage';
@@ -81,6 +82,7 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set());
+  const [reviewNote, setReviewNote] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filteredItems = useMemo(() => {
@@ -296,13 +298,106 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({
                 </>
               )}
             </div>
-            {/* Metadata Sidebar */}
-            <div className="w-full md:w-80 bg-neutral-900/80 p-6 rounded-2xl border border-neutral-800 backdrop-blur-md h-fit">
-              <h3 className="text-xl font-bold text-white mb-2">{previewItem.title}</h3>
-              <p className="text-xs text-neutral-500 uppercase font-black tracking-widest mb-6">@{previewItem.creatorName}</p>
+            {/* Review & Metadata Sidebar */}
+            <div className="w-full md:w-96 bg-neutral-900/80 p-6 rounded-2xl border border-neutral-800 backdrop-blur-md h-fit space-y-5 max-h-[80vh] overflow-y-auto">
+              <h3 className="text-xl font-bold text-white mb-1">{previewItem.title}</h3>
+              <p className="text-xs text-neutral-500 uppercase font-black tracking-widest">@{previewItem.creatorName} • {new Date(previewItem.uploadDate).toLocaleDateString()}</p>
 
-              {/* PLATFORM SELECTOR IN PREVIEW */}
-              <div className="mb-6">
+              {/* STATUS BADGE */}
+              <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest ${CONTENT_STATUS_COLORS[previewItem.status]} border border-current/20`}>
+                {previewItem.status === ContentStatus.Raw && '📦'}
+                {previewItem.status === ContentStatus.Approved && '✅'}
+                {previewItem.status === ContentStatus.Ready && '🟢'}
+                {previewItem.status === ContentStatus.Posted && '🚀'}
+                {previewItem.status === ContentStatus.Editing && '✂️'}
+                {previewItem.status}
+              </div>
+
+              {/* REVIEW ACTIONS — only for Raw/Editing content */}
+              {(previewItem.status === ContentStatus.Raw || previewItem.status === ContentStatus.Editing) && (
+                <div className="space-y-3">
+                  <p className="text-[10px] font-black text-fuchsia-400 uppercase tracking-widest flex items-center gap-1">
+                    <Eye size={12} /> Review Actions
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => {
+                        onUpdate(previewItem.id, { status: ContentStatus.Approved, reviewedAt: new Date().toISOString(), reviewedBy: 'Team' });
+                        setPreviewItem({ ...previewItem, status: ContentStatus.Approved });
+                      }}
+                      className="py-2.5 bg-emerald-500 text-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-400 transition-all active:scale-95 flex items-center justify-center gap-1"
+                    >
+                      <CheckCircle size={14} /> Approve
+                    </button>
+                    <button
+                      onClick={() => {
+                        onUpdate(previewItem.id, { status: ContentStatus.Editing, reviewedAt: new Date().toISOString(), reviewedBy: 'Team' });
+                        setPreviewItem({ ...previewItem, status: ContentStatus.Editing });
+                      }}
+                      className="py-2.5 bg-amber-500 text-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-400 transition-all active:scale-95 flex items-center justify-center gap-1"
+                    >
+                      <Edit3 size={14} /> Needs Changes
+                    </button>
+                  </div>
+
+                  {/* Team Note Input */}
+                  <div>
+                    <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-1 block">Review Note</label>
+                    <div className="flex gap-2">
+                      <input
+                        value={reviewNote}
+                        onChange={(e) => setReviewNote(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && reviewNote.trim()) {
+                            const note = { id: crypto.randomUUID(), user: 'Team', text: reviewNote.trim(), date: new Date().toISOString() };
+                            onUpdate(previewItem.id, { teamNotes: [...(previewItem.teamNotes || []), note] });
+                            setPreviewItem({ ...previewItem, teamNotes: [...(previewItem.teamNotes || []), note] });
+                            setReviewNote('');
+                          }
+                        }}
+                        placeholder="Add feedback for the creator..."
+                        className="flex-1 bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-fuchsia-500/50"
+                      />
+                      <button
+                        onClick={() => {
+                          if (!reviewNote.trim()) return;
+                          const note = { id: crypto.randomUUID(), user: 'Team', text: reviewNote.trim(), date: new Date().toISOString() };
+                          onUpdate(previewItem.id, { teamNotes: [...(previewItem.teamNotes || []), note] });
+                          setPreviewItem({ ...previewItem, teamNotes: [...(previewItem.teamNotes || []), note] });
+                          setReviewNote('');
+                        }}
+                        className="p-2 bg-fuchsia-500 text-black rounded-lg hover:bg-fuchsia-400 transition-all"
+                        title="Add note"
+                      >
+                        <Send size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* EXISTING TEAM NOTES */}
+              {previewItem.teamNotes && previewItem.teamNotes.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                    <MessageSquare size={10} /> Team Notes ({previewItem.teamNotes.length})
+                  </p>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {previewItem.teamNotes.map(note => (
+                      <div key={note.id} className={`p-2.5 rounded-lg border text-xs ${note.isCreatorReply ? 'bg-purple-500/5 border-purple-500/10' : 'bg-blue-500/5 border-blue-500/10'}`}>
+                        <div className="flex justify-between mb-1">
+                          <span className={`text-[9px] font-bold ${note.isCreatorReply ? 'text-purple-400' : 'text-blue-400'}`}>{note.isCreatorReply ? `💬 ${note.user}` : `📣 ${note.user}`}</span>
+                          <span className="text-[8px] text-neutral-600">{new Date(note.date).toLocaleDateString()}</span>
+                        </div>
+                        <p className="text-neutral-300">{note.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* PLATFORM SELECTOR */}
+              <div>
                 <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-2 block">Target Platform</label>
                 <select
                   value={previewItem.platform}
@@ -314,7 +409,7 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({
               </div>
 
               {previewItem.tags && previewItem.tags.length > 0 && (
-                <div className="mb-6">
+                <div>
                   <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2 flex items-center gap-2"><Sparkles size={12} /> AI Vision Tags</p>
                   <div className="flex flex-wrap gap-2">
                     {previewItem.tags.map(tag => (
@@ -443,6 +538,15 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({
                   <div className="bg-emerald-500 text-white border-2 border-white px-4 py-1 rounded-lg transform -rotate-12 shadow-2xl">
                     <p className="text-lg font-black uppercase tracking-widest">USED</p>
                   </div>
+                </div>
+              )}
+
+              {/* PENDING REVIEW BADGE */}
+              {item.status === ContentStatus.Raw && !item.isUsed && (
+                <div className="absolute bottom-2 right-2 z-20">
+                  <span className="px-2 py-1 bg-fuchsia-500/90 text-white text-[7px] font-black uppercase tracking-widest rounded-md backdrop-blur-md animate-pulse flex items-center gap-1">
+                    <Eye size={8} /> Review
+                  </span>
                 </div>
               )}
 
