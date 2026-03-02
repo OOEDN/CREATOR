@@ -7,15 +7,13 @@ import { Creator, Campaign, ContentItem, AppSettings, TeamMessage, TeamTask } fr
 // Uses the logged-in user's OAuth token + Gmail send-as alias
 // ===================================================================
 
-const TEAM_EMAIL = 'creator@ooedn.com';
+const TEAM_EMAIL = 'create@ooedn.com';
 
-// Gmail API user identifier — use the shared team email for sending
-// In production, this routes through a server proxy that authenticates as create@ooedn.com
-const GMAIL_USER = 'create@ooedn.com';
+// Gmail API user — 'me' uses the signed-in user's mailbox (for reading inbox, threads, etc.)
+const GMAIL_USER = 'me';
 
-// Route Gmail API calls through our own server proxy
-// The server forwards to gmail.googleapis.com using create@ooedn.com credentials
-const GMAIL_API_BASE = '/api/gmail/v1';
+// Direct Gmail API for reading — sending routes through server SMTP instead
+const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1';
 
 export interface EmailMessage {
     id: string;
@@ -86,7 +84,10 @@ const extractTextFromHtml = (html: string) => {
     return decodeHtmlEntities(text);
 };
 
-// ── Send an email FROM creator@ooedn.com ──
+// ── Send an email via server-side SMTP (create@ooedn.com) ──
+// Reading emails uses Gmail API with the signed-in user's token.
+// SENDING routes through the server's SMTP (nodemailer) authenticated as create@ooedn.com
+// so emails always come from create@ooedn.com regardless of who's signed in.
 export const sendEmail = async (
     token: string,
     to: string,
@@ -96,49 +97,20 @@ export const sendEmail = async (
     inReplyTo?: string,
     fromEmail: string = TEAM_EMAIL
 ): Promise<{ id: string; threadId: string }> => {
-    const hasNonAscii = /[^\x00-\x7F]/.test(subject);
-    const encodedSubject = hasNonAscii
-        ? `=?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`
-        : subject;
-
-    const headers = [
-        `From: OOEDN Creative Team <${fromEmail}>`,
-        `To: ${to}`,
-        `Subject: ${encodedSubject}`,
-        `Content-Type: text/plain; charset=utf-8`,
-        `MIME-Version: 1.0`,
-    ];
-    if (inReplyTo) {
-        headers.push(`In-Reply-To: ${inReplyTo}`);
-        headers.push(`References: ${inReplyTo}`);
-    }
-
-    const rawEmail = [...headers, '', body].join('\r\n');
-    const encoded = btoa(unescape(encodeURIComponent(rawEmail)))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
-
-    const payload: any = { raw: encoded };
-    if (threadId) payload.threadId = threadId;
-
-    const resp = await fetch(`${GMAIL_API_BASE}/users/${GMAIL_USER}/messages/send`, {
+    const resp = await fetch('/api/send-email', {
         method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to, subject, body, inReplyTo }),
     });
 
     if (!resp.ok) {
         const err = await resp.text();
-        throw new Error(`Gmail Send Failed (${resp.status}): ${err}`);
+        throw new Error(`Email Send Failed (${resp.status}): ${err}`);
     }
 
     const result = await resp.json();
-    console.log(`[Gmail] Email sent from ${fromEmail} to ${to}: ${subject}`);
-    return { id: result.id, threadId: result.threadId };
+    console.log(`[Email] Sent to ${to}: ${subject}`);
+    return { id: result.id || 'smtp', threadId: result.threadId || 'smtp' };
 };
 
 // ── Send bulk emails to multiple creators ──
