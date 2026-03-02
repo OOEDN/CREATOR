@@ -215,14 +215,14 @@ const CreatorEditModal: React.FC<CreatorEditModalProps> = ({
             }
 
             // Email credentials via Gmail (using admin's OAuth token)
-            const portalUrl = window.location.origin + '/creator';
-            const emailBody = `Hey ${creator.name}! 🎉\\n\\nYou've been invited to the OOEDN Creator Portal!\\n\\nHere are your login credentials:\\n\\n📧 Email: ${creatorEmail}\\n🔑 Password: ${password}\\n\\n🔗 Portal Link: ${portalUrl}\\n\\nLog in to view your campaigns, upload content, request payments, and chat with the team.\\n\\nWelcome aboard! 🚀\\n\\n— The OOEDN Creative Team`;
+            const portalUrl = 'https://ooedn-creators-270857128950.us-west1.run.app';
+            const emailBody = `Hey ${creator.name}!\n\nYou've been invited to the OOEDN Creator Portal!\n\nHere are your login credentials:\n\nEmail: ${creatorEmail}\nPassword: ${password}\n\nPortal Link: ${portalUrl}\n\nLog in to view your campaigns, upload content, request payments, and chat with the team.\n\nWelcome aboard!\n\n-- The OOEDN Creative Team`;
 
             try {
                 await sendEmail(
                     appSettings.googleCloudToken!,
                     creatorEmail,
-                    '🎉 Welcome to the OOEDN Creator Portal!',
+                    'Welcome to the OOEDN Creator Portal!',
                     emailBody
                 );
             } catch (emailErr: any) {
