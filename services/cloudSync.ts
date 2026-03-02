@@ -281,13 +281,51 @@ export const syncStateToCloud = async (
         fileUrl: c.storageType === 'cloud' ? c.fileUrl : ''
     }));
 
+    // ── MERGE CONTENT ITEMS: Creator uploads arrive via /api/creator/save directly to GCS.
+    // Admin auto-save must NOT overwrite them. Merge cloud content with admin state. ──
+    let mergedContent: ContentItem[] = cleanContent as ContentItem[];
+    let mergedMessages = teamMessages || [];
+    try {
+        const existing = await fetchJSONFromGoogleCloud(
+            settings.googleCloudBucket,
+            settings.googleCloudToken,
+            MASTER_DB_FILENAME,
+            settings.googleProjectId
+        ) as MasterDB | null;
+
+        // Merge content: keep cloud items that admin doesn't have (creator uploads)
+        if (existing?.contentItems) {
+            const adminContentIds = new Set(cleanContent.map(c => c.id));
+            const creatorOnlyContent = existing.contentItems.filter(c =>
+                !adminContentIds.has(c.id) && c.storageType === 'cloud'
+            );
+            if (creatorOnlyContent.length > 0) {
+                console.log(`[CloudSync] 🔄 Merging ${creatorOnlyContent.length} creator-uploaded items from cloud`);
+                mergedContent = [...cleanContent, ...creatorOnlyContent];
+            }
+        }
+
+        // Merge messages: keep cloud messages that admin doesn't have (creator messages)
+        if (existing?.teamMessages && mergedMessages) {
+            const adminMsgIds = new Set(mergedMessages.map(m => m.id));
+            const cloudOnlyMsgs = existing.teamMessages.filter(m => !adminMsgIds.has(m.id));
+            if (cloudOnlyMsgs.length > 0) {
+                console.log(`[CloudSync] 🔄 Merging ${cloudOnlyMsgs.length} messages from cloud`);
+                mergedMessages = [...mergedMessages, ...cloudOnlyMsgs];
+            }
+        }
+    } catch (e) {
+        // If we can't read cloud, still save (we already read for accounts above)
+        console.warn('[CloudSync] ⚠️ Could not merge content/messages from cloud — saving admin state as-is');
+    }
+
     const dbPayload: MasterDB = {
         lastUpdated: new Date().toISOString(),
         creators,
         campaigns,
-        contentItems: cleanContent,
+        contentItems: mergedContent,
         brandInfo,
-        teamMessages,
+        teamMessages: mergedMessages,
         teamTasks,
         betaTests,
         betaReleases,

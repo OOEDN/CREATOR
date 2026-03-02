@@ -930,6 +930,13 @@ function App() {
                                         setTeamMessages(prev => [...prev, msg]);
                                         // Auto-save debounce will pick this up
                                     }}
+                                    onMarkRead={(creatorId) => {
+                                        setTeamMessages(prev => prev.map(m =>
+                                            m.creatorId === creatorId && m.isCreatorMessage && !m.readByTeam
+                                                ? { ...m, readByTeam: true }
+                                                : m
+                                        ));
+                                    }}
                                     onPushNotify={async (creatorIds, title, body) => {
                                         try {
                                             await fetch('/api/push/send-creators', {

@@ -6,13 +6,14 @@ interface CreatorCommsWidgetProps {
     teamMessages: TeamMessage[];
     creators: Creator[];
     onSendMessage: (msg: TeamMessage) => void;
+    onMarkRead: (creatorId: string) => void;
     onPushNotify: (creatorIds: string[], title: string, body: string) => void;
     onEmailCreators: (creatorIds: string[], subject: string, body: string) => void;
     currentUser: string;
 }
 
 const CreatorCommsWidget: React.FC<CreatorCommsWidgetProps> = ({
-    teamMessages = [], creators = [], onSendMessage, onPushNotify, onEmailCreators, currentUser
+    teamMessages = [], creators = [], onSendMessage, onMarkRead, onPushNotify, onEmailCreators, currentUser
 }) => {
     const [selectedCreatorId, setSelectedCreatorId] = useState<string | null>(null);
     const [replyText, setReplyText] = useState('');
@@ -50,6 +51,13 @@ const CreatorCommsWidget: React.FC<CreatorCommsWidgetProps> = ({
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [selectedCreatorId, teamMessages]);
+
+    // Mark messages as read when a thread is opened
+    useEffect(() => {
+        if (selectedCreatorId) {
+            onMarkRead(selectedCreatorId);
+        }
+    }, [selectedCreatorId]);
 
     const handleSendReply = () => {
         if (!replyText.trim() || !selectedCreatorId) return;
