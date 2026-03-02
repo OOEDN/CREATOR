@@ -884,6 +884,67 @@ app.post('/api/creator/reset-password', async (req, res) => {
   }
 });
 
+// --- POST /api/creator/delete-account --- (admin utility)
+app.post('/api/creator/delete-account', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'email required' });
+
+    const db = await readMasterDB();
+    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
+
+    const before = (db.creatorAccounts || []).length;
+    db.creatorAccounts = (db.creatorAccounts || []).filter(a => a.email.toLowerCase() !== email.toLowerCase().trim());
+    const after = db.creatorAccounts.length;
+
+    if (before === after) return res.status(404).json({ error: `No account found for ${email}` });
+
+    db.lastUpdated = new Date().toISOString();
+    db.version = Date.now();
+    const saved = await writeMasterDB(db);
+    if (!saved) return res.status(500).json({ error: 'Failed to save' });
+
+    console.log(`[CreatorAuth] 🗑️ Deleted account: ${email}`);
+    res.json({ success: true, deleted: email, remaining: after });
+  } catch (e) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// --- POST /api/creator/debug-login --- (debug: test password without logging in)
+app.post('/api/creator/debug-login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const db = await readMasterDB();
+    if (!db) return res.status(503).json({ error: 'DB unavailable' });
+
+    const account = (db.creatorAccounts || []).find(a => a.email.toLowerCase() === email.toLowerCase().trim());
+    if (!account) return res.json({ found: false, message: 'No account found' });
+
+    const storedHash = account.password;
+    const isBcrypt = storedHash.startsWith('$2a$') || storedHash.startsWith('$2b$');
+    const inputTrimmed = password.trim();
+
+    let result = false;
+    if (isBcrypt) {
+      result = await bcrypt.compare(inputTrimmed, storedHash);
+    } else {
+      result = storedHash === inputTrimmed;
+    }
+
+    res.json({
+      found: true,
+      email: account.email,
+      isBcrypt,
+      hashPrefix: storedHash.substring(0, 10) + '...',
+      inputLength: inputTrimmed.length,
+      passwordMatch: result
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // --- GET /api/creator/accounts-check --- (admin debug - no passwords)
 app.get('/api/creator/accounts-check', async (req, res) => {
   try {
