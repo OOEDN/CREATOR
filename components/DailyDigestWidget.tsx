@@ -53,15 +53,16 @@ const DailyDigestWidget: React.FC<DailyDigestWidgetProps> = ({
             )
         );
 
-        // Videos pending review (Raw status, uploaded in last 7 days)
+        // Videos pending review (Raw status, uploaded from creator portal = cloud storage)
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
         const pendingReviewVideos = contentItems.filter(c =>
-            c.status === ContentStatus.Raw && c.uploadDate > weekAgo
+            c.status === ContentStatus.Raw && c.uploadDate > weekAgo &&
+            c.creatorId && c.creatorId !== 'team' && c.storageType === 'cloud'
         );
 
-        // Creator messages in last 24h
+        // Unread creator messages in last 24h (exclude already-read messages)
         const creatorMessages = teamMessages.filter(m =>
-            m.timestamp > yesterday && m.isCreatorMessage
+            m.timestamp > yesterday && m.isCreatorMessage && !m.readByTeam
         );
 
         // Upcoming deadlines (next 3 days)

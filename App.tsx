@@ -1051,8 +1051,9 @@ function App() {
                     {view === 'asset-pool' && (
                         <ContentLibrary
                             items={contentItems.filter(c => {
-                                // Hide unapproved creator content from Asset Pool — it belongs in Pending Review
-                                if (c.creatorId && c.creatorId !== 'team' && (c.status === ContentStatus.Raw || c.status === ContentStatus.Editing)) {
+                                // Hide unapproved creator-portal uploads — they belong in Pending Review
+                                // Only hide content with storageType 'cloud' (uploaded from creator portal)
+                                if (c.creatorId && c.creatorId !== 'team' && c.storageType === 'cloud' && (c.status === ContentStatus.Raw || c.status === ContentStatus.Editing)) {
                                     return false;
                                 }
                                 return true;

@@ -194,6 +194,7 @@ export interface TeamMessage {
   creatorId?: string;
   creatorName?: string;
   isCreatorMessage?: boolean;
+  readByTeam?: boolean;             // Whether the team has read this creator message
 }
 
 export interface TeamTask {

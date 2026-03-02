@@ -24,8 +24,12 @@ const PendingReview: React.FC<PendingReviewProps> = ({ contentItems, onUpdateCon
     const [noteText, setNoteText] = useState('');
     const [filter, setFilter] = useState<'all' | 'pending' | 'changes' | 'approved'>('pending');
 
-    // Get only creator-submitted content (has creatorId and not team-created)
-    const creatorContent = contentItems.filter(c => c.creatorId && c.creatorId !== 'team');
+    // Only show content that was UPLOADED FROM the creator portal
+    // storageType === 'cloud' means it came through the creator upload flow (uploaded to GCS)
+    // This excludes team-uploaded content that just happens to be associated with a creator
+    const creatorContent = contentItems.filter(c =>
+        c.creatorId && c.creatorId !== 'team' && c.storageType === 'cloud'
+    );
 
     const filteredContent = creatorContent.filter(c => {
         if (filter === 'pending') return c.status === ContentStatus.Raw;
@@ -170,8 +174,8 @@ const PendingReview: React.FC<PendingReviewProps> = ({ contentItems, onUpdateCon
 
                     return (
                         <div key={item.id} className={`bg-ooedn-gray border rounded-2xl overflow-hidden transition-all ${item.status === ContentStatus.Raw ? 'border-fuchsia-500/30' :
-                                item.status === ContentStatus.Editing ? 'border-amber-500/30' :
-                                    'border-neutral-800'
+                            item.status === ContentStatus.Editing ? 'border-amber-500/30' :
+                                'border-neutral-800'
                             }`}>
                             {/* Header Row */}
                             <div
@@ -286,8 +290,8 @@ const PendingReview: React.FC<PendingReviewProps> = ({ contentItems, onUpdateCon
                                                     <div
                                                         key={note.id}
                                                         className={`p-3 rounded-xl border text-xs ${note.isCreatorReply
-                                                                ? 'bg-purple-500/5 border-purple-500/15 ml-4'
-                                                                : 'bg-blue-500/5 border-blue-500/15 mr-4'
+                                                            ? 'bg-purple-500/5 border-purple-500/15 ml-4'
+                                                            : 'bg-blue-500/5 border-blue-500/15 mr-4'
                                                             }`}
                                                     >
                                                         <div className="flex justify-between mb-1">
