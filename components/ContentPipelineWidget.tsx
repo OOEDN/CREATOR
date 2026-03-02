@@ -64,12 +64,17 @@ const ContentPipelineWidget: React.FC<ContentPipelineWidgetProps> = ({ contentIt
                     {counts.map(stage => (
                         <div
                             key={stage.status}
-                            className="flex-1 bg-black/30 rounded-lg px-3 py-2 border border-neutral-800/50 flex items-center justify-between"
+                            className={`flex-1 bg-black/30 rounded-lg px-3 py-2 border ${stage.status === ContentStatus.Raw && stage.count > 0 ? 'border-fuchsia-500/40 bg-fuchsia-500/5' : 'border-neutral-800/50'} flex items-center justify-between`}
                         >
                             <span className={`text-[9px] font-black uppercase tracking-wider ${stage.textColor}`}>
                                 {stage.emoji} {stage.label}
                             </span>
-                            <span className="text-sm font-black text-white">{stage.count}</span>
+                            <span className="text-sm font-black text-white flex items-center gap-1">
+                                {stage.status === ContentStatus.Raw && stage.count > 0 && (
+                                    <span className="w-2 h-2 bg-fuchsia-500 rounded-full animate-pulse" />
+                                )}
+                                {stage.count}
+                            </span>
                         </div>
                     ))}
                 </div>

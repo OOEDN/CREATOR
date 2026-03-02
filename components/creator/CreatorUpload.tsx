@@ -61,7 +61,46 @@ const CreatorUpload: React.FC<Props> = ({ creator, contentItems, onUpload, onRep
         if (!selectedFile || !title) return;
         setIsUploading(true);
         try {
-            const fileUrl = URL.createObjectURL(selectedFile);
+            // Read file as base64
+            const base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const result = reader.result as string;
+                    // Strip the data:...;base64, prefix
+                    resolve(result.split(',')[1]);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(selectedFile);
+            });
+
+            // Upload to GCS via server API
+            const jwt = localStorage.getItem('ooedn_creator_jwt');
+            const uploadResp = await fetch('/api/creator/upload-file', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${jwt}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    fileData: base64,
+                    fileName: selectedFile.name,
+                    contentType: selectedFile.type,
+                }),
+            });
+
+            let fileUrl = '';
+            let storageType: 'cloud' | 'local' = 'local';
+
+            if (uploadResp.ok) {
+                const uploadData = await uploadResp.json();
+                fileUrl = uploadData.url;
+                storageType = 'cloud';
+            } else {
+                // Fallback to local blob if GCS upload fails (dev mode)
+                console.warn('[Upload] GCS upload failed, using local blob URL');
+                fileUrl = URL.createObjectURL(selectedFile);
+            }
+
             const item: ContentItem = {
                 id: crypto.randomUUID(),
                 creatorId: creator.id,
@@ -71,7 +110,7 @@ const CreatorUpload: React.FC<Props> = ({ creator, contentItems, onUpload, onRep
                 status: ContentStatus.Raw,
                 platform,
                 fileUrl,
-                storageType: 'local',
+                storageType,
                 uploadDate: new Date().toISOString(),
                 caption: caption || undefined,
                 tags: [creator.name, 'creator-upload'],
@@ -81,6 +120,8 @@ const CreatorUpload: React.FC<Props> = ({ creator, contentItems, onUpload, onRep
             setTitle('');
             setCaption('');
             setPreview(null);
+        } catch (e) {
+            console.error('[Upload] Submit error:', e);
         } finally {
             setIsUploading(false);
         }
@@ -129,8 +170,8 @@ const CreatorUpload: React.FC<Props> = ({ creator, contentItems, onUpload, onRep
                         onDrop={handleDrop}
                         onClick={() => fileRef.current?.click()}
                         className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${isDragging ? 'border-purple-500 bg-purple-500/5 scale-[1.02]' :
-                                selectedFile ? 'border-emerald-500/30 bg-emerald-500/5' :
-                                    'border-neutral-800 hover:border-purple-500/30 bg-neutral-900/80'
+                            selectedFile ? 'border-emerald-500/30 bg-emerald-500/5' :
+                                'border-neutral-800 hover:border-purple-500/30 bg-neutral-900/80'
                             }`}
                     >
                         <input
@@ -290,8 +331,8 @@ const CreatorUpload: React.FC<Props> = ({ creator, contentItems, onUpload, onRep
                                                             <div
                                                                 key={note.id}
                                                                 className={`p-3 rounded-xl border ${note.isCreatorReply
-                                                                        ? 'bg-purple-500/5 border-purple-500/10 ml-4'
-                                                                        : 'bg-blue-500/5 border-blue-500/10'
+                                                                    ? 'bg-purple-500/5 border-purple-500/10 ml-4'
+                                                                    : 'bg-blue-500/5 border-blue-500/10'
                                                                     }`}
                                                             >
                                                                 <div className="flex items-center justify-between mb-1">

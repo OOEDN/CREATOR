@@ -15,7 +15,7 @@ const app = express();
 const port = process.env.PORT || 8080;
 
 // --- JSON body parser for API endpoints ---
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 // --- VAPID Configuration ---
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BCibI4a7TWgbM97VXFd9u73W-ZwS1FHRLciBfCOPjyMx-CVC8zqQk3DWsoMv-F8eMtR8Fz-2EZ_cJDfdZZgXBCo';
@@ -967,6 +967,65 @@ app.get('/api/creator/accounts-check', async (req, res) => {
     res.json({ count: accounts.length, accounts });
   } catch (e) {
     res.status(500).json({ error: 'Failed to check accounts' });
+  }
+});
+
+// --- POST /api/creator/upload-file --- (JWT protected, uploads file to GCS)
+app.post('/api/creator/upload-file', creatorAuthMiddleware, async (req, res) => {
+  try {
+    const { fileData, fileName, contentType } = req.body;
+    if (!fileData || !fileName) return res.status(400).json({ error: 'fileData and fileName required' });
+
+    const token = await getGCSAuthToken();
+    if (!token) return res.status(503).json({ error: 'GCS auth unavailable' });
+
+    // Determine the account's linked creator ID
+    const db = await readMasterDB();
+    const account = (db?.creatorAccounts || []).find(a => a.id === req.creatorAccountId);
+    const creatorId = account?.linkedCreatorId || req.creatorAccountId;
+
+    // Build GCS path: creator-uploads/{creatorId}/{timestamp}-{filename}
+    const sanitizedName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const gcsPath = `creator-uploads/${creatorId}/${Date.now()}-${sanitizedName}`;
+
+    // Decode base64 and upload to GCS
+    const buffer = Buffer.from(fileData, 'base64');
+    const mimeType = contentType || 'application/octet-stream';
+
+    const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${MAIN_BUCKET}/o?uploadType=media&name=${encodeURIComponent(gcsPath)}`;
+    const uploadRes = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': mimeType,
+      },
+      body: buffer,
+    });
+
+    if (!uploadRes.ok) {
+      const err = await uploadRes.text();
+      console.error('[Upload] GCS upload failed:', err);
+      return res.status(500).json({ error: 'File upload failed' });
+    }
+
+    // Make the object publicly readable
+    const aclUrl = `https://storage.googleapis.com/storage/v1/b/${MAIN_BUCKET}/o/${encodeURIComponent(gcsPath)}/acl`;
+    await fetch(aclUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ entity: 'allUsers', role: 'READER' }),
+    }).catch(e => console.warn('[Upload] ACL set failed (file may not be public):', e));
+
+    const publicUrl = `https://storage.googleapis.com/${MAIN_BUCKET}/${gcsPath}`;
+    console.log(`[Upload] ✅ File uploaded: ${publicUrl}`);
+
+    res.json({ success: true, url: publicUrl, gcsPath });
+  } catch (e) {
+    console.error('[Upload] Error:', e);
+    res.status(500).json({ error: 'Upload failed' });
   }
 });
 

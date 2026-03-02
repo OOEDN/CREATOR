@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Clock, MessageSquare, Truck, CheckCircle, ArrowRight, Brain, Loader2, Sparkles, DollarSign } from 'lucide-react';
-import { Creator, TeamTask, TeamMessage, ShipmentStatus, PaymentStatus } from '../types';
+import { AlertTriangle, Clock, MessageSquare, Truck, CheckCircle, ArrowRight, Brain, Loader2, Sparkles, DollarSign, Video, UserCheck } from 'lucide-react';
+import { Creator, TeamTask, TeamMessage, ContentItem, ContentStatus, ShipmentStatus, PaymentStatus } from '../types';
 import { auraDigest } from '../services/aura/auraCore';
 
 interface DailyDigestWidgetProps {
     creators: Creator[];
     teamTasks: TeamTask[];
     teamMessages: TeamMessage[];
+    contentItems?: ContentItem[];
     currentUser: string;
     onNavigate: (view: string) => void;
 }
 
 const DailyDigestWidget: React.FC<DailyDigestWidgetProps> = ({
-    creators, teamTasks, teamMessages, currentUser, onNavigate
+    creators, teamTasks, teamMessages, contentItems = [], currentUser, onNavigate
 }) => {
     try {
         const now = new Date();
@@ -52,6 +53,17 @@ const DailyDigestWidget: React.FC<DailyDigestWidgetProps> = ({
             )
         );
 
+        // Videos pending review (Raw status, uploaded in last 7 days)
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const pendingReviewVideos = contentItems.filter(c =>
+            c.status === ContentStatus.Raw && c.uploadDate > weekAgo
+        );
+
+        // Creator messages in last 24h
+        const creatorMessages = teamMessages.filter(m =>
+            m.timestamp > yesterday && m.isCreatorMessage
+        );
+
         // Upcoming deadlines (next 3 days)
         const threeDaysOut = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         const upcomingDeadlines = teamTasks.filter(t =>
@@ -59,6 +71,22 @@ const DailyDigestWidget: React.FC<DailyDigestWidgetProps> = ({
         );
 
         const items = [
+            {
+                show: pendingReviewVideos.length > 0,
+                icon: <Video size={14} className="text-fuchsia-400 animate-pulse" />,
+                label: `${pendingReviewVideos.length} video${pendingReviewVideos.length !== 1 ? 's' : ''} pending review`,
+                color: 'text-fuchsia-400',
+                bgColor: 'bg-fuchsia-500/10 border-fuchsia-500/20',
+                action: () => onNavigate('asset-pool')
+            },
+            {
+                show: creatorMessages.length > 0,
+                icon: <UserCheck size={14} className="text-emerald-400" />,
+                label: `${creatorMessages.length} message${creatorMessages.length !== 1 ? 's' : ''} from creators`,
+                color: 'text-emerald-400',
+                bgColor: 'bg-emerald-500/10 border-emerald-500/20',
+                action: () => onNavigate('dashboard')
+            },
             {
                 show: overdueTasks.length > 0,
                 icon: <AlertTriangle size={14} className="text-red-400" />,

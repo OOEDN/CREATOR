@@ -414,6 +414,38 @@ function App() {
         return unsub;
     }, []);
 
+    // Poll for creator activity (messages, uploads) every 30s
+    useEffect(() => {
+        if (!isConnected || !settings.googleCloudToken || !initialLoadCompleteRef.current) return;
+        const interval = setInterval(async () => {
+            try {
+                const data = await loadRemoteState(settings);
+                if (!data) return;
+                // Merge new creator messages (don't overwrite — append new ones)
+                if (data.teamMessages) {
+                    const existingIds = new Set(teamMessages.map(m => m.id));
+                    const newMsgs = data.teamMessages.filter(m => !existingIds.has(m.id));
+                    if (newMsgs.length > 0) {
+                        console.log(`[Poll] 📩 ${newMsgs.length} new messages from creators`);
+                        setTeamMessages(prev => [...prev, ...newMsgs]);
+                    }
+                }
+                // Merge new content items
+                if (data.contentItems) {
+                    const existingContentIds = new Set(contentItems.map(c => c.id));
+                    const newContent = data.contentItems.filter(c => !existingContentIds.has(c.id));
+                    if (newContent.length > 0) {
+                        console.log(`[Poll] 🎬 ${newContent.length} new content uploads from creators`);
+                        setContentItems(prev => [...prev, ...newContent]);
+                    }
+                }
+                // Update creator accounts
+                if (data.creatorAccounts) setCreatorAccounts(data.creatorAccounts);
+            } catch (e) { /* silent polling failure */ }
+        }, 30000);
+        return () => clearInterval(interval);
+    }, [isConnected, settings.googleCloudToken]);
+
     // Auth error listener — prompt user to re-login
     useEffect(() => {
         const handler = (e: Event) => {
@@ -782,6 +814,7 @@ function App() {
                                 creators={creators}
                                 teamTasks={teamTasks}
                                 teamMessages={teamMessages}
+                                contentItems={contentItems}
                                 currentUser={userEmail || ''}
                                 onNavigate={(v) => setView(v as any)}
                             />
