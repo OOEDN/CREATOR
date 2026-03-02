@@ -219,7 +219,38 @@ app.post('/api/push/send-creators', async (req, res) => {
   }
 });
 
-// Send email to creators
+// ── General-purpose email send via SMTP (creator@ooedn.com) ──
+// Used by the team app's gmailService to ensure ALL outgoing emails come from creator@ooedn.com
+app.post('/api/send-email', async (req, res) => {
+  try {
+    const { to, subject, body, html, inReplyTo } = req.body;
+    if (!to || !subject) return res.status(400).json({ error: 'to and subject required' });
+    let nodemailer;
+    try { nodemailer = await import('nodemailer'); } catch { return res.status(500).json({ error: 'nodemailer not available' }); }
+    const transporter = nodemailer.default.createTransport({
+      service: 'gmail',
+      auth: { user: process.env.SMTP_USER || 'creator@ooedn.com', pass: process.env.SMTP_PASS || '' }
+    });
+    const mailOpts = {
+      from: `"OOEDN Creative Team" <${process.env.SMTP_USER || 'creator@ooedn.com'}>`,
+      to, subject,
+    };
+    if (html) mailOpts.html = html;
+    else mailOpts.text = body || '';
+    if (inReplyTo) {
+      mailOpts.inReplyTo = inReplyTo;
+      mailOpts.references = inReplyTo;
+    }
+    const info = await transporter.sendMail(mailOpts);
+    console.log(`[SMTP] Email sent to ${to}: ${subject} (messageId: ${info.messageId})`);
+    res.json({ id: info.messageId, threadId: info.messageId });
+  } catch (e) {
+    console.error('[SMTP] Send error:', e);
+    res.status(500).json({ error: e.message || 'Failed to send' });
+  }
+});
+
+// Send email to creators (bulk)
 app.post('/api/creator/send-email', async (req, res) => {
   try {
     const { emails, subject, body } = req.body;
@@ -229,13 +260,13 @@ app.post('/api/creator/send-email', async (req, res) => {
     try { nodemailer = await import('nodemailer'); } catch { return res.status(500).json({ error: 'nodemailer not available' }); }
     const transporter = nodemailer.default.createTransport({
       service: 'gmail',
-      auth: { user: process.env.SMTP_USER || 'noreply@ooedn.com', pass: process.env.SMTP_PASS || '' }
+      auth: { user: process.env.SMTP_USER || 'creator@ooedn.com', pass: process.env.SMTP_PASS || '' }
     });
     let sent = 0, failed = 0;
     for (const email of emails) {
       try {
         await transporter.sendMail({
-          from: `"OOEDN Creator Portal" <${process.env.SMTP_FROM || 'creator@ooedn.com'}>`,
+          from: `"OOEDN Creative Team" <${process.env.SMTP_USER || 'creator@ooedn.com'}>`,
           to: email, subject,
           html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
             <div style="background:#000;padding:24px;border-radius:16px">
