@@ -7,6 +7,7 @@ import webpush from 'web-push';
 import { google } from 'googleapis';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import * as firestoreDAL from './services/firestore.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -537,31 +538,36 @@ const JWT_SECRET = process.env.JWT_SECRET || 'ooedn-creator-portal-stable-secret
 const JWT_EXPIRY = '24h';
 const BCRYPT_ROUNDS = 10;
 
-// --- GCS DB Helpers (server-side) ---
+// --- DB Helpers: Dual-Mode (GCS ↔ Firestore) ---
+// DB_SOURCE: 'gcs' (default/legacy), 'firestore' (Phase 2), 'dual-write' (transition)
+const DB_SOURCE = process.env.DB_SOURCE || 'dual-write';
+console.log(`[DB] Source mode: ${DB_SOURCE}`);
 
-async function readMasterDB() {
+// --- GCS read (original implementation) ---
+async function readMasterDB_GCS() {
   try {
     const token = await getGCSAuthToken();
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
     const url = `https://storage.googleapis.com/storage/v1/b/${MAIN_BUCKET}/o/${encodeURIComponent('ooedn_master_db.json')}?alt=media&t=${Date.now()}`;
     const res = await fetch(url, { headers });
     if (!res.ok) {
-      console.error(`[CreatorAuth] Failed to read DB: ${res.status}`);
+      console.error(`[DB] GCS read failed: ${res.status}`);
       return null;
     }
     return await res.json();
   } catch (e) {
-    console.error('[CreatorAuth] readMasterDB error:', e.message);
+    console.error('[DB] GCS readMasterDB error:', e.message);
     return null;
   }
 }
 
-async function writeMasterDB(db) {
+// --- GCS write (original implementation with safeguards) ---
+async function writeMasterDB_GCS(db) {
   try {
     const token = await getGCSAuthToken();
-    if (!token) { console.error('[CreatorAuth] No GCS token for writing'); return false; }
+    if (!token) { console.error('[DB] No GCS token for writing'); return false; }
 
-    // SAFEGUARD: Read existing DB to check if we'd be wiping creator accounts
+    // SAFEGUARD: check for account wipe
     try {
       const checkUrl = `https://storage.googleapis.com/storage/v1/b/${MAIN_BUCKET}/o/${encodeURIComponent('ooedn_master_db.json')}?alt=media&t=${Date.now()}`;
       const checkRes = await fetch(checkUrl, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -571,12 +577,10 @@ async function writeMasterDB(db) {
         const newAccounts = db?.creatorAccounts?.length || 0;
         const dropped = existingAccounts - newAccounts;
         if (existingAccounts > 2 && newAccounts === 0) {
-          // Catastrophic wipe: many accounts → 0. Block and preserve.
-          console.error(`[CreatorAuth] ⛔ BLOCKED WRITE: Would wipe ${existingAccounts} creator accounts! Preserving existing accounts.`);
+          console.error(`[DB] ⛔ BLOCKED WRITE: Would wipe ${existingAccounts} creator accounts!`);
           db.creatorAccounts = existing.creatorAccounts;
         } else if (dropped >= 3) {
-          // Large drop (3+) — suspicious, merge to be safe
-          console.warn(`[CreatorAuth] ⚠️ Large account drop (${existingAccounts} → ${newAccounts}), merging to be safe`);
+          console.warn(`[DB] ⚠️ Large account drop (${existingAccounts} → ${newAccounts}), merging`);
           const merged = new Map();
           for (const a of existing.creatorAccounts) merged.set(a.id, a);
           for (const a of (db.creatorAccounts || [])) merged.set(a.id, a);
@@ -584,7 +588,7 @@ async function writeMasterDB(db) {
         }
       }
     } catch (checkErr) {
-      console.warn('[CreatorAuth] Could not verify accounts before write — proceeding with caution');
+      console.warn('[DB] Could not verify accounts before write');
     }
 
     const url = `https://storage.googleapis.com/upload/storage/v1/b/${MAIN_BUCKET}/o?uploadType=media&name=${encodeURIComponent('ooedn_master_db.json')}`;
@@ -597,15 +601,61 @@ async function writeMasterDB(db) {
       body: JSON.stringify(db)
     });
     if (!res.ok) {
-      console.error(`[CreatorAuth] Failed to write DB: ${res.status}`);
+      console.error(`[DB] GCS write failed: ${res.status}`);
       return false;
     }
-    console.log('[CreatorAuth] DB written successfully');
     return true;
   } catch (e) {
-    console.error('[CreatorAuth] writeMasterDB error:', e.message);
+    console.error('[DB] GCS writeMasterDB error:', e.message);
     return false;
   }
+}
+
+// --- Firestore read ---
+async function readMasterDB_Firestore() {
+  try {
+    return await firestoreDAL.loadAllData();
+  } catch (e) {
+    console.error('[DB] Firestore readMasterDB error:', e.message);
+    return null;
+  }
+}
+
+// --- Firestore write ---
+async function writeMasterDB_Firestore(db) {
+  try {
+    await firestoreDAL.saveAllData(db);
+    return true;
+  } catch (e) {
+    console.error('[DB] Firestore writeMasterDB error:', e.message);
+    return false;
+  }
+}
+
+// --- UNIFIED readMasterDB / writeMasterDB ---
+async function readMasterDB() {
+  if (DB_SOURCE === 'firestore') {
+    return readMasterDB_Firestore();
+  }
+  // 'gcs' or 'dual-write': read from GCS (trusted source during transition)
+  return readMasterDB_GCS();
+}
+
+async function writeMasterDB(db) {
+  if (DB_SOURCE === 'gcs') {
+    return writeMasterDB_GCS(db);
+  }
+  if (DB_SOURCE === 'firestore') {
+    return writeMasterDB_Firestore(db);
+  }
+  // 'dual-write': write to BOTH
+  const [gcsResult, fsResult] = await Promise.all([
+    writeMasterDB_GCS(db),
+    writeMasterDB_Firestore(db),
+  ]);
+  if (!gcsResult) console.warn('[DB] Dual-write: GCS write failed');
+  if (!fsResult) console.warn('[DB] Dual-write: Firestore write failed');
+  return gcsResult || fsResult; // succeed if either succeeds
 }
 
 // --- JWT Auth Middleware ---
