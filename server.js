@@ -495,7 +495,9 @@ app.use('/api/gmail/*', async (req, res) => {
 // CREATOR PORTAL AUTH — Phase 1 Server-Side Authentication
 // ===================================================================
 
-const JWT_SECRET = process.env.JWT_SECRET || 'ooedn-creator-portal-secret-' + Date.now();
+// IMPORTANT: Use a STABLE secret so JWTs survive server restarts/deploys.
+// If JWT_SECRET uses Date.now() as fallback, every deploy invalidates all sessions.
+const JWT_SECRET = process.env.JWT_SECRET || 'ooedn-creator-portal-stable-secret-v18';
 const JWT_EXPIRY = '24h';
 const BCRYPT_ROUNDS = 10;
 
