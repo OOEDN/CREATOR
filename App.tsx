@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     LayoutDashboard, Users, Flame, Settings, Plus, Search, Menu, X, CreditCard, CalendarDays, Loader2, Briefcase, RefreshCw, Sparkles, Link, Database, Truck, Package, Library, Inbox, FolderLock, MapPin, Layers, Cloud, LogOut, AlertTriangle, ShieldCheck, Globe, Info, Terminal, UserPlus, CloudCog, Archive, Copy, KeyRound, ExternalLink, ArrowRight, Wrench, Trash2, Sun, Moon, Mail, Crown
 } from 'lucide-react';
-import { Creator, CreatorStatus, PaymentStatus, Platform, ContentItem, AppSettings, ShipmentStatus, Campaign, ContentStatus, PaymentOption, Shipment, TeamMessage, TeamTask, BetaTest, BetaRelease } from './types';
+import { Creator, CreatorStatus, PaymentStatus, Platform, ContentItem, AppSettings, ShipmentStatus, Campaign, ContentStatus, PaymentOption, Shipment, TeamMessage, TeamTask, BetaTest, BetaRelease, CreatorAccount } from './types';
 import { syncTrackingWithAI } from './services/geminiService';
 import { syncStateToCloud, loadRemoteState, MasterDB, onSyncStatusChange, SyncStatus, getSyncStatus } from './services/cloudSync';
 import CreatorCard from './components/CreatorCard';
@@ -97,6 +97,7 @@ function App() {
     const [teamTasks, setTeamTasks] = useState<TeamTask[]>([]);
     const [betaTests, setBetaTests] = useState<BetaTest[]>([]);
     const [betaReleases, setBetaReleases] = useState<BetaRelease[]>([]);
+    const [creatorAccounts, setCreatorAccounts] = useState<CreatorAccount[]>([]);
     const [view, setView] = useState<'dashboard' | 'active' | 'inactive' | 'blackburn' | 'payments' | 'calendar' | 'campaigns' | 'asset-pool' | 'team-assets' | 'master-library' | 'team' | 'inbox' | 'partners'>('dashboard');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -372,6 +373,7 @@ function App() {
                     if (data.teamTasks) setTeamTasks(data.teamTasks);
                     if (data.betaTests) setBetaTests(data.betaTests);
                     if (data.betaReleases) setBetaReleases(data.betaReleases);
+                    if (data.creatorAccounts) setCreatorAccounts(data.creatorAccounts);
                     if (data.brandInfo) setSettings(s => ({ ...s, brandInfo: data.brandInfo }));
                     setLastSyncedTime(new Date().toLocaleTimeString());
                 }
@@ -397,11 +399,11 @@ function App() {
             }
             console.log(`[AutoSave] Saving: ${creators.length} creators, ${contentItems.length} content, ${campaigns.length} campaigns`);
             // Guard 3+4: cloudSync.ts has isSuspiciouslyEmpty check + save queue
-            syncStateToCloud(settings, creators, campaigns, contentItems, settings.brandInfo, teamMessages, teamTasks, undefined, betaTests, betaReleases);
+            syncStateToCloud(settings, creators, campaigns, contentItems, settings.brandInfo, teamMessages, teamTasks, undefined, betaTests, betaReleases, creatorAccounts);
             setLastSyncedTime(new Date().toLocaleTimeString());
         }, 3000); // 3s debounce (was 5s — faster persistence)
         return () => clearTimeout(timer);
-    }, [creators, campaigns, contentItems, settings, isConnected, teamMessages, teamTasks, betaTests, betaReleases]);
+    }, [creators, campaigns, contentItems, settings, isConnected, teamMessages, teamTasks, betaTests, betaReleases, creatorAccounts]);
 
     // Sync status listener
     useEffect(() => {
@@ -674,7 +676,7 @@ function App() {
                             )}
                             <button
                                 onClick={() => {
-                                    syncStateToCloud(settings, creators, campaigns, contentItems, settings.brandInfo, teamMessages, teamTasks);
+                                    syncStateToCloud(settings, creators, campaigns, contentItems, settings.brandInfo, teamMessages, teamTasks, undefined, betaTests, betaReleases, creatorAccounts);
                                     setLastSyncedTime(new Date().toLocaleTimeString());
                                 }}
                                 className="w-full text-[9px] bg-neutral-900 text-neutral-500 px-2 py-1.5 rounded-lg border border-neutral-800 font-bold hover:text-white hover:border-neutral-600 transition-all"
@@ -891,7 +893,7 @@ function App() {
                                     currentUser={userEmail || 'Anonymous'}
                                     onSendMessage={(msg) => {
                                         setTeamMessages(prev => [...prev, msg]);
-                                        saveMasterDB();
+                                        // Auto-save debounce will pick this up
                                     }}
                                     onPushNotify={async (creatorIds, title, body) => {
                                         try {

@@ -1,27 +1,24 @@
-# Use official Node.js image
+# Creator Portal - Standalone Build
 FROM node:20-alpine
 
-# Set working directory
 WORKDIR /app
 
-# Copy package files first to leverage Docker cache
+# Copy package files first for Docker cache
 COPY package*.json ./
-
-# Install dependencies (Clean install)
 RUN npm ci
 
-# Copy the rest of the application code
+# Copy all source
 COPY . .
 
-# Build the VITE application
-RUN npm run build
+# Build ONLY the creator portal
+RUN npx vite build --config vite.creator.config.ts
 
-# Copy service worker and public assets into dist
-RUN cp -r public/* dist/ 2>/dev/null || true
+# Copy public assets into creator dist
+RUN cp -r public/* dist-creator/ 2>/dev/null || true
 
-# Expose the port the app runs on
+# Set creator mode so server serves dist-creator/
 ENV PORT=8080
+ENV CREATOR_MODE=true
 EXPOSE 8080
 
-# Start the application
 CMD ["npm", "start"]

@@ -491,6 +491,24 @@ async function writeMasterDB(db) {
   try {
     const token = await getGCSAuthToken();
     if (!token) { console.error('[CreatorAuth] No GCS token for writing'); return false; }
+
+    // SAFEGUARD: Read existing DB to check if we'd be wiping creator accounts
+    try {
+      const checkUrl = `https://storage.googleapis.com/storage/v1/b/${MAIN_BUCKET}/o/${encodeURIComponent('ooedn_master_db.json')}?alt=media&t=${Date.now()}`;
+      const checkRes = await fetch(checkUrl, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (checkRes.ok) {
+        const existing = await checkRes.json();
+        const existingAccounts = existing?.creatorAccounts?.length || 0;
+        const newAccounts = db?.creatorAccounts?.length || 0;
+        if (existingAccounts > 0 && newAccounts === 0) {
+          console.error(`[CreatorAuth] ⛔ BLOCKED WRITE: Would wipe ${existingAccounts} creator accounts! Preserving existing accounts.`);
+          db.creatorAccounts = existing.creatorAccounts;
+        }
+      }
+    } catch (checkErr) {
+      console.warn('[CreatorAuth] Could not verify accounts before write — proceeding with caution');
+    }
+
     const url = `https://storage.googleapis.com/upload/storage/v1/b/${MAIN_BUCKET}/o?uploadType=media&name=${encodeURIComponent('ooedn_master_db.json')}`;
     const res = await fetch(url, {
       method: 'POST',
