@@ -136,14 +136,6 @@ const DailyDigestWidget: React.FC<DailyDigestWidgetProps> = ({
                 bgColor: 'bg-cyan-500/10 border-cyan-500/20',
                 action: () => onNavigate('team')
             },
-            {
-                show: recentMessages.length > 0,
-                icon: <MessageSquare size={14} className="text-neutral-400" />,
-                label: `${recentMessages.length} new message${recentMessages.length !== 1 ? 's' : ''} today`,
-                color: 'text-neutral-400',
-                bgColor: 'bg-neutral-800 border-neutral-700',
-                action: () => onNavigate('dashboard')
-            }
         ].filter(item => item.show);
 
         // If nothing to show, show a clean "all clear" state

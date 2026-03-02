@@ -422,23 +422,30 @@ function App() {
             try {
                 const data = await loadRemoteState(settings);
                 if (!data) return;
-                // Merge new creator messages (don't overwrite — append new ones)
+                // Merge new creator messages — use functional updater for fresh state
                 if (data.teamMessages) {
-                    const existingIds = new Set(teamMessages.map(m => m.id));
-                    const newMsgs = data.teamMessages.filter(m => !existingIds.has(m.id));
-                    if (newMsgs.length > 0) {
-                        console.log(`[Poll] 📩 ${newMsgs.length} new messages from creators`);
-                        setTeamMessages(prev => [...prev, ...newMsgs]);
-                    }
+                    setTeamMessages(prev => {
+                        const existingIds = new Set(prev.map(m => m.id));
+                        const newMsgs = data.teamMessages!.filter(m => !existingIds.has(m.id));
+                        if (newMsgs.length > 0) {
+                            console.log(`[Poll] 📩 ${newMsgs.length} new messages from creators`);
+                            return [...prev, ...newMsgs];
+                        }
+                        return prev;
+                    });
                 }
-                // Merge new content items
+                // Merge content items — use functional updater for fresh state
+                // Also update existing items (e.g. status/review changes from server)
                 if (data.contentItems) {
-                    const existingContentIds = new Set(contentItems.map(c => c.id));
-                    const newContent = data.contentItems.filter(c => !existingContentIds.has(c.id));
-                    if (newContent.length > 0) {
-                        console.log(`[Poll] 🎬 ${newContent.length} new content uploads from creators`);
-                        setContentItems(prev => [...prev, ...newContent]);
-                    }
+                    setContentItems(prev => {
+                        const existingIds = new Set(prev.map(c => c.id));
+                        const newContent = data.contentItems!.filter(c => !existingIds.has(c.id));
+                        if (newContent.length > 0) {
+                            console.log(`[Poll] 🎬 ${newContent.length} new content uploads from creators`);
+                            return [...prev, ...newContent];
+                        }
+                        return prev;
+                    });
                 }
                 // Update creator accounts
                 if (data.creatorAccounts) setCreatorAccounts(data.creatorAccounts);
