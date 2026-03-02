@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-    LayoutDashboard, Users, Flame, Settings, Plus, Search, Menu, X, CreditCard, CalendarDays, Loader2, Briefcase, RefreshCw, Sparkles, Link, Database, Truck, Package, Library, Inbox, FolderLock, MapPin, Layers, Cloud, LogOut, AlertTriangle, ShieldCheck, Globe, Info, Terminal, UserPlus, CloudCog, Archive, Copy, KeyRound, ExternalLink, ArrowRight, Wrench, Trash2, Sun, Moon, Mail, Crown, Eye
+    LayoutDashboard, Users, Flame, Settings, Plus, Search, Menu, X, CreditCard, CalendarDays, Loader2, Briefcase, RefreshCw, Sparkles, Link, Database, Truck, Package, Library, Inbox, FolderLock, MapPin, Layers, Cloud, LogOut, AlertTriangle, ShieldCheck, Globe, Info, Terminal, UserPlus, CloudCog, Archive, Copy, KeyRound, ExternalLink, ArrowRight, Wrench, Trash2, Sun, Moon, Mail, Crown, Eye, FlaskConical
 } from 'lucide-react';
 import { Creator, CreatorStatus, PaymentStatus, Platform, ContentItem, AppSettings, ShipmentStatus, Campaign, ContentStatus, PaymentOption, Shipment, TeamMessage, TeamTask, BetaTest, BetaRelease, CreatorAccount } from './types';
 import { syncTrackingWithAI } from './services/geminiService';
@@ -99,7 +99,7 @@ function App() {
     const [betaTests, setBetaTests] = useState<BetaTest[]>([]);
     const [betaReleases, setBetaReleases] = useState<BetaRelease[]>([]);
     const [creatorAccounts, setCreatorAccounts] = useState<CreatorAccount[]>([]);
-    const [view, setView] = useState<'dashboard' | 'active' | 'inactive' | 'blackburn' | 'payments' | 'calendar' | 'campaigns' | 'pending-review' | 'asset-pool' | 'team-assets' | 'master-library' | 'team' | 'inbox' | 'partners'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'active' | 'inactive' | 'blackburn' | 'payments' | 'calendar' | 'campaigns' | 'pending-review' | 'asset-pool' | 'team-assets' | 'master-library' | 'team' | 'inbox' | 'partners' | 'betaLab'>('dashboard');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -648,6 +648,7 @@ function App() {
                         { id: 'active', icon: Users, label: 'Active Roster' },
                         { id: 'payments', icon: CreditCard, label: 'Payment Hub' },
                         { id: 'campaigns', icon: Briefcase, label: 'Campaigns' },
+                        { id: 'betaLab', icon: FlaskConical, label: 'Beta Lab' },
                         { id: 'calendar', icon: CalendarDays, label: 'Calendar' },
                         { id: 'asset-pool', icon: Inbox, label: 'Asset Pool' },
                         { id: 'pending-review', icon: Eye, label: 'Pending Review' },
@@ -1009,27 +1010,8 @@ function App() {
                         </>
                     )}
 
-                    {/* CAMPAIGNS */}
                     {view === 'campaigns' && (
                         <>
-                            <BetaTestManager
-                                betaTests={betaTests}
-                                betaReleases={betaReleases}
-                                creators={creators}
-                                onSaveBetaTest={(test) => {
-                                    setBetaTests(prev => {
-                                        const idx = prev.findIndex(t => t.id === test.id);
-                                        return idx >= 0 ? prev.map(t => t.id === test.id ? test : t) : [...prev, test];
-                                    });
-                                }}
-                                onDeleteBetaTest={(id) => setBetaTests(prev => prev.filter(t => t.id !== id))}
-                                onUpdateRelease={(release) => {
-                                    setBetaReleases(prev => {
-                                        const idx = prev.findIndex(r => r.id === release.id);
-                                        return idx >= 0 ? prev.map(r => r.id === release.id ? release : r) : [...prev, release];
-                                    });
-                                }}
-                            />
                             <CampaignBoard
                                 campaigns={campaigns}
                                 creators={creators}
@@ -1059,6 +1041,28 @@ function App() {
                                 }}
                             />
                         </>
+                    )}
+
+                    {/* BETA LAB */}
+                    {view === 'betaLab' && (
+                        <BetaTestManager
+                            betaTests={betaTests}
+                            betaReleases={betaReleases}
+                            creators={creators}
+                            onSaveBetaTest={(test) => {
+                                setBetaTests(prev => {
+                                    const idx = prev.findIndex(t => t.id === test.id);
+                                    return idx >= 0 ? prev.map(t => t.id === test.id ? test : t) : [...prev, test];
+                                });
+                            }}
+                            onDeleteBetaTest={(id) => setBetaTests(prev => prev.filter(t => t.id !== id))}
+                            onUpdateRelease={(release) => {
+                                setBetaReleases(prev => {
+                                    const idx = prev.findIndex(r => r.id === release.id);
+                                    return idx >= 0 ? prev.map(r => r.id === release.id ? release : r) : [...prev, release];
+                                });
+                            }}
+                        />
                     )}
 
                     {/* CALENDAR */}
@@ -1097,6 +1101,18 @@ function App() {
                             contentItems={contentItems}
                             onUpdateContent={handleContentUpdate}
                             onNavigate={(v) => setView(v as any)}
+                            onNotifyRevision={(item, note) => {
+                                if (!item.creatorId) return;
+                                const msg = {
+                                    id: crypto.randomUUID(),
+                                    creatorId: item.creatorId,
+                                    sender: userEmail || 'OOEDN Team',
+                                    text: `✂️ Revision requested on "${item.title}": ${note}`,
+                                    timestamp: new Date().toISOString(),
+                                    isCreatorMessage: false,
+                                };
+                                setTeamMessages(prev => [...prev, msg]);
+                            }}
                         />
                     )}
 

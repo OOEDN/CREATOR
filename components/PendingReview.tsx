@@ -9,6 +9,7 @@ interface PendingReviewProps {
     contentItems: ContentItem[];
     onUpdateContent: (id: string, updates: Partial<ContentItem>) => void;
     onNavigate: (view: string) => void;
+    onNotifyRevision?: (item: ContentItem, note: string) => void;
 }
 
 const STATUS_CONFIG: Record<string, { bg: string; text: string; emoji: string; label: string }> = {
@@ -19,7 +20,7 @@ const STATUS_CONFIG: Record<string, { bg: string; text: string; emoji: string; l
     [ContentStatus.Posted]: { bg: 'bg-purple-500/10', text: 'text-purple-400', emoji: '🚀', label: 'Posted' },
 };
 
-const PendingReview: React.FC<PendingReviewProps> = ({ contentItems, onUpdateContent, onNavigate }) => {
+const PendingReview: React.FC<PendingReviewProps> = ({ contentItems, onUpdateContent, onNavigate, onNotifyRevision }) => {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [noteText, setNoteText] = useState('');
     const [filter, setFilter] = useState<'all' | 'pending' | 'changes' | 'approved'>('pending');
@@ -71,6 +72,11 @@ const PendingReview: React.FC<PendingReviewProps> = ({ contentItems, onUpdateCon
             updates.teamNotes = [...(item?.teamNotes || []), teamNote];
         }
         onUpdateContent(id, updates);
+        // Notify creator about the revision request
+        if (onNotifyRevision) {
+            const item = contentItems.find(c => c.id === id);
+            if (item) onNotifyRevision(item, note || 'Changes requested by the team.');
+        }
     };
 
     const handleAddNote = (id: string) => {

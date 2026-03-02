@@ -315,6 +315,15 @@ function CreatorApp() {
         addNotification('message', 'Content Uploaded! 🚀', `"${item.title}" has been submitted for review.`);
     };
 
+    const handleContentUpdate = (id: string, updates: Partial<ContentItem>) => {
+        const updatedContent = contentItems.map(c => c.id === id ? { ...c, ...updates } : c);
+        setContentItems(updatedContent);
+        saveMasterDB(undefined, undefined, updatedContent);
+        if (updates.status === ContentStatus.Raw && updates.revisionCount) {
+            addNotification('message', 'Revision Uploaded! 📎', `Revised version submitted for review.`);
+        }
+    };
+
     const handleReplyToNote = (contentId: string, text: string) => {
         if (!creatorRecord) return;
         const reply: ContentNote = {
@@ -669,6 +678,7 @@ function CreatorApp() {
                             contentItems={contentItems}
                             onUpload={handleContentUpload}
                             onReplyToNote={handleReplyToNote}
+                            onUpdateContent={handleContentUpdate}
                         />
                     )}
                     {view === 'payments' && (

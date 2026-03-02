@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Creator, ContentItem, ContentType, ContentStatus, Platform, ContentNote } from '../../types';
 import {
     Upload as UploadIcon, Image, Video, FileText, CheckCircle, Loader2,
-    MessageSquare, Send, ChevronDown, ChevronUp, Sparkles, Eye
+    MessageSquare, Send, ChevronDown, ChevronUp, Sparkles, Eye, RotateCw
 } from 'lucide-react';
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
     contentItems: ContentItem[];
     onUpload: (item: ContentItem) => void;
     onReplyToNote: (contentId: string, text: string) => void;
+    onUpdateContent?: (id: string, updates: Partial<ContentItem>) => void;
 }
 
 const statusColors: Record<string, { bg: string; text: string; emoji: string }> = {
@@ -20,7 +21,7 @@ const statusColors: Record<string, { bg: string; text: string; emoji: string }> 
     'Published': { bg: 'bg-purple-500/10', text: 'text-purple-400', emoji: '🚀' },
 };
 
-const CreatorUpload: React.FC<Props> = ({ creator, contentItems, onUpload, onReplyToNote }) => {
+const CreatorUpload: React.FC<Props> = ({ creator, contentItems, onUpload, onReplyToNote, onUpdateContent }) => {
     const [isDragging, setIsDragging] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [title, setTitle] = useState('');
@@ -32,7 +33,9 @@ const CreatorUpload: React.FC<Props> = ({ creator, contentItems, onUpload, onRep
     const [expandedContentId, setExpandedContentId] = useState<string | null>(null);
     const [replyText, setReplyText] = useState('');
     const [showUploadForm, setShowUploadForm] = useState(true);
+    const [revisingContentId, setRevisingContentId] = useState<string | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
+    const revisionFileRef = useRef<HTMLInputElement>(null);
 
     const myContent = contentItems.filter(c => c.creatorId === creator.id || c.creatorName === creator.name);
 
@@ -132,6 +135,60 @@ const CreatorUpload: React.FC<Props> = ({ creator, contentItems, onUpload, onRep
         if (!replyText.trim()) return;
         onReplyToNote(contentId, replyText.trim());
         setReplyText('');
+    };
+
+    const handleRevisionUpload = async (contentId: string, file: File) => {
+        if (!onUpdateContent) return;
+        setIsUploading(true);
+        try {
+            const base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve((reader.result as string).split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+
+            const jwt = localStorage.getItem('ooedn_creator_jwt');
+            const uploadResp = await fetch('/api/creator/upload-file', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fileData: base64, fileName: file.name, contentType: file.type }),
+            });
+
+            let fileUrl = '';
+            let storageType: 'cloud' | 'local' = 'local';
+            if (uploadResp.ok) {
+                const d = await uploadResp.json();
+                fileUrl = d.url;
+                storageType = 'cloud';
+            } else {
+                fileUrl = URL.createObjectURL(file);
+            }
+
+            const item = contentItems.find(c => c.id === contentId);
+            const revisionNote = {
+                id: crypto.randomUUID(),
+                user: creator.name,
+                text: `📎 Revised version uploaded`,
+                date: new Date().toISOString(),
+                isCreatorReply: true,
+            };
+
+            onUpdateContent(contentId, {
+                fileUrl,
+                storageType,
+                status: ContentStatus.Raw, // Back to pending review
+                uploadDate: new Date().toISOString(),
+                submittedByCreator: true,
+                revisionCount: (item?.revisionCount || 0) + 1,
+                teamNotes: [...(item?.teamNotes || []), revisionNote],
+            });
+            setRevisingContentId(null);
+        } catch (e) {
+            console.error('[Revision Upload] error:', e);
+        } finally {
+            setIsUploading(false);
+        }
     };
 
     return (
@@ -376,6 +433,41 @@ const CreatorUpload: React.FC<Props> = ({ creator, contentItems, onUpload, onRep
                                                 <div className="flex items-center gap-2 bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-2">
                                                     <CheckCircle size={12} className="text-emerald-400" />
                                                     <span className="text-[10px] text-emerald-400 font-bold">Payment requested for this video</span>
+                                                </div>
+                                            )}
+
+                                            {/* RE-UPLOAD REVISION BUTTON */}
+                                            {content.status === ContentStatus.Editing && onUpdateContent && (
+                                                <div className="bg-orange-500/5 border border-orange-500/20 rounded-xl p-4">
+                                                    <p className="text-[10px] font-bold text-orange-400 uppercase mb-2 flex items-center gap-1">
+                                                        <RotateCw size={10} /> Revision Requested
+                                                        {content.revisionCount ? ` (Revision #${content.revisionCount})` : ''}
+                                                    </p>
+                                                    <p className="text-xs text-neutral-400 mb-3">The team has requested changes. Re-upload your revised file below — it will replace the current version and go back into review.</p>
+                                                    <input
+                                                        ref={revisionFileRef}
+                                                        type="file"
+                                                        accept="video/*,image/*"
+                                                        className="hidden"
+                                                        onChange={(e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (file) handleRevisionUpload(content.id, file);
+                                                        }}
+                                                    />
+                                                    <button
+                                                        onClick={() => {
+                                                            setRevisingContentId(content.id);
+                                                            revisionFileRef.current?.click();
+                                                        }}
+                                                        disabled={isUploading}
+                                                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-orange-500 text-black rounded-xl font-black uppercase text-xs tracking-widest hover:bg-orange-400 transition-all active:scale-95 disabled:opacity-50"
+                                                    >
+                                                        {isUploading && revisingContentId === content.id ? (
+                                                            <><Loader2 size={14} className="animate-spin" /> Uploading Revision...</>
+                                                        ) : (
+                                                            <><RotateCw size={14} /> Re-Upload Revised File</>
+                                                        )}
+                                                    </button>
                                                 </div>
                                             )}
                                         </div>
