@@ -1046,6 +1046,17 @@ function App() {
                                     // Store in sessionStorage so CreatorInbox can pick it up
                                     sessionStorage.setItem('compose_prefill', JSON.stringify({ to, subject, body }));
                                 }}
+                                onNotifyCreator={(creatorId, campaignTitle) => {
+                                    const msg = {
+                                        id: crypto.randomUUID(),
+                                        creatorId,
+                                        sender: userEmail || 'OOEDN Team',
+                                        text: `📋 You've been assigned to a new campaign: "${campaignTitle}". Check your Campaigns tab to view the brief and get started!`,
+                                        timestamp: new Date().toISOString(),
+                                        isCreatorMessage: false,
+                                    };
+                                    setTeamMessages(prev => [...prev, msg]);
+                                }}
                             />
                         </>
                     )}

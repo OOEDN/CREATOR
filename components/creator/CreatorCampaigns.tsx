@@ -3,7 +3,7 @@ import { Creator, Campaign, ContentItem } from '../../types';
 import {
     Briefcase, CheckSquare, Square, Calendar, Clock, Sparkles,
     Trophy, Upload, ArrowRight, Timer, Palette, LinkIcon, ExternalLink,
-    FileText, Image, ListTodo, MessageSquare, ChevronDown, ChevronRight, Eye
+    FileText, Image, ListTodo, MessageSquare, ChevronDown, ChevronRight, Eye, Send
 } from 'lucide-react';
 
 interface Props {
@@ -13,9 +13,10 @@ interface Props {
     onMarkTaskDone: (campaignId: string, taskId: string) => void;
     onAcceptCampaign: (campaignId: string) => void;
     onNavigate: (view: string) => void;
+    onAddComment?: (campaignId: string, text: string) => void;
 }
 
-type CampaignTab = 'brief' | 'moodboard' | 'tasks' | 'uploads';
+type CampaignTab = 'brief' | 'moodboard' | 'tasks' | 'uploads' | 'notes';
 
 // Confetti for campaign completion
 const CampaignConfetti: React.FC<{ active: boolean }> = ({ active }) => {
@@ -47,13 +48,14 @@ const CampaignConfetti: React.FC<{ active: boolean }> = ({ active }) => {
     );
 };
 
-const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, onMarkTaskDone, onAcceptCampaign, onNavigate }) => {
+const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, onMarkTaskDone, onAcceptCampaign, onNavigate, onAddComment }) => {
     const myCampaigns = campaigns.filter(c => c.assignedCreatorIds?.includes(creator.id));
     const [completedCampaignId, setCompletedCampaignId] = useState<string | null>(null);
     const [recentlyCompleted, setRecentlyCompleted] = useState<Set<string>>(new Set());
     const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<Record<string, CampaignTab>>({});
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+    const [noteText, setNoteText] = useState<Record<string, string>>({});
 
     const getTab = (campaignId: string) => activeTab[campaignId] || 'brief';
     const setTab = (campaignId: string, tab: CampaignTab) => setActiveTab(prev => ({ ...prev, [campaignId]: tab }));
@@ -101,6 +103,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
             ...(hasMoodboard ? [{ id: 'moodboard' as CampaignTab, label: 'Moodboard', icon: Palette, emoji: '🎨' }] : []),
             { id: 'tasks' as CampaignTab, label: 'Tasks', icon: ListTodo, emoji: '✅', count: campaign?.tasks?.length || 0 },
             { id: 'uploads' as CampaignTab, label: 'Uploads', icon: Upload, emoji: '📎', count: myUploads.length },
+            { id: 'notes' as CampaignTab, label: 'Notes', icon: MessageSquare, emoji: '💬', count: campaign?.comments?.length || 0 },
         ];
     };
 
@@ -142,8 +145,8 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                             <div
                                 key={campaign.id}
                                 className={`bg-neutral-900/80 border rounded-2xl relative overflow-hidden transition-all ${isNew ? 'border-yellow-500/30 bg-yellow-500/5' :
-                                        isComplete ? 'border-emerald-500/20' :
-                                            'border-neutral-800'
+                                    isComplete ? 'border-emerald-500/20' :
+                                        'border-neutral-800'
                                     }`}
                             >
                                 <CampaignConfetti active={showConfetti} />
@@ -162,8 +165,8 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                         </div>
                                         <div className="flex items-center gap-2 mt-1 ml-6 flex-wrap">
                                             <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg ${campaign.status === 'Final Campaign' ? 'bg-emerald-500/10 text-emerald-400' :
-                                                    campaign.status === 'Brainstorming' ? 'bg-yellow-500/10 text-yellow-400' :
-                                                        'bg-neutral-500/10 text-neutral-400'
+                                                campaign.status === 'Brainstorming' ? 'bg-yellow-500/10 text-yellow-400' :
+                                                    'bg-neutral-500/10 text-neutral-400'
                                                 }`}>{campaign.status}</span>
                                             {timeLeft && !isComplete && (
                                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 ${timeLeft.urgent ? 'bg-red-500/10 text-red-400' : 'bg-neutral-500/10 text-neutral-400'
@@ -225,8 +228,8 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                     key={tab.id}
                                                     onClick={() => setTab(campaign.id, tab.id)}
                                                     className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-all text-[10px] font-black uppercase tracking-widest ${currentTab === tab.id
-                                                            ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/20'
-                                                            : 'text-neutral-500 hover:text-white hover:bg-neutral-800'
+                                                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/20'
+                                                        : 'text-neutral-500 hover:text-white hover:bg-neutral-800'
                                                         }`}
                                                 >
                                                     <span>{tab.emoji}</span> {tab.label}
@@ -387,8 +390,8 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                 onClick={() => !task.isDone && handleTaskDone(campaign.id, task.id)}
                                                                 disabled={task.isDone}
                                                                 className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${task.isDone
-                                                                        ? 'bg-emerald-500/5 border border-emerald-500/10'
-                                                                        : 'bg-black/50 border border-neutral-800 hover:border-purple-500/30 cursor-pointer hover:scale-[1.01] active:scale-95'
+                                                                    ? 'bg-emerald-500/5 border border-emerald-500/10'
+                                                                    : 'bg-black/50 border border-neutral-800 hover:border-purple-500/30 cursor-pointer hover:scale-[1.01] active:scale-95'
                                                                     }`}
                                                             >
                                                                 {task.isDone ? (
@@ -450,6 +453,63 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                         </div>
                                                         <ArrowRight size={12} className="text-neutral-600 group-hover:text-purple-400 transition-colors" />
                                                     </button>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* NOTES TAB */}
+                                        {currentTab === 'notes' && (
+                                            <div className="space-y-4">
+                                                <p className="text-[10px] text-neutral-500 font-bold uppercase">💬 Campaign Notes — Chat with team</p>
+                                                <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
+                                                    {(campaign.comments || []).length === 0 && (
+                                                        <div className="text-center py-6">
+                                                            <MessageSquare size={20} className="text-neutral-600 mx-auto mb-2" />
+                                                            <p className="text-neutral-500 text-sm">No notes yet. Start the conversation!</p>
+                                                        </div>
+                                                    )}
+                                                    {(campaign.comments || []).map(comment => (
+                                                        <div key={comment.id} className={`rounded-xl p-3 border ${comment.isCreatorComment
+                                                                ? 'bg-purple-500/5 border-purple-500/20 ml-4'
+                                                                : 'bg-black/50 border-neutral-800 mr-4'
+                                                            }`}>
+                                                            <div className="flex items-center justify-between mb-1">
+                                                                <span className={`text-[10px] font-bold ${comment.isCreatorComment ? 'text-purple-400' : 'text-emerald-400'
+                                                                    }`}>
+                                                                    {comment.isCreatorComment ? `${creator.name} (You)` : comment.user || 'Team'}
+                                                                </span>
+                                                                <span className="text-[9px] text-neutral-600">{formatDate(comment.date)}</span>
+                                                            </div>
+                                                            <p className="text-xs text-neutral-300 leading-relaxed">{comment.text}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {/* Note input */}
+                                                {onAddComment && (
+                                                    <div className="flex gap-2 pt-2 border-t border-neutral-800">
+                                                        <input
+                                                            value={noteText[campaign.id] || ''}
+                                                            onChange={(e) => setNoteText(prev => ({ ...prev, [campaign.id]: e.target.value }))}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter' && (noteText[campaign.id] || '').trim()) {
+                                                                    onAddComment(campaign.id, noteText[campaign.id]!);
+                                                                    setNoteText(prev => ({ ...prev, [campaign.id]: '' }));
+                                                                }
+                                                            }}
+                                                            placeholder="Add a note or question..."
+                                                            className="flex-1 bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-purple-500 outline-none"
+                                                        />
+                                                        <button
+                                                            onClick={() => {
+                                                                if ((noteText[campaign.id] || '').trim()) {
+                                                                    onAddComment(campaign.id, noteText[campaign.id]!);
+                                                                    setNoteText(prev => ({ ...prev, [campaign.id]: '' }));
+                                                                }
+                                                            }}
+                                                            className="bg-purple-500 text-white p-2 rounded-lg hover:bg-purple-400 transition-colors"
+                                                            title="Send note"
+                                                        ><Send size={14} /></button>
+                                                    </div>
                                                 )}
                                             </div>
                                         )}

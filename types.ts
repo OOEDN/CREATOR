@@ -141,6 +141,8 @@ export interface CampaignComment {
   user: string;
   text: string;
   date: string;
+  isCreatorComment?: boolean;
+  creatorId?: string;
 }
 
 export interface MoodboardItem {

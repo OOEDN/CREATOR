@@ -17,11 +17,12 @@ interface CampaignBoardProps {
     onContentDelete: (id: string) => void;
     appSettings: AppSettings;
     onEmailBrief?: (to: string, subject: string, body: string) => void;
+    onNotifyCreator?: (creatorId: string, campaignTitle: string) => void;
 }
 
 const CampaignBoard: React.FC<CampaignBoardProps> = ({
     campaigns, creators, content, onSaveCampaign, onDeleteCampaign,
-    onContentUpload, onContentUpdate, onContentDelete, appSettings, onEmailBrief
+    onContentUpload, onContentUpdate, onContentDelete, appSettings, onEmailBrief, onNotifyCreator
 }) => {
     const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
     const [showAIPrompt, setShowAIPrompt] = useState(false);
@@ -291,11 +292,11 @@ Use "Negative Assumption": Stop doing X if you want Y.
                         </div>
                     </div>
 
-                    <div className="flex gap-6 h-[calc(100%-100px)] min-w-[1000px]">
+                    <div className="flex gap-6 h-[calc(100%-100px)]">
                         {columns.map(col => (
                             <div
                                 key={col.id}
-                                className="flex-1 flex flex-col min-w-[320px]"
+                                className="flex-1 flex flex-col min-w-[260px]"
                                 onDragOver={handleDragOver}
                                 onDrop={(e) => handleDrop(e, col.id)}
                             >
@@ -515,12 +516,18 @@ Use "Negative Assumption": Stop doing X if you want Y.
 
                                 {/* TEAM CHAT */}
                                 <div className="border-t border-neutral-800 pt-6">
-                                    <h4 className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-4 flex items-center gap-2"><MessageSquare size={14} /> Team Idea Chat</h4>
+                                    <h4 className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-4 flex items-center gap-2"><MessageSquare size={14} /> Team & Creator Notes</h4>
                                     <div className="space-y-3 mb-4 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
                                         {(editingCampaign.comments || []).map(comment => (
-                                            <div key={comment.id} className="bg-neutral-900 p-3 rounded-xl border border-neutral-800">
+                                            <div key={comment.id} className={`p-3 rounded-xl border ${comment.isCreatorComment
+                                                    ? 'bg-purple-500/5 border-purple-500/20'
+                                                    : 'bg-neutral-900 border-neutral-800'
+                                                }`}>
                                                 <div className="flex justify-between items-center mb-1">
-                                                    <span className="text-[9px] font-black text-emerald-500 uppercase">{comment.user}</span>
+                                                    <span className={`text-[9px] font-black uppercase ${comment.isCreatorComment ? 'text-purple-400' : 'text-emerald-500'
+                                                        }`}>
+                                                        {comment.isCreatorComment ? `🎨 ${comment.user}` : comment.user}
+                                                    </span>
                                                     <span className="text-[8px] text-neutral-600">{new Date(comment.date).toLocaleDateString()}</span>
                                                 </div>
                                                 <p className="text-xs text-neutral-300">{comment.text}</p>
@@ -576,6 +583,10 @@ Use "Negative Assumption": Stop doing X if you want Y.
                                                 };
                                                 setEditingCampaign(updated);
                                                 onSaveCampaign(updated);
+                                                // Send notification to creator
+                                                if (onNotifyCreator) {
+                                                    onNotifyCreator(creatorId, editingCampaign.title);
+                                                }
                                                 e.target.value = '';
                                             }}
                                             className="w-full bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-purple-500 outline-none mb-2"

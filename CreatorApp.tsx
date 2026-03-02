@@ -697,6 +697,35 @@ function CreatorApp() {
                             onMarkTaskDone={handleMarkTaskDone}
                             onAcceptCampaign={handleAcceptCampaign}
                             onNavigate={(v: string) => setView(v as CreatorView)}
+                            onAddComment={(campaignId, text) => {
+                                if (!creatorRecord) return;
+                                const comment = {
+                                    id: crypto.randomUUID(),
+                                    user: creatorRecord.name,
+                                    text,
+                                    date: new Date().toISOString(),
+                                    isCreatorComment: true,
+                                    creatorId: creatorRecord.id,
+                                };
+                                const updatedCampaigns = campaigns.map(c => {
+                                    if (c.id !== campaignId) return c;
+                                    return { ...c, comments: [...(c.comments || []), comment] };
+                                });
+                                setCampaigns(updatedCampaigns);
+                                saveMasterDB(undefined, updatedCampaigns);
+                                // Also send a message so the team gets notified
+                                const campaign = campaigns.find(c => c.id === campaignId);
+                                const msg: TeamMessage = {
+                                    id: crypto.randomUUID(),
+                                    creatorId: creatorRecord.id,
+                                    sender: creatorRecord.name,
+                                    text: `📋 Note on campaign "${campaign?.title || 'Unknown'}": ${text}`,
+                                    timestamp: new Date().toISOString(),
+                                    isCreatorMessage: true,
+                                };
+                                setTeamMessages(prev => [...prev, msg]);
+                                saveMasterDB();
+                            }}
                         />
                     )}
                     {view === 'betaLab' && currentAccount && (

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Creator, ContentItem, PaymentStatus } from '../../types';
 import {
     CreditCard, Clock, CheckCircle, AlertCircle, Send, DollarSign,
-    Video, Image, Check, Sparkles, TrendingUp
+    Video, Image, Check, Sparkles, TrendingUp, Download
 } from 'lucide-react';
 
 interface Props {
@@ -106,6 +106,50 @@ const CreatorPayments: React.FC<Props> = ({ creator, contentItems, onRequestPaym
                 </div>
             </div>
 
+            {/* LAST PAYMENT RECEIPT */}
+            {(creator.lastPaymentProof || creator.lastPaymentDate) && (
+                <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-5">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-emerald-400 mb-3 flex items-center gap-2">
+                        <Download size={14} /> Last Payment Receipt
+                    </h3>
+                    <div className="flex items-start gap-4">
+                        {creator.lastPaymentProof && (
+                            <a href={creator.lastPaymentProof} target="_blank" rel="noopener noreferrer"
+                                className="w-24 h-24 rounded-xl border border-emerald-500/30 overflow-hidden flex-shrink-0 hover:border-emerald-400 transition-colors block">
+                                <img src={creator.lastPaymentProof} alt="Payment Receipt" className="w-full h-full object-cover" />
+                            </a>
+                        )}
+                        <div className="flex-1 space-y-2">
+                            {creator.lastPaymentDate && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-bold text-neutral-500 uppercase">Date:</span>
+                                    <span className="text-sm text-white font-bold">{formatDate(creator.lastPaymentDate)}</span>
+                                </div>
+                            )}
+                            {creator.lastTransactionId && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-bold text-neutral-500 uppercase">Transaction:</span>
+                                    <span className="text-sm text-neutral-300 font-mono">{creator.lastTransactionId}</span>
+                                </div>
+                            )}
+                            {creator.rate > 0 && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-bold text-neutral-500 uppercase">Amount:</span>
+                                    <span className="text-sm text-emerald-400 font-black">${creator.rate.toLocaleString()}</span>
+                                </div>
+                            )}
+                            {creator.lastPaymentProof && (
+                                <a href={creator.lastPaymentProof} target="_blank" rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-lg hover:bg-emerald-500/20 transition-colors mt-1"
+                                    download>
+                                    <Download size={10} /> Download Receipt
+                                </a>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* EARNINGS OVERVIEW */}
             <div className="grid grid-cols-3 gap-3">
                 <div className="bg-neutral-900/80 backdrop-blur-sm rounded-2xl p-4 border border-neutral-800 text-center">
@@ -145,8 +189,8 @@ const CreatorPayments: React.FC<Props> = ({ creator, contentItems, onRequestPaym
                                     key={content.id}
                                     onClick={() => toggleSelect(content.id)}
                                     className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${isSelected
-                                            ? 'bg-purple-500/10 border border-purple-500/30'
-                                            : 'bg-black/50 border border-neutral-800 hover:border-neutral-700'
+                                        ? 'bg-purple-500/10 border border-purple-500/30'
+                                        : 'bg-black/50 border border-neutral-800 hover:border-neutral-700'
                                         }`}
                                 >
                                     <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${isSelected ? 'bg-purple-500 text-black' : 'bg-neutral-800 text-neutral-600'
