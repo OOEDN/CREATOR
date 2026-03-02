@@ -80,7 +80,9 @@ const CreatorBetaLab: React.FC<Props> = ({ creator, account, betaTests, betaRele
     };
 
     // ── INTRO SCREEN ──────────────────────────────────────────
-    if (!account.betaLabIntroSeen) {
+    // Check both server-side flag AND localStorage fallback
+    const betaIntroSeen = account.betaLabIntroSeen || localStorage.getItem(`ooedn_beta_intro_${creator.id}`) === 'true';
+    if (!betaIntroSeen) {
         return (
             <div className="max-w-xl mx-auto">
                 <div className="relative bg-gradient-to-b from-neutral-900/80 to-black border border-neutral-800 rounded-3xl overflow-hidden">

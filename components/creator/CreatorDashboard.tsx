@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Creator, Campaign, ContentItem, ContentStatus, TeamMessage, PaymentStatus } from '../../types';
 import {
     LayoutDashboard, MessageCircle, Upload, CreditCard, Package, Briefcase,
-    ArrowRight, Bell, BellOff, Zap, Trophy, TrendingUp, Calendar, Sparkles, Star, AlertTriangle, CheckCircle
+    ArrowRight, Bell, BellOff, Zap, Trophy, TrendingUp, Calendar, Sparkles, Star, AlertTriangle, CheckCircle, X
 } from 'lucide-react';
 
 interface Props {
@@ -88,7 +88,24 @@ const CreatorDashboard: React.FC<Props> = ({ creator, campaigns, contentItems, t
     }, [allDone]);
 
     const feedbackCount = myContent.reduce((acc, c) => acc + (c.teamNotes?.length || 0), 0);
-    const newCampaigns = myCampaigns.filter(c => !c.acceptedByCreatorIds?.includes(creator.id));
+
+    // Dismissed campaigns persisted in localStorage so they don't come back
+    const [dismissedCampaignIds, setDismissedCampaignIds] = useState<Set<string>>(() => {
+        try {
+            const saved = localStorage.getItem(`ooedn_dismissed_campaigns_${creator.id}`);
+            return saved ? new Set(JSON.parse(saved)) : new Set();
+        } catch { return new Set(); }
+    });
+    const dismissCampaign = (id: string) => {
+        setDismissedCampaignIds(prev => {
+            const next = new Set(prev).add(id);
+            localStorage.setItem(`ooedn_dismissed_campaigns_${creator.id}`, JSON.stringify([...next]));
+            return next;
+        });
+    };
+    const newCampaigns = myCampaigns.filter(c =>
+        !c.acceptedByCreatorIds?.includes(creator.id) && !dismissedCampaignIds.has(c.id)
+    );
 
     // Time-based greeting
     const hour = new Date().getHours();
@@ -243,21 +260,34 @@ const CreatorDashboard: React.FC<Props> = ({ creator, campaigns, contentItems, t
 
             {/* NEW CAMPAIGNS ALERT */}
             {newCampaigns.length > 0 && (
-                <button
-                    onClick={() => onNavigate('campaigns')}
-                    className="w-full flex items-center gap-3 p-4 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-2xl hover:border-yellow-500/50 transition-all group"
-                >
-                    <div className="w-10 h-10 rounded-xl bg-yellow-500/20 flex items-center justify-center animate-bounce">
-                        <Sparkles size={18} className="text-yellow-400" />
-                    </div>
-                    <div className="text-left flex-1">
-                        <p className="text-sm font-bold text-white">
-                            {newCampaigns.length} New Campaign{newCampaigns.length > 1 ? 's' : ''}! 🎉
-                        </p>
-                        <p className="text-[10px] text-neutral-400">Tap to view and accept</p>
-                    </div>
-                    <ArrowRight size={14} className="text-neutral-600 group-hover:text-yellow-400 transition-colors" />
-                </button>
+                <div className="space-y-2">
+                    {newCampaigns.map(campaign => (
+                        <div key={campaign.id} className="relative w-full flex items-center gap-3 p-4 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-2xl group">
+                            <button
+                                onClick={() => onNavigate('campaigns')}
+                                className="flex items-center gap-3 flex-1 text-left"
+                            >
+                                <div className="w-10 h-10 rounded-xl bg-yellow-500/20 flex items-center justify-center">
+                                    <Sparkles size={18} className="text-yellow-400" />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-sm font-bold text-white">
+                                        New Campaign: {campaign.title} 🎉
+                                    </p>
+                                    <p className="text-[10px] text-neutral-400">Tap to view and accept</p>
+                                </div>
+                                <ArrowRight size={14} className="text-neutral-600 group-hover:text-yellow-400 transition-colors" />
+                            </button>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); dismissCampaign(campaign.id); }}
+                                className="absolute top-2 right-2 p-1 text-neutral-600 hover:text-red-400 transition-colors rounded-full hover:bg-red-500/10"
+                                title="Dismiss this alert"
+                            >
+                                <X size={12} />
+                            </button>
+                        </div>
+                    ))}
+                </div>
             )}
 
             {/* QUICK STATS GRID */}

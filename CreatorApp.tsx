@@ -438,6 +438,8 @@ function CreatorApp() {
         setCurrentAccount(updatedAccount);
         setCreatorAccounts(updatedAccounts);
         saveMasterDB(undefined, undefined, undefined, undefined, undefined, updatedAccounts);
+        // localStorage fallback so it stays dismissed even if server save fails
+        if (creatorRecord) localStorage.setItem(`ooedn_beta_intro_${creatorRecord.id}`, 'true');
     };
 
     // --- BETA REQUEST ---
