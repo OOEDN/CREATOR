@@ -76,8 +76,8 @@ const CreatorPayments: React.FC<Props> = ({ creator, contentItems, onRequestPaym
 
     // Proxy GCS URLs through server so browser can load them without auth headers
     const proxyUrl = (url: string) => {
-        if (url.includes('storage.googleapis.com/storage/v1/b/')) {
-            return `/api/receipt-proxy?url=${encodeURIComponent(url)}`;
+        if (url.includes('storage.googleapis.com')) {
+            return `/api/media-proxy?url=${encodeURIComponent(url)}`;
         }
         return url;
     };

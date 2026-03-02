@@ -545,7 +545,62 @@ function App() {
     };
 
     const handleContentUpdate = (id: string, updates: Partial<ContentItem>) => {
-        setContentItems(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+        setContentItems(prev => {
+            const oldItem = prev.find(c => c.id === id);
+            const newItems = prev.map(c => c.id === id ? { ...c, ...updates } : c);
+
+            // --- AUTO PIPELINE: When content is APPROVED ---
+            if (updates.status === ContentStatus.Approved && oldItem && oldItem.status !== ContentStatus.Approved) {
+                const creatorId = oldItem.creatorId;
+                if (creatorId) {
+                    // 1. Notify creator via TeamMessage
+                    const approvalMsg = {
+                        id: crypto.randomUUID(),
+                        creatorId,
+                        sender: userEmail || 'OOEDN Team',
+                        text: `✅ Your content "${oldItem.title}" has been approved! Great work! 🎉`,
+                        timestamp: new Date().toISOString(),
+                        isCreatorMessage: false,
+                    };
+                    setTeamMessages(prev => [...prev, approvalMsg]);
+
+                    // 2. Auto-request payment for paid creators
+                    const creator = creators.find(c => c.id === creatorId);
+                    if (creator && creator.rate > 0 && creator.paymentStatus !== PaymentStatus.Paid) {
+                        // Mark this content item as payment-requested
+                        const updatedItem = newItems.find(c => c.id === id);
+                        if (updatedItem) {
+                            updatedItem.paymentRequested = true;
+                            updatedItem.paymentAmount = creator.rate;
+                        }
+
+                        // Update creator payment status to Processing
+                        setCreators(prev => prev.map(c =>
+                            c.id === creatorId ? { ...c, paymentStatus: PaymentStatus.Processing } : c
+                        ));
+
+                        // Notify creator about payment
+                        const paymentMsg = {
+                            id: crypto.randomUUID(),
+                            creatorId,
+                            sender: 'OOEDN Payment System',
+                            text: `💰 Payment of $${creator.rate} has been queued for "${oldItem.title}". You'll receive your receipt once processed!`,
+                            timestamp: new Date().toISOString(),
+                            isCreatorMessage: false,
+                        };
+                        setTeamMessages(prev => [...prev, paymentMsg]);
+
+                        // Push notification for team
+                        try { sendPushNotification('💰 Payment Queued', `$${creator.rate} queued for ${creator.name} — "${oldItem.title}"`, '/', 'ooedn-payment'); } catch (e) { }
+                    }
+
+                    // 3. Push notification for team about approval
+                    try { sendPushNotification('✅ Content Approved', `"${oldItem.title}" by ${oldItem.creatorName} approved`, '/', 'ooedn-content'); } catch (e) { }
+                }
+            }
+
+            return newItems;
+        });
     };
 
     const handleContentDelete = (id: string) => {

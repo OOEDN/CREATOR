@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Creator, Campaign, ContentItem, ContentStatus, TeamMessage } from '../../types';
 import {
     LayoutDashboard, MessageCircle, Upload, CreditCard, Package, Briefcase,
-    ArrowRight, Bell, BellOff, Zap, Trophy, TrendingUp, Calendar, Sparkles, Star, AlertTriangle
+    ArrowRight, Bell, BellOff, Zap, Trophy, TrendingUp, Calendar, Sparkles, Star, AlertTriangle, CheckCircle
 } from 'lucide-react';
 
 interface Props {
@@ -70,6 +70,7 @@ const CreatorDashboard: React.FC<Props> = ({ creator, campaigns, contentItems, t
     const myCampaigns = campaigns.filter(c => c.assignedCreatorIds?.includes(creator.id));
     const myContent = contentItems.filter(c => c.creatorId === creator.id || c.creatorName === creator.name);
     const needsEditing = myContent.filter(c => c.status === ContentStatus.Editing);
+    const recentlyApproved = myContent.filter(c => c.status === ContentStatus.Approved);
     const pendingTasks = myCampaigns.flatMap(c => c.tasks?.filter(t => !t.isDone) || []);
     const allTasks = myCampaigns.flatMap(c => c.tasks || []);
     const completedTasks = allTasks.filter(t => t.isDone).length;
@@ -203,6 +204,35 @@ const CreatorDashboard: React.FC<Props> = ({ creator, campaigns, contentItems, t
                             </button>
                         );
                     })}
+                </div>
+            )}
+
+            {/* CONTENT APPROVED BANNER */}
+            {recentlyApproved.length > 0 && (
+                <div className="space-y-3">
+                    {recentlyApproved.map(item => (
+                        <div
+                            key={item.id}
+                            className="w-full text-left bg-gradient-to-r from-emerald-500/15 to-green-500/10 border-2 border-emerald-500/40 rounded-2xl p-5"
+                        >
+                            <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    <CheckCircle size={18} className="text-emerald-400" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">
+                                            Content Approved! 🎉
+                                        </span>
+                                    </div>
+                                    <p className="text-sm font-bold text-white mb-1">{item.title}</p>
+                                    <p className="text-[10px] text-emerald-400/60">
+                                        {item.paymentRequested ? '💰 Payment has been queued!' : 'Great work — your content is ready!'}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             )}
 

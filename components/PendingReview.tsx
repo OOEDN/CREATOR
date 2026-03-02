@@ -279,7 +279,7 @@ const PendingReview: React.FC<PendingReviewProps> = ({ contentItems, onUpdateCon
                                                         </span>
                                                     )}
                                                     <a
-                                                        href={item.fileUrl}
+                                                        href={mediaSrc}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         className="text-[9px] text-fuchsia-400 hover:text-fuchsia-300 font-bold flex items-center gap-1"
