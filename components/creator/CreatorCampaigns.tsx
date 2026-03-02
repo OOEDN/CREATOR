@@ -12,6 +12,7 @@ interface Props {
     contentItems: ContentItem[];
     onMarkTaskDone: (campaignId: string, taskId: string) => void;
     onAcceptCampaign: (campaignId: string) => void;
+    onDeclineCampaign: (campaignId: string) => void;
     onNavigate: (view: string) => void;
     onAddComment?: (campaignId: string, text: string) => void;
 }
@@ -48,7 +49,7 @@ const CampaignConfetti: React.FC<{ active: boolean }> = ({ active }) => {
     );
 };
 
-const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, onMarkTaskDone, onAcceptCampaign, onNavigate, onAddComment }) => {
+const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, onMarkTaskDone, onAcceptCampaign, onDeclineCampaign, onNavigate, onAddComment }) => {
     const myCampaigns = campaigns.filter(c => c.assignedCreatorIds?.includes(creator.id));
     const [completedCampaignId, setCompletedCampaignId] = useState<string | null>(null);
     const [recentlyCompleted, setRecentlyCompleted] = useState<Set<string>>(new Set());
@@ -211,14 +212,26 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                 {/* EXPANDED DETAIL VIEW */}
                                 {isExpanded && (
                                     <div className="px-5 pb-5">
-                                        {/* ACCEPT BUTTON */}
+                                        {/* ACCEPT / DECLINE BUTTONS */}
                                         {isNew && (
-                                            <button
-                                                onClick={() => onAcceptCampaign(campaign.id)}
-                                                className="w-full mb-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-black py-3 rounded-xl font-black uppercase tracking-widest text-sm hover:from-yellow-400 hover:to-orange-400 transition-all flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/20 active:scale-95"
-                                            >
-                                                <Sparkles size={14} /> Accept Campaign 🎯
-                                            </button>
+                                            <div className="flex gap-3 mb-4">
+                                                <button
+                                                    onClick={() => onAcceptCampaign(campaign.id)}
+                                                    className="flex-1 bg-gradient-to-r from-yellow-500 to-orange-500 text-black py-3 rounded-xl font-black uppercase tracking-widest text-sm hover:from-yellow-400 hover:to-orange-400 transition-all flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/20 active:scale-95"
+                                                >
+                                                    <Sparkles size={14} /> Accept 🎯
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        if (confirm('Are you sure you want to decline this campaign? \n\nYou can always ask the team to re-assign it later.')) {
+                                                            onDeclineCampaign(campaign.id);
+                                                        }
+                                                    }}
+                                                    className="px-6 bg-neutral-800 text-neutral-400 py-3 rounded-xl font-black uppercase tracking-widest text-sm hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 transition-all flex items-center justify-center gap-2 border border-neutral-700 active:scale-95"
+                                                >
+                                                    Decline
+                                                </button>
+                                            </div>
                                         )}
 
                                         {/* TAB BAR */}
@@ -470,8 +483,8 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                     )}
                                                     {(campaign.comments || []).map(comment => (
                                                         <div key={comment.id} className={`rounded-xl p-3 border ${comment.isCreatorComment
-                                                                ? 'bg-purple-500/5 border-purple-500/20 ml-4'
-                                                                : 'bg-black/50 border-neutral-800 mr-4'
+                                                            ? 'bg-purple-500/5 border-purple-500/20 ml-4'
+                                                            : 'bg-black/50 border-neutral-800 mr-4'
                                                             }`}>
                                                             <div className="flex items-center justify-between mb-1">
                                                                 <span className={`text-[10px] font-bold ${comment.isCreatorComment ? 'text-purple-400' : 'text-emerald-400'

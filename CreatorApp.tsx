@@ -373,6 +373,35 @@ function CreatorApp() {
         addNotification('campaign', 'Campaign Accepted! 🎯', `You're now part of the campaign. Check the deliverables!`);
     };
 
+    const handleDeclineCampaign = (campaignId: string) => {
+        if (!creatorRecord) return;
+        const campaign = campaigns.find(c => c.id === campaignId);
+        // Remove the creator from assignedCreatorIds
+        const updatedCampaigns = campaigns.map(c => {
+            if (c.id !== campaignId) return c;
+            return {
+                ...c,
+                assignedCreatorIds: (c.assignedCreatorIds || []).filter(id => id !== creatorRecord.id),
+                acceptedByCreatorIds: [...(c.acceptedByCreatorIds || []), creatorRecord.id] // Mark as "handled" so it doesn't re-appear
+            };
+        });
+        setCampaigns(updatedCampaigns);
+        saveMasterDB(undefined, updatedCampaigns);
+        // Send a message to the team so they know
+        const msg: TeamMessage = {
+            id: crypto.randomUUID(),
+            creatorId: creatorRecord.id,
+            sender: creatorRecord.name,
+            text: `❌ Declined campaign "${campaign?.title || 'Unknown'}"`,
+            timestamp: new Date().toISOString(),
+            isCreatorMessage: true,
+        };
+        const updatedMessages = [...teamMessages, msg];
+        setTeamMessages(updatedMessages);
+        saveMasterDB(undefined, undefined, undefined, updatedMessages);
+        addNotification('campaign', 'Campaign Declined', `You've declined this campaign.`);
+    };
+
     // --- BETA LAB HANDLERS ---
     const handleSignBetaRelease = (betaTestId: string) => {
         if (!creatorRecord) return;
@@ -812,6 +841,7 @@ function CreatorApp() {
                             contentItems={contentItems}
                             onMarkTaskDone={handleMarkTaskDone}
                             onAcceptCampaign={handleAcceptCampaign}
+                            onDeclineCampaign={handleDeclineCampaign}
                             onNavigate={(v: string) => setView(v as CreatorView)}
                             onAddComment={(campaignId, text) => {
                                 if (!creatorRecord) return;
@@ -840,7 +870,7 @@ function CreatorApp() {
                                     isCreatorMessage: true,
                                 };
                                 setTeamMessages(prev => [...prev, msg]);
-                                saveMasterDB();
+                                saveMasterDB(undefined, undefined, undefined, [...teamMessages, msg]);
                             }}
                         />
                     )}

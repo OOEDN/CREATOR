@@ -1210,12 +1210,16 @@ app.post('/api/creator/save', creatorAuthMiddleware, async (req, res) => {
       }
     }
 
-    // Campaigns: only allow updating acceptedByCreatorIds (accepting a campaign)
+    // Campaigns: allow updating acceptedByCreatorIds (accepting) AND assignedCreatorIds (declining)
     if (updates.campaigns) {
       for (const campaign of updates.campaigns) {
-        db.campaigns = (db.campaigns || []).map(c =>
-          c.id === campaign.id ? { ...c, acceptedByCreatorIds: campaign.acceptedByCreatorIds } : c
-        );
+        db.campaigns = (db.campaigns || []).map(c => {
+          if (c.id !== campaign.id) return c;
+          const patch = { acceptedByCreatorIds: campaign.acceptedByCreatorIds };
+          // Allow removing self from assignedCreatorIds (decline)
+          if (campaign.assignedCreatorIds) patch.assignedCreatorIds = campaign.assignedCreatorIds;
+          return { ...c, ...patch };
+        });
       }
     }
 
