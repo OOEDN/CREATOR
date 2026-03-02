@@ -439,7 +439,10 @@ function App() {
                 if (data.contentItems) {
                     setContentItems(prev => {
                         const existingIds = new Set(prev.map(c => c.id));
-                        const newContent = data.contentItems!.filter(c => !existingIds.has(c.id));
+                        // Filter out items that were deliberately deleted this session
+                        const newContent = data.contentItems!.filter(c =>
+                            !existingIds.has(c.id) && !deletedContentIdsRef.current.has(c.id)
+                        );
                         if (newContent.length > 0) {
                             console.log(`[Poll] 🎬 ${newContent.length} new content uploads from creators`);
                             return [...prev, ...newContent];
@@ -609,13 +612,27 @@ function App() {
         });
     };
 
+    // Track deleted content IDs to stop them from being re-added by poll
+    const deletedContentIdsRef = useRef<Set<string>>(new Set());
+
     const handleContentDelete = (id: string) => {
+        // Track this deletion so the poll cycle doesn't re-add it
+        deletedContentIdsRef.current.add(id);
         setContentItems(prev => {
             const filtered = prev.filter(c => c.id !== id);
             // IMMEDIATE PERSIST: Save right away so deleted item doesn't come back on reload
             setTimeout(() => {
                 console.log(`[ContentDelete] 🗑️ Deleting content ${id} — saving immediately`);
                 syncStateToCloud(settings, creators, campaigns, filtered, settings.brandInfo, teamMessages, teamTasks, undefined, betaTests, betaReleases, creatorAccounts);
+                // Also delete from Firestore via server endpoint
+                fetch(`${window.location.origin}/api/content/delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contentId: id })
+                }).then(r => {
+                    if (r.ok) console.log(`[ContentDelete] ✅ Deleted from server: ${id}`);
+                    else console.warn(`[ContentDelete] Server delete failed: ${r.status}`);
+                }).catch(e => console.warn('[ContentDelete] Server delete error:', e.message));
             }, 100);
             return filtered;
         });

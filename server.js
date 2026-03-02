@@ -1206,6 +1206,43 @@ app.get('/api/media-proxy', async (req, res) => {
   }
 });
 
+// --- POST /api/content/delete --- (delete content from both GCS and Firestore)
+app.post('/api/content/delete', async (req, res) => {
+  try {
+    const { contentId } = req.body;
+    if (!contentId) return res.status(400).json({ error: 'contentId required' });
+
+    console.log(`[ContentDelete] Deleting content ${contentId} from all sources`);
+
+    // 1. Delete from GCS master DB
+    const db = await readMasterDB_GCS();
+    if (db) {
+      const before = (db.contentItems || []).length;
+      db.contentItems = (db.contentItems || []).filter(c => c.id !== contentId);
+      const after = db.contentItems.length;
+      if (before !== after) {
+        db.lastUpdated = new Date().toISOString();
+        db.version = Date.now();
+        await writeMasterDB_GCS(db);
+        console.log(`[ContentDelete] Removed from GCS (${before} → ${after})`);
+      }
+    }
+
+    // 2. Delete from Firestore directly
+    try {
+      await firestoreDAL.deleteContentItem(contentId);
+      console.log(`[ContentDelete] ✅ Removed from Firestore: ${contentId}`);
+    } catch (e) {
+      console.warn(`[ContentDelete] Firestore delete failed: ${e.message}`);
+    }
+
+    res.json({ success: true, contentId });
+  } catch (e) {
+    console.error('[ContentDelete] Error:', e);
+    res.status(500).json({ error: 'Delete failed' });
+  }
+});
+
 // --- POST /api/creator/save --- (JWT protected, creator writes their own changes)
 
 app.post('/api/creator/save', creatorAuthMiddleware, async (req, res) => {
