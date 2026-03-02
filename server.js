@@ -17,48 +17,6 @@ const port = process.env.PORT || 8080;
 // --- JSON body parser for API endpoints ---
 app.use(express.json({ limit: '50mb' }));
 
-// --- Gmail API Proxy ---
-// Routes /api/gmail/v1/* to gmail.googleapis.com/gmail/v1/*
-// This ensures all Gmail API calls go through our server, matching the production pattern.
-// The client sends its Authorization header; the server forwards it to Google.
-app.all('/api/gmail/v1/*', async (req, res) => {
-  try {
-    // Strip the /api prefix to get the real Gmail API path
-    const gmailPath = req.originalUrl.replace('/api/gmail/v1', '/gmail/v1');
-    const googleUrl = `https://gmail.googleapis.com${gmailPath}`;
-
-    const headers = {
-      'Content-Type': req.headers['content-type'] || 'application/json',
-    };
-    if (req.headers.authorization) {
-      headers['Authorization'] = req.headers.authorization;
-    }
-
-    const fetchOpts = {
-      method: req.method,
-      headers,
-    };
-    if (req.method !== 'GET' && req.method !== 'HEAD' && req.body) {
-      fetchOpts.body = JSON.stringify(req.body);
-    }
-
-    const gResp = await fetch(googleUrl, fetchOpts);
-    const contentType = gResp.headers.get('content-type') || 'application/json';
-    res.status(gResp.status).set('Content-Type', contentType);
-
-    if (contentType.includes('json')) {
-      const data = await gResp.json();
-      res.json(data);
-    } else {
-      const text = await gResp.text();
-      res.send(text);
-    }
-  } catch (e) {
-    console.error('[GmailProxy] Error:', e);
-    res.status(500).json({ error: 'Gmail proxy error' });
-  }
-});
-
 // --- VAPID Configuration ---
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BCibI4a7TWgbM97VXFd9u73W-ZwS1FHRLciBfCOPjyMx-CVC8zqQk3DWsoMv-F8eMtR8Fz-2EZ_cJDfdZZgXBCo';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'z0mdG9UnP7HYufX6x9YIJ6-3cZ4GhnwWm384ad1h2kI';

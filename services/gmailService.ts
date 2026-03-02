@@ -9,11 +9,11 @@ import { Creator, Campaign, ContentItem, AppSettings, TeamMessage, TeamTask } fr
 
 const TEAM_EMAIL = 'create@ooedn.com';
 
-// Gmail API user — 'me' uses the signed-in user's mailbox (for reading inbox, threads, etc.)
-const GMAIL_USER = 'me';
-
-// Direct Gmail API for reading — sending routes through server SMTP instead
-const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1';
+// Route ALL Gmail API calls through the server's Domain-Wide Delegation proxy.
+// The proxy (/api/gmail/*) uses a service account to impersonate create@ooedn.com,
+// so all reads and sends happen as create@ooedn.com regardless of who's logged in.
+const GMAIL_USER = 'create@ooedn.com';
+const GMAIL_API_BASE = '/api/gmail/v1';
 
 export interface EmailMessage {
     id: string;
@@ -84,10 +84,9 @@ const extractTextFromHtml = (html: string) => {
     return decodeHtmlEntities(text);
 };
 
-// ── Send an email via server-side SMTP (create@ooedn.com) ──
-// Reading emails uses Gmail API with the signed-in user's token.
-// SENDING routes through the server's SMTP (nodemailer) authenticated as create@ooedn.com
-// so emails always come from create@ooedn.com regardless of who's signed in.
+// ── Send an email via server-side DWD proxy (create@ooedn.com) ──
+// The server's /api/gmail/* proxy uses a service account with Domain-Wide Delegation
+// to impersonate create@ooedn.com. We construct the raw MIME and POST to the proxy.
 export const sendEmail = async (
     token: string,
     to: string,
@@ -97,20 +96,47 @@ export const sendEmail = async (
     inReplyTo?: string,
     fromEmail: string = TEAM_EMAIL
 ): Promise<{ id: string; threadId: string }> => {
-    const resp = await fetch('/api/send-email', {
+    const hasNonAscii = /[^\x00-\x7F]/.test(subject);
+    const encodedSubject = hasNonAscii
+        ? `=?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`
+        : subject;
+
+    const headers = [
+        `From: OOEDN Creative Team <${fromEmail}>`,
+        `To: ${to}`,
+        `Subject: ${encodedSubject}`,
+        `Content-Type: text/plain; charset=utf-8`,
+        `MIME-Version: 1.0`,
+    ];
+    if (inReplyTo) {
+        headers.push(`In-Reply-To: ${inReplyTo}`);
+        headers.push(`References: ${inReplyTo}`);
+    }
+
+    const rawEmail = [...headers, '', body].join('\r\n');
+    const encoded = btoa(unescape(encodeURIComponent(rawEmail)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
+    const payload: any = { raw: encoded };
+    if (threadId) payload.threadId = threadId;
+
+    // Route through server DWD proxy — NOT directly to Google
+    const resp = await fetch(`${GMAIL_API_BASE}/users/${GMAIL_USER}/messages/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to, subject, body, inReplyTo }),
+        body: JSON.stringify(payload)
     });
 
     if (!resp.ok) {
         const err = await resp.text();
-        throw new Error(`Email Send Failed (${resp.status}): ${err}`);
+        throw new Error(`Gmail Send Failed (${resp.status}): ${err}`);
     }
 
     const result = await resp.json();
-    console.log(`[Email] Sent to ${to}: ${subject}`);
-    return { id: result.id || 'smtp', threadId: result.threadId || 'smtp' };
+    console.log(`[Gmail] Email sent from ${fromEmail} to ${to}: ${subject}`);
+    return { id: result.id, threadId: result.threadId };
 };
 
 // ── Send bulk emails to multiple creators ──
