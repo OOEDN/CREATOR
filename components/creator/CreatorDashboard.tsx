@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Creator, Campaign, ContentItem, ContentStatus, TeamMessage } from '../../types';
+import { Creator, Campaign, ContentItem, ContentStatus, TeamMessage, PaymentStatus } from '../../types';
 import {
     LayoutDashboard, MessageCircle, Upload, CreditCard, Package, Briefcase,
     ArrowRight, Bell, BellOff, Zap, Trophy, TrendingUp, Calendar, Sparkles, Star, AlertTriangle, CheckCircle
@@ -99,7 +99,12 @@ const CreatorDashboard: React.FC<Props> = ({ creator, campaigns, contentItems, t
     const daysSinceJoin = Math.floor((Date.now() - new Date(creator.dateAdded).getTime()) / (1000 * 60 * 60 * 24));
     const streak = Math.min(daysSinceJoin + 1, 30); // Cap at 30
 
-    const earnings = creator.totalEarned || 0;
+    // Compute earnings: use totalEarned if set, otherwise derive from paid status + rate
+    const earnings = (() => {
+        if (creator.totalEarned && creator.totalEarned > 0) return creator.totalEarned;
+        if (creator.paymentStatus === PaymentStatus.Paid && creator.rate > 0) return creator.rate;
+        return 0;
+    })();
 
     const statusColor = creator.paymentStatus === 'Paid' ? 'text-emerald-400' :
         creator.paymentStatus === 'Processing' ? 'text-yellow-400' : 'text-red-400';

@@ -38,9 +38,28 @@ const CreatorPayments: React.FC<Props> = ({ creator, contentItems, onRequestPaym
 
     const perVideoRate = creator.rate || 0;
     const totalAmount = selectedIds.size * perVideoRate;
+
+    // Count content that has been paid for (paymentRequested OR approvedByTeam)
     const paidContent = contentItems.filter(c =>
-        (c.creatorId === creator.id || c.creatorName === creator.name) && c.paymentRequested
+        (c.creatorId === creator.id || c.creatorName === creator.name) &&
+        (c.paymentRequested || c.approvedByTeam)
     );
+
+    // Compute real total earned:
+    // 1. Use explicit totalEarned if set
+    // 2. Otherwise compute from paid content count × rate
+    // 3. If status is Paid but no tracked content, at least show the rate
+    const computedTotalEarned = (() => {
+        if (creator.totalEarned && creator.totalEarned > 0) return creator.totalEarned;
+        if (paidContent.length > 0) return paidContent.length * perVideoRate;
+        if (creator.paymentStatus === PaymentStatus.Paid && perVideoRate > 0) return perVideoRate;
+        return 0;
+    })();
+
+    // Videos paid: use paid content count, but if Paid status and 0 tracked, show at least 1
+    const videosPaidCount = paidContent.length > 0
+        ? paidContent.length
+        : (creator.paymentStatus === PaymentStatus.Paid ? 1 : 0);
 
     const handleRequest = () => {
         if (selectedIds.size === 0) return;
@@ -161,12 +180,12 @@ const CreatorPayments: React.FC<Props> = ({ creator, contentItems, onRequestPaym
             <div className="grid grid-cols-3 gap-3">
                 <div className="bg-neutral-900/80 backdrop-blur-sm rounded-2xl p-4 border border-neutral-800 text-center">
                     <TrendingUp size={16} className="text-emerald-400 mx-auto mb-2" />
-                    <p className="text-xl font-black text-emerald-400">${(creator.totalEarned || 0).toLocaleString()}</p>
+                    <p className="text-xl font-black text-emerald-400">${computedTotalEarned.toLocaleString()}</p>
                     <p className="text-[9px] text-neutral-600 font-bold uppercase">Total Earned</p>
                 </div>
                 <div className="bg-neutral-900/80 backdrop-blur-sm rounded-2xl p-4 border border-neutral-800 text-center">
                     <Video size={16} className="text-purple-400 mx-auto mb-2" />
-                    <p className="text-xl font-black text-white">{paidContent.length}</p>
+                    <p className="text-xl font-black text-white">{videosPaidCount}</p>
                     <p className="text-[9px] text-neutral-600 font-bold uppercase">Videos Paid</p>
                 </div>
                 <div className="bg-neutral-900/80 backdrop-blur-sm rounded-2xl p-4 border border-neutral-800 text-center">
