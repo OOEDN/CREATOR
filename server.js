@@ -567,24 +567,25 @@ async function writeMasterDB_GCS(db) {
     const token = await getGCSAuthToken();
     if (!token) { console.error('[DB] No GCS token for writing'); return false; }
 
-    // SAFEGUARD: check for account wipe
+    // SAFEGUARD: NEVER allow account count to decrease — always merge
     try {
       const checkUrl = `https://storage.googleapis.com/storage/v1/b/${MAIN_BUCKET}/o/${encodeURIComponent('ooedn_master_db.json')}?alt=media&t=${Date.now()}`;
       const checkRes = await fetch(checkUrl, { headers: { 'Authorization': `Bearer ${token}` } });
       if (checkRes.ok) {
         const existing = await checkRes.json();
-        const existingAccounts = existing?.creatorAccounts?.length || 0;
-        const newAccounts = db?.creatorAccounts?.length || 0;
-        const dropped = existingAccounts - newAccounts;
-        if (existingAccounts > 2 && newAccounts === 0) {
-          console.error(`[DB] ⛔ BLOCKED WRITE: Would wipe ${existingAccounts} creator accounts!`);
-          db.creatorAccounts = existing.creatorAccounts;
-        } else if (dropped >= 3) {
-          console.warn(`[DB] ⚠️ Large account drop (${existingAccounts} → ${newAccounts}), merging`);
+        const existingAccounts = existing?.creatorAccounts || [];
+        const newAccounts = db?.creatorAccounts || [];
+        const existingCount = existingAccounts.length;
+        const newCount = newAccounts.length;
+
+        if (existingCount > 0 && newCount < existingCount) {
+          // ALWAYS merge — never allow account count to drop
+          console.warn(`[DB] 🔒 Account protection: merging ${existingCount} existing + ${newCount} incoming accounts`);
           const merged = new Map();
-          for (const a of existing.creatorAccounts) merged.set(a.id, a);
-          for (const a of (db.creatorAccounts || [])) merged.set(a.id, a);
+          for (const a of existingAccounts) merged.set(a.id, a);
+          for (const a of newAccounts) merged.set(a.id, a);
           db.creatorAccounts = Array.from(merged.values());
+          console.log(`[DB] 🔒 Result: ${db.creatorAccounts.length} accounts preserved`);
         }
       }
     } catch (checkErr) {

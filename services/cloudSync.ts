@@ -245,10 +245,11 @@ export const syncStateToCloud = async (
     // Update known counts 
     updateKnownCounts(creators.length, content.length, campaigns.length);
 
-    // ── ALWAYS MERGE CREATOR ACCOUNTS: Server-side invite creates accounts directly in GCS.
-    // Admin React state may be stale (e.g. loaded as [] before invites were sent).
-    // We MUST merge with the cloud DB to preserve server-created accounts. ──
-    let accountsToSave = creatorAccounts || [];
+    // ── CREATOR ACCOUNTS: NEVER from admin state — always from server/cloud ──
+    // Creator accounts are managed exclusively by server endpoints (/api/creator/invite,
+    // /api/creator/signup, etc.). The admin app must NEVER overwrite them.
+    // We read the existing accounts from cloud and write them back UNCHANGED.
+    let accountsToSave: CreatorAccount[] = [];
     try {
         const existing = await fetchJSONFromGoogleCloud(
             settings.googleCloudBucket,
@@ -256,19 +257,8 @@ export const syncStateToCloud = async (
             MASTER_DB_FILENAME,
             settings.googleProjectId
         ) as MasterDB | null;
-        const cloudAccounts = existing?.creatorAccounts || [];
-        if (cloudAccounts.length > 0) {
-            // Merge: cloud accounts are the source of truth, admin state supplements
-            const merged = new Map<string, any>();
-            // Cloud accounts first (server-side created accounts take priority)
-            for (const a of cloudAccounts) merged.set(a.id, a);
-            // Then overlay any from admin state (in case admin modified something)
-            for (const a of accountsToSave) merged.set(a.id, a);
-            accountsToSave = Array.from(merged.values());
-            if (accountsToSave.length !== (creatorAccounts || []).length) {
-                console.log(`[CloudSync] 🔄 Merged creator accounts: ${(creatorAccounts || []).length} local + ${cloudAccounts.length} cloud = ${accountsToSave.length} total`);
-            }
-        }
+        accountsToSave = existing?.creatorAccounts || [];
+        console.log(`[CloudSync] 🔒 Preserving ${accountsToSave.length} server-managed accounts (admin state ignored)`);
     } catch (e) {
         console.error('[CloudSync] ⛔ Could not read existing accounts — BLOCKING save to prevent data loss');
         setSyncStatus('error', 'Cannot verify creator accounts — save blocked for safety');
