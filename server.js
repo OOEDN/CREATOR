@@ -235,7 +235,7 @@ app.post('/api/creator/send-email', async (req, res) => {
     for (const email of emails) {
       try {
         await transporter.sendMail({
-          from: `"OOEDN" <${process.env.SMTP_USER || 'noreply@ooedn.com'}>`,
+          from: `"OOEDN Creator Portal" <${process.env.SMTP_FROM || 'creator@ooedn.com'}>`,
           to: email, subject,
           html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
             <div style="background:#000;padding:24px;border-radius:16px">

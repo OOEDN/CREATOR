@@ -260,6 +260,39 @@ const PendingReview: React.FC<PendingReviewProps> = ({ contentItems, onUpdateCon
                                         </div>
                                     )}
 
+                                    {/* MEDIA PREVIEW */}
+                                    {item.fileUrl && (
+                                        <div className="bg-black/50 rounded-xl border border-neutral-800 overflow-hidden">
+                                            <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-800">
+                                                <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                    <Eye size={10} /> Quick Preview
+                                                </span>
+                                                {item.revisionCount && item.revisionCount > 0 && (
+                                                    <span className="text-[9px] font-bold bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded-lg">
+                                                        Revision #{item.revisionCount}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {item.type === ContentType.Video ? (
+                                                <video
+                                                    src={item.fileUrl}
+                                                    controls
+                                                    preload="metadata"
+                                                    className="w-full max-h-[400px] bg-black"
+                                                    style={{ objectFit: 'contain' }}
+                                                />
+                                            ) : (
+                                                <a href={item.fileUrl} target="_blank" rel="noopener noreferrer">
+                                                    <img
+                                                        src={item.fileUrl}
+                                                        alt={item.title}
+                                                        className="w-full max-h-[400px] object-contain bg-black cursor-pointer hover:opacity-90 transition-opacity"
+                                                    />
+                                                </a>
+                                            )}
+                                        </div>
+                                    )}
+
                                     {/* Note Input */}
                                     <div>
                                         <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-1.5 block flex items-center gap-1">
