@@ -568,7 +568,7 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({
             <div className="p-3">
               <div className="flex items-center justify-between mb-1">
                 <h4 className="text-[10px] font-black text-white truncate uppercase tracking-tight max-w-[70%]">{item.title}</h4>
-                <button onClick={(e) => { e.stopPropagation(); onDelete(item.id); }} className="text-neutral-700 hover:text-red-500 transition-colors"><Trash2 size={12} /></button>
+                <button onClick={(e) => { e.stopPropagation(); if (confirm('⚠️ Delete this content permanently?\n\nThis cannot be undone. The file will be removed from the pipeline.')) onDelete(item.id); }} className="text-neutral-700 hover:text-red-500 transition-colors" title="Delete content"><Trash2 size={12} /></button>
               </div>
               <div className="flex items-center justify-between">
                 <p className="text-[8px] text-emerald-500 font-bold uppercase tracking-widest truncate">@{item.creatorName}</p>

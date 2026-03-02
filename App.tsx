@@ -610,7 +610,15 @@ function App() {
     };
 
     const handleContentDelete = (id: string) => {
-        setContentItems(prev => prev.filter(c => c.id !== id));
+        setContentItems(prev => {
+            const filtered = prev.filter(c => c.id !== id);
+            // IMMEDIATE PERSIST: Save right away so deleted item doesn't come back on reload
+            setTimeout(() => {
+                console.log(`[ContentDelete] 🗑️ Deleting content ${id} — saving immediately`);
+                syncStateToCloud(settings, creators, campaigns, filtered, settings.brandInfo, teamMessages, teamTasks, undefined, betaTests, betaReleases, creatorAccounts);
+            }, 100);
+            return filtered;
+        });
     };
 
     const handleSaveCampaign = (campaign: Campaign) => {
