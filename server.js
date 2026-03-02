@@ -500,9 +500,18 @@ async function writeMasterDB(db) {
         const existing = await checkRes.json();
         const existingAccounts = existing?.creatorAccounts?.length || 0;
         const newAccounts = db?.creatorAccounts?.length || 0;
-        if (existingAccounts > 0 && newAccounts === 0) {
+        const dropped = existingAccounts - newAccounts;
+        if (existingAccounts > 2 && newAccounts === 0) {
+          // Catastrophic wipe: many accounts → 0. Block and preserve.
           console.error(`[CreatorAuth] ⛔ BLOCKED WRITE: Would wipe ${existingAccounts} creator accounts! Preserving existing accounts.`);
           db.creatorAccounts = existing.creatorAccounts;
+        } else if (dropped >= 3) {
+          // Large drop (3+) — suspicious, merge to be safe
+          console.warn(`[CreatorAuth] ⚠️ Large account drop (${existingAccounts} → ${newAccounts}), merging to be safe`);
+          const merged = new Map();
+          for (const a of existing.creatorAccounts) merged.set(a.id, a);
+          for (const a of (db.creatorAccounts || [])) merged.set(a.id, a);
+          db.creatorAccounts = Array.from(merged.values());
         }
       }
     } catch (checkErr) {

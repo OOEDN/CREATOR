@@ -245,25 +245,34 @@ export const syncStateToCloud = async (
     // Update known counts 
     updateKnownCounts(creators.length, content.length, campaigns.length);
 
-    // ── PRESERVE CREATOR ACCOUNTS: If not provided, read from existing cloud DB ──
-    let accountsToSave = creatorAccounts;
-    if (!accountsToSave) {
-        try {
-            const existing = await fetchJSONFromGoogleCloud(
-                settings.googleCloudBucket,
-                settings.googleCloudToken,
-                MASTER_DB_FILENAME,
-                settings.googleProjectId
-            ) as MasterDB | null;
-            accountsToSave = existing?.creatorAccounts || [];
-            if (accountsToSave.length > 0) {
-                console.log(`[CloudSync] Preserving ${accountsToSave.length} creator accounts from existing DB`);
+    // ── ALWAYS MERGE CREATOR ACCOUNTS: Server-side invite creates accounts directly in GCS.
+    // Admin React state may be stale (e.g. loaded as [] before invites were sent).
+    // We MUST merge with the cloud DB to preserve server-created accounts. ──
+    let accountsToSave = creatorAccounts || [];
+    try {
+        const existing = await fetchJSONFromGoogleCloud(
+            settings.googleCloudBucket,
+            settings.googleCloudToken,
+            MASTER_DB_FILENAME,
+            settings.googleProjectId
+        ) as MasterDB | null;
+        const cloudAccounts = existing?.creatorAccounts || [];
+        if (cloudAccounts.length > 0) {
+            // Merge: cloud accounts are the source of truth, admin state supplements
+            const merged = new Map<string, any>();
+            // Cloud accounts first (server-side created accounts take priority)
+            for (const a of cloudAccounts) merged.set(a.id, a);
+            // Then overlay any from admin state (in case admin modified something)
+            for (const a of accountsToSave) merged.set(a.id, a);
+            accountsToSave = Array.from(merged.values());
+            if (accountsToSave.length !== (creatorAccounts || []).length) {
+                console.log(`[CloudSync] 🔄 Merged creator accounts: ${(creatorAccounts || []).length} local + ${cloudAccounts.length} cloud = ${accountsToSave.length} total`);
             }
-        } catch (e) {
-            console.error('[CloudSync] ⛔ Could not read existing accounts — BLOCKING save to prevent data loss');
-            setSyncStatus('error', 'Cannot verify creator accounts — save blocked for safety');
-            return; // DO NOT save without accounts — this would wipe them
         }
+    } catch (e) {
+        console.error('[CloudSync] ⛔ Could not read existing accounts — BLOCKING save to prevent data loss');
+        setSyncStatus('error', 'Cannot verify creator accounts — save blocked for safety');
+        return; // DO NOT save without accounts — this would wipe them
     }
 
     const cleanContent = content.map(c => ({
