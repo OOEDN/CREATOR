@@ -1066,8 +1066,7 @@ function App() {
                         <ContentLibrary
                             items={contentItems.filter(c => {
                                 // Hide unapproved creator-portal uploads — they belong in Pending Review
-                                // Only hide content with storageType 'cloud' (uploaded from creator portal)
-                                if (c.creatorId && c.creatorId !== 'team' && c.storageType === 'cloud' && (c.status === ContentStatus.Raw || c.status === ContentStatus.Editing)) {
+                                if (c.creatorId && c.creatorId !== 'team' && (c.submittedByCreator || c.storageType === 'cloud') && (c.status === ContentStatus.Raw || c.status === ContentStatus.Editing)) {
                                     return false;
                                 }
                                 return true;

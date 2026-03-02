@@ -114,6 +114,7 @@ const CreatorUpload: React.FC<Props> = ({ creator, contentItems, onUpload, onRep
                 uploadDate: new Date().toISOString(),
                 caption: caption || undefined,
                 tags: [creator.name, 'creator-upload'],
+                submittedByCreator: true,
             };
             onUpload(item);
             setSelectedFile(null);

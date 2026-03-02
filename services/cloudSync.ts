@@ -297,11 +297,11 @@ export const syncStateToCloud = async (
         if (existing?.contentItems) {
             const adminContentIds = new Set(cleanContent.map(c => c.id));
             const creatorOnlyContent = existing.contentItems.filter(c =>
-                !adminContentIds.has(c.id) && c.storageType === 'cloud'
+                !adminContentIds.has(c.id) && (c.submittedByCreator || c.storageType === 'cloud')
             );
             if (creatorOnlyContent.length > 0) {
                 console.log(`[CloudSync] 🔄 Merging ${creatorOnlyContent.length} creator-uploaded items from cloud`);
-                mergedContent = [...cleanContent, ...creatorOnlyContent];
+                mergedContent = [...cleanContent, ...creatorOnlyContent] as ContentItem[];
             }
         }
 

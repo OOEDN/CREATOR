@@ -25,10 +25,10 @@ const PendingReview: React.FC<PendingReviewProps> = ({ contentItems, onUpdateCon
     const [filter, setFilter] = useState<'all' | 'pending' | 'changes' | 'approved'>('pending');
 
     // Only show content that was UPLOADED FROM the creator portal
-    // storageType === 'cloud' means it came through the creator upload flow (uploaded to GCS)
-    // This excludes team-uploaded content that just happens to be associated with a creator
+    // submittedByCreator flag is set during creator upload — works regardless of GCS success
+    // Also check storageType === 'cloud' for backward compat with items before the flag was added
     const creatorContent = contentItems.filter(c =>
-        c.creatorId && c.creatorId !== 'team' && c.storageType === 'cloud'
+        c.creatorId && c.creatorId !== 'team' && (c.submittedByCreator || c.storageType === 'cloud')
     );
 
     const filteredContent = creatorContent.filter(c => {

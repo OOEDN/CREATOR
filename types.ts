@@ -127,6 +127,7 @@ export interface ContentItem {
   // Review tracking
   reviewedAt?: string;              // When the content was last reviewed
   reviewedBy?: string;              // Who reviewed it
+  submittedByCreator?: boolean;     // True if uploaded from creator portal (not team-uploaded)
 }
 
 export interface CampaignTask {

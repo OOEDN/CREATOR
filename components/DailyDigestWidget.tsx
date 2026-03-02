@@ -57,7 +57,7 @@ const DailyDigestWidget: React.FC<DailyDigestWidgetProps> = ({
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
         const pendingReviewVideos = contentItems.filter(c =>
             c.status === ContentStatus.Raw && c.uploadDate > weekAgo &&
-            c.creatorId && c.creatorId !== 'team' && c.storageType === 'cloud'
+            c.creatorId && c.creatorId !== 'team' && (c.submittedByCreator || c.storageType === 'cloud')
         );
 
         // Unread creator messages in last 24h (exclude already-read messages)
