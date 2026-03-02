@@ -92,6 +92,14 @@ function CreatorApp() {
         localStorage.setItem('ooedn_creator_theme', isDarkMode ? 'dark' : 'light');
     }, [isDarkMode]);
 
+    // Auto-dismiss welcome intro after 5 seconds (must be before any conditional returns)
+    useEffect(() => {
+        if (showWelcomeIntro) {
+            const timer = setTimeout(() => setShowWelcomeIntro(false), 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [showWelcomeIntro]);
+
     const [settings] = useState<AppSettings>(() => {
         const saved = localStorage.getItem('ooedn_settings');
         if (saved) {
@@ -498,14 +506,6 @@ function CreatorApp() {
         );
     }
 
-    // --- WELCOME INTRO (first login only) ---
-    // Auto-dismiss after 3.5 seconds to prevent getting stuck
-    useEffect(() => {
-        if (showWelcomeIntro) {
-            const timer = setTimeout(() => setShowWelcomeIntro(false), 5000);
-            return () => clearTimeout(timer);
-        }
-    }, [showWelcomeIntro]);
 
     if (showWelcomeIntro) {
         return (
