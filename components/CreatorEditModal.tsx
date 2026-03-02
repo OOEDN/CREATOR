@@ -23,11 +23,12 @@ interface CreatorEditModalProps {
     onDeleteContent: (id: string) => void;
     appSettings: AppSettings;
     initialShipmentId?: string | null;
+    onNotifyCreator?: (creatorId: string, message: string) => void;
 }
 
 const CreatorEditModal: React.FC<CreatorEditModalProps> = ({
     creator, content, onClose, onSave, onDelete,
-    onContentUpload, onUpdateContent, onDeleteContent, appSettings, initialShipmentId
+    onContentUpload, onUpdateContent, onDeleteContent, appSettings, initialShipmentId, onNotifyCreator
 }) => {
     const [activeTab, setActiveTab] = useState<'details' | 'content' | 'outreach'>('details');
     const [formData, setFormData] = useState<Partial<Creator>>({ ...creator });
@@ -113,10 +114,15 @@ const CreatorEditModal: React.FC<CreatorEditModalProps> = ({
         const current = formData.shipments || [];
         handleChange('shipments', [s, ...current]);
         try { sendPushNotification('📦 Shipment Alert', `New package for ${creator.name} needs to go out`, '/', 'ooedn-shipment'); } catch (e) { }
+        // Notify creator about the new shipment
+        if (onNotifyCreator) {
+            onNotifyCreator(creator.id, `📦 A package "${s.title}" has been prepared for you! We'll update you with tracking info once it ships.`);
+        }
     };
 
     const handleUpdateShipment = (id: string, updates: Partial<Shipment>) => {
         const current = formData.shipments || [];
+        const oldShipment = current.find(s => s.id === id);
         const updatedShipments = current.map(s => {
             if (s.id === id) {
                 const updatedShipment = { ...s, ...updates };
@@ -137,6 +143,17 @@ const CreatorEditModal: React.FC<CreatorEditModalProps> = ({
 
         // INSTANT SAVE: Persist immediately to prevent data loss
         onSave(creator.id, { ...formData, shipments: updatedShipments });
+
+        // Notify creator when tracking is added or status changes
+        if (onNotifyCreator) {
+            if (updates.trackingNumber && updates.trackingNumber !== 'PENDING' && updates.trackingNumber !== oldShipment?.trackingNumber) {
+                const shipmentTitle = oldShipment?.title || 'your package';
+                onNotifyCreator(creator.id, `🚚 Your package "${shipmentTitle}" is on the way! Tracking #: ${updates.trackingNumber} via ${oldShipment?.carrier || 'carrier'}. Check your Shipments tab for live tracking!`);
+            } else if (updates.status && updates.status !== oldShipment?.status) {
+                const shipmentTitle = oldShipment?.title || 'your package';
+                onNotifyCreator(creator.id, `📦 Shipment update: "${shipmentTitle}" status changed to ${updates.status}.`);
+            }
+        }
     };
 
     const handleDeleteShipment = (id: string) => {

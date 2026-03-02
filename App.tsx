@@ -544,59 +544,65 @@ function App() {
         }
     };
 
+    // Track pending approval to handle outside of setContentItems (avoids stale closure)
+    const pendingApprovalRef = React.useRef<{ oldItem: ContentItem; newItem: ContentItem } | null>(null);
+
     const handleContentUpdate = (id: string, updates: Partial<ContentItem>) => {
         setContentItems(prev => {
             const oldItem = prev.find(c => c.id === id);
             const newItems = prev.map(c => c.id === id ? { ...c, ...updates } : c);
 
-            // --- AUTO PIPELINE: When content is APPROVED ---
+            // Flag if this is a new approval (to handle outside this closure)
             if (updates.status === ContentStatus.Approved && oldItem && oldItem.status !== ContentStatus.Approved) {
-                const creatorId = oldItem.creatorId;
-                if (creatorId) {
+                const newItem = newItems.find(c => c.id === id)!;
+                // Use setTimeout to escape the state updater and access fresh state
+                setTimeout(() => {
+                    const creatorId = oldItem.creatorId;
+                    if (!creatorId) return;
+
                     // 1. Notify creator via TeamMessage
-                    const approvalMsg = {
+                    setTeamMessages(prev => [...prev, {
                         id: crypto.randomUUID(),
                         creatorId,
                         sender: userEmail || 'OOEDN Team',
                         text: `✅ Your content "${oldItem.title}" has been approved! Great work! 🎉`,
                         timestamp: new Date().toISOString(),
                         isCreatorMessage: false,
-                    };
-                    setTeamMessages(prev => [...prev, approvalMsg]);
+                    }]);
 
                     // 2. Auto-request payment for paid creators
-                    const creator = creators.find(c => c.id === creatorId);
-                    if (creator && creator.rate > 0 && creator.paymentStatus !== PaymentStatus.Paid) {
-                        // Mark this content item as payment-requested
-                        const updatedItem = newItems.find(c => c.id === id);
-                        if (updatedItem) {
-                            updatedItem.paymentRequested = true;
-                            updatedItem.paymentAmount = creator.rate;
+                    setCreators(prevCreators => {
+                        const creator = prevCreators.find(c => c.id === creatorId);
+                        if (creator && creator.rate > 0 && creator.paymentStatus !== PaymentStatus.Paid) {
+                            // Mark the content as payment-requested
+                            setContentItems(prevContent => prevContent.map(c =>
+                                c.id === id ? { ...c, paymentRequested: true, paymentAmount: creator.rate } : c
+                            ));
+
+                            // Notify creator about payment
+                            setTeamMessages(prev => [...prev, {
+                                id: crypto.randomUUID(),
+                                creatorId,
+                                sender: 'OOEDN Payment System',
+                                text: `💰 Payment of $${creator.rate} has been queued for "${oldItem.title}". You'll receive your receipt once processed!`,
+                                timestamp: new Date().toISOString(),
+                                isCreatorMessage: false,
+                            }]);
+
+                            // Push notifications
+                            try { sendPushNotification('💰 Payment Queued', `$${creator.rate} queued for ${creator.name} — "${oldItem.title}"`, '/', 'ooedn-payment'); } catch (e) { }
+
+                            // Update payment status
+                            return prevCreators.map(c =>
+                                c.id === creatorId ? { ...c, paymentStatus: PaymentStatus.Processing } : c
+                            );
                         }
+                        return prevCreators;
+                    });
 
-                        // Update creator payment status to Processing
-                        setCreators(prev => prev.map(c =>
-                            c.id === creatorId ? { ...c, paymentStatus: PaymentStatus.Processing } : c
-                        ));
-
-                        // Notify creator about payment
-                        const paymentMsg = {
-                            id: crypto.randomUUID(),
-                            creatorId,
-                            sender: 'OOEDN Payment System',
-                            text: `💰 Payment of $${creator.rate} has been queued for "${oldItem.title}". You'll receive your receipt once processed!`,
-                            timestamp: new Date().toISOString(),
-                            isCreatorMessage: false,
-                        };
-                        setTeamMessages(prev => [...prev, paymentMsg]);
-
-                        // Push notification for team
-                        try { sendPushNotification('💰 Payment Queued', `$${creator.rate} queued for ${creator.name} — "${oldItem.title}"`, '/', 'ooedn-payment'); } catch (e) { }
-                    }
-
-                    // 3. Push notification for team about approval
+                    // 3. Push notification about approval
                     try { sendPushNotification('✅ Content Approved', `"${oldItem.title}" by ${oldItem.creatorName} approved`, '/', 'ooedn-content'); } catch (e) { }
-                }
+                }, 0);
             }
 
             return newItems;
@@ -1437,6 +1443,16 @@ function App() {
                         onUpdateContent={handleContentUpdate}
                         onDeleteContent={handleContentDelete}
                         appSettings={settings}
+                        onNotifyCreator={(creatorId, message) => {
+                            setTeamMessages(prev => [...prev, {
+                                id: crypto.randomUUID(),
+                                creatorId,
+                                sender: userEmail || 'OOEDN Team',
+                                text: message,
+                                timestamp: new Date().toISOString(),
+                                isCreatorMessage: false,
+                            }]);
+                        }}
                     />
                 )
             }
