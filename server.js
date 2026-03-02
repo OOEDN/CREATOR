@@ -491,6 +491,42 @@ app.use('/api/gmail/*', async (req, res) => {
   }
 });
 
+// --- GCS Receipt Proxy (allows browser to view/download receipts that need auth) ---
+app.get('/api/receipt-proxy', async (req, res) => {
+  const { url } = req.query;
+  if (!url || typeof url !== 'string' || !url.includes('storage.googleapis.com')) {
+    return res.status(400).json({ error: 'Invalid or missing GCS URL' });
+  }
+
+  try {
+    let token = null;
+    if (gmailAuthClient) {
+      const tokenInfo = await gmailAuthClient.getAccessToken();
+      token = tokenInfo.token;
+    }
+
+    const fetchHeaders = {};
+    if (token) fetchHeaders['Authorization'] = `Bearer ${token}`;
+
+    const gcsRes = await fetch(url, { headers: fetchHeaders });
+    if (!gcsRes.ok) {
+      console.error(`[Receipt Proxy] GCS returned ${gcsRes.status} for ${url}`);
+      return res.status(gcsRes.status).json({ error: `GCS error: ${gcsRes.status}` });
+    }
+
+    const contentType = gcsRes.headers.get('content-type') || 'application/octet-stream';
+    res.set('Content-Type', contentType);
+    res.set('Cache-Control', 'public, max-age=86400');
+
+    // Stream the response body
+    const buffer = await gcsRes.arrayBuffer();
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    console.error('[Receipt Proxy] Error:', error);
+    res.status(500).json({ error: 'Receipt proxy failed' });
+  }
+});
+
 // ===================================================================
 // CREATOR PORTAL AUTH — Phase 1 Server-Side Authentication
 // ===================================================================

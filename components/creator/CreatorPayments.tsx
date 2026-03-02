@@ -74,6 +74,14 @@ const CreatorPayments: React.FC<Props> = ({ creator, contentItems, onRequestPaym
         try { return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }); } catch { return iso; }
     };
 
+    // Proxy GCS URLs through server so browser can load them without auth headers
+    const proxyUrl = (url: string) => {
+        if (url.includes('storage.googleapis.com/storage/v1/b/')) {
+            return `/api/receipt-proxy?url=${encodeURIComponent(url)}`;
+        }
+        return url;
+    };
+
     return (
         <div className="max-w-2xl mx-auto space-y-6">
             {/* Cha-ching animation */}
@@ -114,9 +122,9 @@ const CreatorPayments: React.FC<Props> = ({ creator, contentItems, onRequestPaym
                     </h3>
                     <div className="flex items-start gap-4">
                         {creator.lastPaymentProof && (
-                            <a href={creator.lastPaymentProof} target="_blank" rel="noopener noreferrer"
+                            <a href={proxyUrl(creator.lastPaymentProof)} target="_blank" rel="noopener noreferrer"
                                 className="w-24 h-24 rounded-xl border border-emerald-500/30 overflow-hidden flex-shrink-0 hover:border-emerald-400 transition-colors block">
-                                <img src={creator.lastPaymentProof} alt="Payment Receipt" className="w-full h-full object-cover" />
+                                <img src={proxyUrl(creator.lastPaymentProof)} alt="Payment Receipt" className="w-full h-full object-cover" />
                             </a>
                         )}
                         <div className="flex-1 space-y-2">
@@ -139,10 +147,9 @@ const CreatorPayments: React.FC<Props> = ({ creator, contentItems, onRequestPaym
                                 </div>
                             )}
                             {creator.lastPaymentProof && (
-                                <a href={creator.lastPaymentProof} target="_blank" rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-lg hover:bg-emerald-500/20 transition-colors mt-1"
-                                    download>
-                                    <Download size={10} /> Download Receipt
+                                <a href={proxyUrl(creator.lastPaymentProof)} target="_blank" rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-lg hover:bg-emerald-500/20 transition-colors mt-1">
+                                    <Download size={10} /> View Receipt
                                 </a>
                             )}
                         </div>
