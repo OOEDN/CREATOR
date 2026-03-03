@@ -225,7 +225,7 @@ export const syncStateToCloud = async (
     lastBackupDate?: string,
     betaTests?: BetaTest[],
     betaReleases?: BetaRelease[],
-    creatorAccounts?: CreatorAccount[]
+    creatorAccounts?: CreatorAccount[] // DEPRECATED: ignored, accounts are Firestore-only
 ) => {
     if (!settings.useCloudStorage || !settings.googleCloudBucket || !settings.googleCloudToken) {
         return;
@@ -245,25 +245,10 @@ export const syncStateToCloud = async (
     // Update known counts 
     updateKnownCounts(creators.length, content.length, campaigns.length);
 
-    // ── CREATOR ACCOUNTS: NEVER from admin state — always from server/cloud ──
-    // Creator accounts are managed exclusively by server endpoints (/api/creator/invite,
-    // /api/creator/signup, etc.). The admin app must NEVER overwrite them.
-    // We read the existing accounts from cloud and write them back UNCHANGED.
-    let accountsToSave: CreatorAccount[] = [];
-    try {
-        const existing = await fetchJSONFromGoogleCloud(
-            settings.googleCloudBucket,
-            settings.googleCloudToken,
-            MASTER_DB_FILENAME,
-            settings.googleProjectId
-        ) as MasterDB | null;
-        accountsToSave = existing?.creatorAccounts || [];
-        console.log(`[CloudSync] 🔒 Preserving ${accountsToSave.length} server-managed accounts (admin state ignored)`);
-    } catch (e) {
-        console.error('[CloudSync] ⛔ Could not read existing accounts — BLOCKING save to prevent data loss');
-        setSyncStatus('error', 'Cannot verify creator accounts — save blocked for safety');
-        return; // DO NOT save without accounts — this would wipe them
-    }
+    // ── CREATOR ACCOUNTS: Firestore-only — NEVER written to GCS ──
+    // Accounts are managed exclusively by server endpoints (/api/creator/invite, etc.)
+    // The admin app cannot affect them. This is intentional.
+    // DO NOT add creatorAccounts back to the GCS payload.
 
     const cleanContent = content.map(c => ({
         ...c,
@@ -319,7 +304,7 @@ export const syncStateToCloud = async (
         teamTasks,
         betaTests,
         betaReleases,
-        creatorAccounts: accountsToSave,
+        // NOTE: creatorAccounts intentionally omitted — Firestore only
         lastBackupDate,
         version: Date.now()
     };

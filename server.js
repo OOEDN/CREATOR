@@ -705,20 +705,18 @@ function scopeDataForCreator(db, creatorRecord) {
   };
 }
 
-// --- POST /api/creator/login ---
+// --- POST /api/creator/login --- (ACCOUNTS FROM FIRESTORE ONLY)
 
 app.post('/api/creator/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
-    const db = await readMasterDB();
-    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
-
-    const accounts = db.creatorAccounts || [];
     const inputEmail = email.toLowerCase().trim();
     const inputPassword = password.trim();
-    const account = accounts.find(a => a.email.toLowerCase() === inputEmail);
+
+    // ACCOUNTS: Always from Firestore — never from GCS
+    const account = await firestoreDAL.getAccountByEmail(inputEmail);
 
     if (!account) {
       console.log(`[CreatorAuth] Login failed — no account for: ${inputEmail}`);
@@ -728,19 +726,13 @@ app.post('/api/creator/login', async (req, res) => {
     // Support both bcrypt hashed and legacy plain-text passwords
     let passwordValid = false;
     if (account.password.startsWith('$2a$') || account.password.startsWith('$2b$')) {
-      // Bcrypt hash — verify properly
       passwordValid = await bcrypt.compare(inputPassword, account.password);
     } else {
-      // Legacy plain-text — direct comparison
       passwordValid = account.password === inputPassword;
-      // Auto-upgrade: hash the plain-text password on successful login
       if (passwordValid) {
         console.log(`[CreatorAuth] Auto-upgrading plain-text password for: ${inputEmail}`);
-        account.password = await bcrypt.hash(inputPassword, BCRYPT_ROUNDS);
-        db.creatorAccounts = accounts.map(a => a.id === account.id ? account : a);
-        db.lastUpdated = new Date().toISOString();
-        db.version = Date.now();
-        writeMasterDB(db).catch(e => console.warn('[CreatorAuth] Auto-upgrade write failed:', e));
+        const hashed = await bcrypt.hash(inputPassword, BCRYPT_ROUNDS);
+        await firestoreDAL.updateAccount(account.id, { password: hashed });
       }
     }
 
@@ -749,14 +741,14 @@ app.post('/api/creator/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // Find the creator record
-    const creatorRecord = (db.creators || []).find(c =>
+    // Get other data from GCS/Firestore for scoping
+    const db = await readMasterDB();
+    const creatorRecord = (db?.creators || []).find(c =>
       c.id === account.linkedCreatorId ||
       c.email?.toLowerCase() === account.email.toLowerCase() ||
       c.portalEmail?.toLowerCase() === account.email.toLowerCase()
     );
 
-    // Sign JWT
     const token = jwt.sign(
       { accountId: account.id, email: account.email, creatorId: creatorRecord?.id },
       JWT_SECRET,
@@ -765,8 +757,7 @@ app.post('/api/creator/login', async (req, res) => {
 
     console.log(`[CreatorAuth] ✅ Login success: ${inputEmail}`);
 
-    // Return scoped data — NEVER send other creators' info
-    const scopedData = scopeDataForCreator(db, creatorRecord);
+    const scopedData = db ? scopeDataForCreator(db, creatorRecord) : {};
 
     res.json({
       token,
@@ -787,29 +778,16 @@ app.post('/api/creator/signup', async (req, res) => {
     if (!email || !password || !name) return res.status(400).json({ error: 'Email, password, and name required' });
     if (password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
 
-    const db = await readMasterDB();
-    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
-
-    const accounts = db.creatorAccounts || [];
     const inputEmail = email.toLowerCase().trim();
 
-    if (accounts.find(a => a.email.toLowerCase() === inputEmail)) {
+    // ACCOUNTS: Check Firestore
+    const existingAccount = await firestoreDAL.getAccountByEmail(inputEmail);
+    if (existingAccount) {
       return res.status(409).json({ error: 'An account with this email already exists' });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password.trim(), BCRYPT_ROUNDS);
 
-    // Create account
-    const newAccount = {
-      id: crypto.randomUUID(),
-      email: inputEmail,
-      password: hashedPassword,
-      displayName: name.trim(),
-      createdAt: new Date().toISOString(),
-    };
-
-    // Create creator record
     const newCreator = {
       id: crypto.randomUUID(),
       name: name.trim(),
@@ -833,26 +811,36 @@ app.post('/api/creator/signup', async (req, res) => {
       lastActiveDate: new Date().toISOString(),
     };
 
-    newAccount.linkedCreatorId = newCreator.id;
+    const newAccount = {
+      id: crypto.randomUUID(),
+      email: inputEmail,
+      password: hashedPassword,
+      displayName: name.trim(),
+      createdAt: new Date().toISOString(),
+      linkedCreatorId: newCreator.id,
+    };
 
-    db.creatorAccounts = [...accounts, newAccount];
-    db.creators = [...(db.creators || []), newCreator];
-    db.lastUpdated = new Date().toISOString();
-    db.version = Date.now();
+    // Write account to Firestore FIRST (source of truth)
+    await firestoreDAL.addAccount(newAccount);
 
-    const saved = await writeMasterDB(db);
-    if (!saved) return res.status(500).json({ error: 'Failed to save account' });
+    // Write creator to GCS (for admin app visibility)
+    const db = await readMasterDB();
+    if (db) {
+      db.creators = [...(db.creators || []), newCreator];
+      db.lastUpdated = new Date().toISOString();
+      db.version = Date.now();
+      writeMasterDB(db).catch(e => console.warn('[CreatorAuth] GCS write failed:', e));
+    }
 
-    // Sign JWT
     const token = jwt.sign(
       { accountId: newAccount.id, email: newAccount.email, creatorId: newCreator.id },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRY }
     );
 
-    console.log(`[CreatorAuth] ✅ Signup success: ${inputEmail}`);
+    console.log(`[CreatorAuth] ✅ Signup success: ${inputEmail} (Firestore)`);
 
-    const scopedData = scopeDataForCreator(db, newCreator);
+    const scopedData = db ? scopeDataForCreator(db, newCreator) : {};
 
     res.status(201).json({
       token,
@@ -869,20 +857,18 @@ app.post('/api/creator/signup', async (req, res) => {
 
 app.get('/api/creator/me', creatorAuthMiddleware, async (req, res) => {
   try {
-    const db = await readMasterDB();
-    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
-
-    const accounts = db.creatorAccounts || [];
-    const account = accounts.find(a => a.id === req.creatorAccountId);
+    // ACCOUNTS: Always from Firestore
+    const account = await firestoreDAL.getAccountById(req.creatorAccountId);
     if (!account) return res.status(404).json({ error: 'Account not found' });
 
-    const creatorRecord = (db.creators || []).find(c =>
+    const db = await readMasterDB();
+    const creatorRecord = (db?.creators || []).find(c =>
       c.id === account.linkedCreatorId ||
       c.email?.toLowerCase() === account.email.toLowerCase() ||
       c.portalEmail?.toLowerCase() === account.email.toLowerCase()
     );
 
-    const scopedData = scopeDataForCreator(db, creatorRecord);
+    const scopedData = db ? scopeDataForCreator(db, creatorRecord) : {};
 
     res.json({
       account: { id: account.id, email: account.email, displayName: account.displayName, onboardingComplete: account.onboardingComplete, betaLabIntroSeen: account.betaLabIntroSeen, linkedCreatorId: account.linkedCreatorId },
@@ -901,17 +887,14 @@ app.post('/api/creator/invite', async (req, res) => {
     const { email, name, creatorId, plainPassword } = req.body;
     if (!email || !name || !plainPassword) return res.status(400).json({ error: 'Email, name, and password required' });
 
-    const db = await readMasterDB();
-    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
-
-    const accounts = db.creatorAccounts || [];
     const inputEmail = email.toLowerCase().trim();
 
-    if (accounts.find(a => a.email.toLowerCase() === inputEmail)) {
+    // ACCOUNTS: Check Firestore directly
+    const existing = await firestoreDAL.getAccountByEmail(inputEmail);
+    if (existing) {
       return res.status(409).json({ error: 'Account already exists for this email' });
     }
 
-    // Hash password before storing
     const hashedPassword = await bcrypt.hash(plainPassword, BCRYPT_ROUNDS);
 
     const newAccount = {
@@ -925,22 +908,23 @@ app.post('/api/creator/invite', async (req, res) => {
       inviteEmailSent: false,
     };
 
-    db.creatorAccounts = [...accounts, newAccount];
+    // Write account to Firestore FIRST (source of truth)
+    await firestoreDAL.addAccount(newAccount);
 
-    // Also set portalEmail on the creator record if creatorId provided
+    // Also update GCS for other data (portalEmail on creator)
     if (creatorId) {
-      db.creators = (db.creators || []).map(c =>
-        c.id === creatorId ? { ...c, portalEmail: inputEmail } : c
-      );
+      const db = await readMasterDB();
+      if (db) {
+        db.creators = (db.creators || []).map(c =>
+          c.id === creatorId ? { ...c, portalEmail: inputEmail } : c
+        );
+        db.lastUpdated = new Date().toISOString();
+        db.version = Date.now();
+        writeMasterDB(db).catch(e => console.warn('[CreatorAuth] GCS update failed:', e));
+      }
     }
 
-    db.lastUpdated = new Date().toISOString();
-    db.version = Date.now();
-
-    const saved = await writeMasterDB(db);
-    if (!saved) return res.status(500).json({ error: 'Failed to save account' });
-
-    console.log(`[CreatorAuth] ✅ Invite created for: ${inputEmail} (hashed)`);
+    console.log(`[CreatorAuth] ✅ Invite created for: ${inputEmail} (Firestore)`);
 
     res.status(201).json({ success: true, accountId: newAccount.id });
   } catch (e) {
@@ -957,18 +941,12 @@ app.post('/api/creator/change-password', creatorAuthMiddleware, async (req, res)
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
-    const db = await readMasterDB();
-    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
-
-    const accounts = db.creatorAccounts || [];
-    const account = accounts.find(a => a.id === req.creatorAccountId);
+    // ACCOUNTS: Firestore only
+    const account = await firestoreDAL.getAccountById(req.creatorAccountId);
     if (!account) return res.status(404).json({ error: 'Account not found' });
 
-    account.password = await bcrypt.hash(newPassword.trim(), BCRYPT_ROUNDS);
-    db.creatorAccounts = accounts.map(a => a.id === account.id ? account : a);
-    db.lastUpdated = new Date().toISOString();
-    db.version = Date.now();
-    await writeMasterDB(db);
+    const hashed = await bcrypt.hash(newPassword.trim(), BCRYPT_ROUNDS);
+    await firestoreDAL.updateAccount(account.id, { password: hashed });
 
     console.log(`[CreatorAuth] ✅ Password changed by creator: ${account.email}`);
     res.json({ success: true });
@@ -1019,20 +997,12 @@ app.post('/api/creator/reset-password', async (req, res) => {
     const { email, newPassword } = req.body;
     if (!email || !newPassword) return res.status(400).json({ error: 'email and newPassword required' });
 
-    const db = await readMasterDB();
-    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
-
-    const accounts = db.creatorAccounts || [];
-    const account = accounts.find(a => a.email.toLowerCase() === email.toLowerCase().trim());
+    // ACCOUNTS: Firestore only
+    const account = await firestoreDAL.getAccountByEmail(email.toLowerCase().trim());
     if (!account) return res.status(404).json({ error: `No account found for ${email}` });
 
-    account.password = await bcrypt.hash(newPassword.trim(), BCRYPT_ROUNDS);
-    db.creatorAccounts = accounts.map(a => a.id === account.id ? account : a);
-    db.lastUpdated = new Date().toISOString();
-    db.version = Date.now();
-
-    const saved = await writeMasterDB(db);
-    if (!saved) return res.status(500).json({ error: 'Failed to save' });
+    const hashed = await bcrypt.hash(newPassword.trim(), BCRYPT_ROUNDS);
+    await firestoreDAL.updateAccount(account.id, { password: hashed });
 
     console.log(`[CreatorAuth] ✅ Password reset for: ${email}`);
     res.json({ success: true, email, accountId: account.id });
@@ -1048,22 +1018,15 @@ app.post('/api/creator/delete-account', async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'email required' });
 
-    const db = await readMasterDB();
-    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
+    // ACCOUNTS: Firestore only
+    const account = await firestoreDAL.getAccountByEmail(email.toLowerCase().trim());
+    if (!account) return res.status(404).json({ error: `No account found for ${email}` });
 
-    const before = (db.creatorAccounts || []).length;
-    db.creatorAccounts = (db.creatorAccounts || []).filter(a => a.email.toLowerCase() !== email.toLowerCase().trim());
-    const after = db.creatorAccounts.length;
-
-    if (before === after) return res.status(404).json({ error: `No account found for ${email}` });
-
-    db.lastUpdated = new Date().toISOString();
-    db.version = Date.now();
-    const saved = await writeMasterDB(db);
-    if (!saved) return res.status(500).json({ error: 'Failed to save' });
+    await firestoreDAL.deleteAccount(account.id);
 
     console.log(`[CreatorAuth] 🗑️ Deleted account: ${email}`);
-    res.json({ success: true, deleted: email, remaining: after });
+    const remaining = await firestoreDAL.getAllAccounts();
+    res.json({ success: true, deleted: email, remaining: remaining.length });
   } catch (e) {
     res.status(500).json({ error: 'Server error' });
   }
@@ -1073,11 +1036,9 @@ app.post('/api/creator/delete-account', async (req, res) => {
 app.post('/api/creator/debug-login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const db = await readMasterDB();
-    if (!db) return res.status(503).json({ error: 'DB unavailable' });
-
-    const account = (db.creatorAccounts || []).find(a => a.email.toLowerCase() === email.toLowerCase().trim());
-    if (!account) return res.json({ found: false, message: 'No account found' });
+    // ACCOUNTS: Firestore only
+    const account = await firestoreDAL.getAccountByEmail(email.toLowerCase().trim());
+    if (!account) return res.json({ found: false, message: 'No account found', source: 'firestore' });
 
     const storedHash = account.password;
     const isBcrypt = storedHash.startsWith('$2a$') || storedHash.startsWith('$2b$');
@@ -1092,6 +1053,7 @@ app.post('/api/creator/debug-login', async (req, res) => {
 
     res.json({
       found: true,
+      source: 'firestore',
       email: account.email,
       isBcrypt,
       hashPrefix: storedHash.substring(0, 10) + '...',
@@ -1106,14 +1068,14 @@ app.post('/api/creator/debug-login', async (req, res) => {
 // --- GET /api/creator/accounts-check --- (admin debug - no passwords)
 app.get('/api/creator/accounts-check', async (req, res) => {
   try {
-    const db = await readMasterDB();
-    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
-    const accounts = (db.creatorAccounts || []).map(a => ({
+    // ACCOUNTS: Always from Firestore
+    const allAccounts = await firestoreDAL.getAllAccounts();
+    const accounts = allAccounts.map(a => ({
       id: a.id, email: a.email, displayName: a.displayName, createdAt: a.createdAt,
       linkedCreatorId: a.linkedCreatorId, invitedByTeam: a.invitedByTeam,
       hasHashedPassword: a.password?.startsWith('$2') || false
     }));
-    res.json({ count: accounts.length, accounts });
+    res.json({ count: accounts.length, accounts, source: 'firestore' });
   } catch (e) {
     res.status(500).json({ error: 'Failed to check accounts' });
   }
@@ -1128,9 +1090,8 @@ app.post('/api/creator/upload-file', creatorAuthMiddleware, async (req, res) => 
     const token = await getGCSAuthToken();
     if (!token) return res.status(503).json({ error: 'GCS auth unavailable' });
 
-    // Determine the account's linked creator ID
-    const db = await readMasterDB();
-    const account = (db?.creatorAccounts || []).find(a => a.id === req.creatorAccountId);
+    // Determine the account's linked creator ID — from Firestore
+    const account = await firestoreDAL.getAccountById(req.creatorAccountId);
     const creatorId = account?.linkedCreatorId || req.creatorAccountId;
 
     // Build GCS path: creator-uploads/{creatorId}/{timestamp}-{filename}
@@ -1254,8 +1215,8 @@ app.post('/api/creator/save', creatorAuthMiddleware, async (req, res) => {
     const db = await readMasterDB();
     if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
 
-    const accounts = db.creatorAccounts || [];
-    const account = accounts.find(a => a.id === req.creatorAccountId);
+    // ACCOUNTS: Firestore only
+    const account = await firestoreDAL.getAccountById(req.creatorAccountId);
     if (!account) return res.status(404).json({ error: 'Account not found' });
 
     // Only allow updating the creator's OWN data
@@ -1311,11 +1272,10 @@ app.post('/api/creator/save', creatorAuthMiddleware, async (req, res) => {
       }
     }
 
-    // Account updates (onboarding, betaLabIntro)
+    // Account updates (onboarding, betaLabIntro) — write to Firestore
     if (updates.account) {
-      db.creatorAccounts = (db.creatorAccounts || []).map(a =>
-        a.id === req.creatorAccountId ? { ...a, ...updates.account, password: a.password } : a
-      );
+      const { password, ...safeUpdates } = updates.account; // never allow password override
+      await firestoreDAL.updateAccount(req.creatorAccountId, safeUpdates);
     }
 
     db.lastUpdated = new Date().toISOString();
