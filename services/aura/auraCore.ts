@@ -6,7 +6,7 @@
  */
 
 import { GoogleGenAI } from "@google/genai";
-import { Creator, Campaign, ContentItem } from "../../types";
+import { Creator, Campaign, ContentItem, TeamTask, TeamMessage, BetaTest, BetaRelease } from "../../types";
 import {
     recall,
     addToSessionConversation,
@@ -29,6 +29,10 @@ export interface AuraContext {
     creators?: Creator[];
     campaigns?: Campaign[];
     content?: ContentItem[];
+    teamTasks?: TeamTask[];
+    teamMessages?: TeamMessage[];
+    betaTests?: BetaTest[];
+    betaReleases?: BetaRelease[];
     brandInfo?: string;
     currentUser?: string;
     currentView?: string;
@@ -90,6 +94,44 @@ function buildAppStateContext(ctx: AuraContext): string {
             status: c.status,
             creator: c.creatorName,
             platform: c.platform,
+        })));
+    }
+
+    if (ctx.teamTasks && ctx.teamTasks.length > 0) {
+        parts.push(`## Team Tasks (${ctx.teamTasks.length})`);
+        parts.push(truncateArray(ctx.teamTasks, 20, t => ({
+            title: t.title,
+            status: t.status,
+            assignedTo: t.assignedTo,
+            dueDate: t.dueDate,
+            notes: t.notes,
+        })));
+    }
+
+    if (ctx.teamMessages && ctx.teamMessages.length > 0) {
+        parts.push(`## Recent Team Messages (${ctx.teamMessages.length}, showing last 20)`);
+        parts.push(truncateArray(ctx.teamMessages.slice(-20), 20, m => ({
+            sender: m.sender,
+            text: m.text?.slice(0, 100),
+            timestamp: m.timestamp,
+        })));
+    }
+
+    if (ctx.betaTests && ctx.betaTests.length > 0) {
+        parts.push(`## Beta Tests (${ctx.betaTests.length})`);
+        parts.push(truncateArray(ctx.betaTests, 10, b => ({
+            title: (b as any).title || (b as any).name || 'Unnamed',
+            status: (b as any).status,
+            createdAt: (b as any).createdAt,
+        })));
+    }
+
+    if (ctx.betaReleases && ctx.betaReleases.length > 0) {
+        parts.push(`## Beta Releases (${ctx.betaReleases.length})`);
+        parts.push(truncateArray(ctx.betaReleases, 10, r => ({
+            creatorId: (r as any).creatorId,
+            status: (r as any).status,
+            feedback: (r as any).feedback?.slice(0, 80),
         })));
     }
 
@@ -300,7 +342,15 @@ function parseEmailResponse(response: string, context: AuraContext): AuraRespons
 
 export async function auraChat(
     message: string,
-    appState: { creators: Creator[]; campaigns: Campaign[]; content: ContentItem[] },
+    appState: {
+        creators: Creator[];
+        campaigns: Campaign[];
+        content: ContentItem[];
+        teamTasks?: TeamTask[];
+        teamMessages?: TeamMessage[];
+        betaTests?: BetaTest[];
+        betaReleases?: BetaRelease[];
+    },
     brandInfo?: string,
     currentUser?: string
 ): Promise<string> {
@@ -308,6 +358,10 @@ export async function auraChat(
         creators: appState.creators,
         campaigns: appState.campaigns,
         content: appState.content,
+        teamTasks: appState.teamTasks,
+        teamMessages: appState.teamMessages,
+        betaTests: appState.betaTests,
+        betaReleases: appState.betaReleases,
         brandInfo,
         currentUser,
     }, { mode: 'chat' });

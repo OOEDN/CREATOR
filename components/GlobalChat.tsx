@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, X, Loader2, Sparkles, Database, MessageSquare, Mic, MicOff, Brain } from 'lucide-react';
-import { Creator, Campaign, ContentItem, TeamMessage } from '../types';
+import { Creator, Campaign, ContentItem, TeamMessage, TeamTask, BetaTest, BetaRelease } from '../types';
 import { auraChat, getAuraGreeting } from '../services/aura/auraCore';
 import { restoreSessionFromSTM, getSessionConversation, clearSessionConversation, addToSessionConversation } from '../services/aura/auraMemory';
 
@@ -9,11 +9,18 @@ interface GlobalChatProps {
         creators: Creator[];
         campaigns: Campaign[];
         content: ContentItem[];
+        teamTasks?: TeamTask[];
+        teamMessages?: TeamMessage[];
+        betaTests?: BetaTest[];
+        betaReleases?: BetaRelease[];
     };
     creators: Creator[];
     campaigns: Campaign[];
     content: ContentItem[];
     teamMessages?: TeamMessage[];
+    teamTasks?: TeamTask[];
+    betaTests?: BetaTest[];
+    betaReleases?: BetaRelease[];
     onSendTeamMessage?: (msg: TeamMessage) => void;
     currentUser?: string;
     brandInfo?: string;
@@ -36,6 +43,28 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
     const recognitionRef = useRef<any>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const teamEndRef = useRef<HTMLDivElement>(null);
+    const panelRef = useRef<HTMLDivElement>(null);
+
+    // Close on Escape key
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsOpen(false); };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [isOpen]);
+
+    // Close on click outside panel
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        // Delay to avoid catching the open-click itself
+        const timer = setTimeout(() => document.addEventListener('mousedown', handleClickOutside), 100);
+        return () => { clearTimeout(timer); document.removeEventListener('mousedown', handleClickOutside); };
+    }, [isOpen]);
 
     // Initialize Coco with greeting and restore memory
     useEffect(() => {
@@ -145,7 +174,7 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
             )}
 
             {isOpen && (
-                <div className="fixed bottom-6 right-6 z-[100] w-[90vw] md:w-[400px] h-[600px] max-h-[80vh] bg-ooedn-dark border border-neutral-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in">
+                <div ref={panelRef} className="fixed bottom-6 right-6 z-[100] w-[90vw] md:w-[400px] h-[600px] max-h-[80vh] bg-ooedn-dark border border-neutral-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in">
 
                     {/* Header with Toggles */}
                     <div className="p-4 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border-b border-emerald-500/20 flex justify-between items-center">
@@ -167,8 +196,13 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
                                     <Sparkles size={14} />
                                 </button>
                             )}
-                            <button onClick={() => setIsOpen(false)} className="text-neutral-400 hover:text-white p-1.5">
-                                <X size={20} />
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setIsOpen(false); }}
+                                className="text-neutral-400 hover:text-white p-2 rounded-lg hover:bg-neutral-800 transition-all cursor-pointer"
+                                title="Close Coco (Esc)"
+                                aria-label="Close Coco panel"
+                            >
+                                <X size={22} strokeWidth={2.5} />
                             </button>
                         </div>
                     </div>

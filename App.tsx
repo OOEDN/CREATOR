@@ -1282,11 +1282,22 @@ function App() {
 
                 {/* Coco — Global AI Assistant */}
                 <GlobalChat
-                    appState={{ creators, campaigns, content: contentItems }}
+                    appState={{
+                        creators,
+                        campaigns,
+                        content: contentItems,
+                        teamTasks,
+                        teamMessages,
+                        betaTests,
+                        betaReleases,
+                    }}
                     creators={creators}
                     campaigns={campaigns}
                     content={contentItems}
                     teamMessages={teamMessages}
+                    teamTasks={teamTasks}
+                    betaTests={betaTests}
+                    betaReleases={betaReleases}
                     onSendTeamMessage={(msg) => setTeamMessages(prev => [...prev, msg])}
                     currentUser={userEmail || 'Anonymous'}
                     brandInfo={settings.brandInfo}
