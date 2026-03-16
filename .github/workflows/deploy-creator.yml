@@ -1,0 +1,81 @@
+name: Deploy Creator (creator.ooedn.com)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+env:
+  PROJECT_ID: ooedn-creator-portal
+  SERVICE: creator-portal
+  REGION: us-west1
+
+jobs:
+  build-check:
+    name: Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Creator Build
+        run: npx vite build --config vite.creator.config.ts
+
+  deploy-creator:
+    name: Deploy to Cloud Run
+    needs: build-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY_CREATOR }}'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Swap to Creator Dockerfile
+        run: |
+          cp Dockerfile Dockerfile.admin.bak
+          cp Dockerfile.creator Dockerfile
+          echo "✅ Creator Dockerfile in place"
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE }} \
+            --source . \
+            --project ${{ env.PROJECT_ID }} \
+            --region ${{ env.REGION }} \
+            --update-env-vars "\
+          CREATOR_MODE=true,\
+          CLIENT_ID=850668507460-3qtvn7krlf5vv0artsraukruq7lqheug.apps.googleusercontent.com,\
+          SMTP_FROM=creator@ooedn.com,\
+          SMTP_USER=create@ooedn.com,\
+          GCS_BUCKET=ai-studio-bucket-850668507460-us-west1,\
+          DB_SOURCE=firestore" \
+            --update-secrets="API_KEY=API_KEY:latest,JWT_SECRET=JWT_SECRET:latest,SMTP_PASS=SMTP_PASS:latest" \
+            --allow-unauthenticated \
+            --timeout=300
+
+      - name: Restore Admin Dockerfile
+        if: always()
+        run: |
+          cp Dockerfile.admin.bak Dockerfile 2>/dev/null || true
+          rm -f Dockerfile.admin.bak
+
+      - name: Show deployment URL
+        run: |
+          echo "✅ Deployed to https://creator.ooedn.com"
+          echo "   Service URL: $(gcloud run services describe ${{ env.SERVICE }} --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} --format 'value(status.url)')"
