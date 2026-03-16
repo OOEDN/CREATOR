@@ -57,6 +57,14 @@ export enum CampaignStatus {
   Final = 'Final Campaign',
 }
 
+export enum ReachoutStatus {
+  None = 'None',
+  Queued = 'Queued',
+  Contacted = 'Contacted',
+  Responded = 'Responded',
+  Reactivated = 'Reactivated',
+}
+
 export type CreatorRating = 'A+' | 'A' | 'B' | 'C' | 'D' | 'F' | null;
 
 export enum ContentStatus {
@@ -154,6 +162,28 @@ export interface MoodboardItem {
   addedAt: string;
 }
 
+// Character Avatar for campaign creator matching
+export interface CampaignAvatar {
+  id: string;
+  name: string;                // e.g. "The Rebel", "The Creator", "The Minimalist"
+  description: string;         // Character personality and content style
+  imageUrl?: string;           // Avatar image URL (optional)
+  traits: string[];            // Key traits: ["bold", "streetwear", "minimal"]
+  color: string;               // Accent color for the avatar card
+  matchedCreatorIds: string[]; // Creators who identified with this avatar
+}
+
+// UGC Inspiration Video reference
+export interface UGCInspoItem {
+  id: string;
+  url: string;                 // Video URL (YouTube, TikTok, Instagram, etc.)
+  title: string;
+  platform?: string;           // Where the video is from
+  notes?: string;              // Why this is inspiration
+  addedBy: string;
+  addedAt: string;
+}
+
 export interface Campaign {
   id: string;
   title: string;
@@ -169,6 +199,15 @@ export interface Campaign {
   moodboard?: MoodboardItem[];     // Visual direction images
   styleNotes?: string;             // Tone, mood, colors, aesthetic guidance
   referenceLinks?: string[];       // Inspiration URLs
+  // Avatar-based creator matching
+  avatars?: CampaignAvatar[];      // Character personas for this campaign
+  avatarOutreachSent?: boolean;    // Whether avatar identification emails have been sent
+  // UGC Inspiration
+  ugcInspo?: UGCInspoItem[];       // Inspiration UGC video references
+  // Channel & Goal (Lark-style)
+  channels?: string[];             // Content channels: "Social", "Video", "Display", "Linear TV", etc.
+  goal?: string;                   // Campaign goal: "Traffic", "Engagement", "Branding", "Conversion", "Awareness"
+  coverImage?: string;             // Cover image URL for gallery view
 }
 
 export interface Shipment {
@@ -249,6 +288,11 @@ export interface Creator {
   notificationsEnabled?: boolean;       // Browser push notifications
   totalEarned?: number;                 // Lifetime earnings tracker
   lastActiveDate?: string;              // For streak tracking
+
+  // Reachout tracking
+  reachoutStatus?: ReachoutStatus;      // Pipeline status for creator reactivation
+  reachoutNote?: string;                // Why this creator was tagged
+  reachoutDate?: string;                // When they were tagged / last status change
 }
 
 export interface TeamMember {

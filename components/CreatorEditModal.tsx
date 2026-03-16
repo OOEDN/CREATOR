@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Creator, CreatorStatus, PaymentMethod, Platform, CreatorRating, ContentItem, AppSettings, ShipmentStatus, PaymentOption, ReachPlatform, Shipment, CreatorAccount } from '../types';
+import { Creator, CreatorStatus, PaymentMethod, Platform, CreatorRating, ContentItem, AppSettings, ShipmentStatus, PaymentOption, ReachPlatform, Shipment, CreatorAccount, ReachoutStatus } from '../types';
 import { X, Flag, Save, Trash2, LayoutGrid, FileImage, Truck, Camera, Sparkles, Loader2, Plus, CreditCard, MapPin, Mail, User, Link, Send, DownloadCloud, FileCheck, DollarSign, UserPlus, CheckCircle } from 'lucide-react';
 import { RATING_COLORS, SHIPMENT_STATUS_COLORS, REACH_PLATFORM_COLORS } from '../constants';
 import ContentLibrary from './ContentLibrary';
@@ -565,6 +565,23 @@ const CreatorEditModal: React.FC<CreatorEditModalProps> = ({
                         >
                             <UserPlus size={14} />
                             Invite to Portal
+                        </button>
+                        <button
+                            onClick={() => {
+                                const isTagged = formData.reachoutStatus && formData.reachoutStatus !== ReachoutStatus.None;
+                                const updates: Partial<Creator> = isTagged
+                                    ? { reachoutStatus: ReachoutStatus.None, reachoutNote: undefined, reachoutDate: undefined }
+                                    : { reachoutStatus: ReachoutStatus.Queued, reachoutDate: new Date().toISOString() };
+                                onSave(creator.id, updates);
+                                handleChange('reachoutStatus', updates.reachoutStatus);
+                                if (updates.reachoutNote !== undefined) handleChange('reachoutNote', updates.reachoutNote);
+                                if (updates.reachoutDate !== undefined) handleChange('reachoutDate', updates.reachoutDate);
+                            }}
+                            className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${formData.reachoutStatus && formData.reachoutStatus !== ReachoutStatus.None ? 'bg-amber-500 text-black border-amber-500' : 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500 hover:text-black'}`}
+                            title={formData.reachoutStatus && formData.reachoutStatus !== ReachoutStatus.None ? 'Remove from reachout list' : 'Tag for reactivation outreach'}
+                        >
+                            <UserPlus size={14} />
+                            {formData.reachoutStatus && formData.reachoutStatus !== ReachoutStatus.None ? '✋ Tagged' : 'Reachout'}
                         </button>
                         <button onClick={handleRequestPayment} className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-black transition-all active:scale-95">
                             <DollarSign size={14} /> Payment

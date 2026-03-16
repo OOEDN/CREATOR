@@ -341,3 +341,33 @@ export async function loadScopedDataForCreator(creatorId) {
         betaReleases,
     };
 }
+
+// ===================================================================
+// GENERIC DOCUMENT OPERATIONS (for Coco Memory & extensibility)
+// ===================================================================
+
+/**
+ * Set a document at a specific path. Supports subcollection paths like:
+ * "coco_memory/userId/memories" → collection "coco_memory", doc "userId", subcollection "memories"
+ */
+export async function setDocument(collectionPath, docId, data) {
+    const db = getFirestore();
+    await db.collection(collectionPath).doc(docId).set(data, { merge: true });
+}
+
+/**
+ * Get all documents from a collection/subcollection path.
+ */
+export async function getCollection(collectionPath) {
+    const db = getFirestore();
+    const snapshot = await db.collection(collectionPath).get();
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+/**
+ * Delete a document at a specific path.
+ */
+export async function deleteDocument(collectionPath, docId) {
+    const db = getFirestore();
+    await db.collection(collectionPath).doc(docId).delete();
+}

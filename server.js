@@ -9,6 +9,14 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import * as firestoreDAL from './services/firestore.js';
 
+// --- Route Modules ---
+import createAiRoutes from './routes/aiRoutes.js';
+import createPushRoutes from './routes/pushRoutes.js';
+import createEmailRoutes from './routes/emailRoutes.js';
+import createCreatorAuthRoutes from './routes/creatorAuthRoutes.js';
+import createCreatorContentRoutes from './routes/creatorContentRoutes.js';
+import createRealtimeRoutes from './routes/realtimeRoutes.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -18,7 +26,10 @@ const port = process.env.PORT || 8080;
 // --- JSON body parser for API endpoints ---
 app.use(express.json({ limit: '50mb' }));
 
-// --- VAPID Configuration ---
+// ═══════════════════════════════════════════════════
+// ── VAPID Configuration ──
+// ═══════════════════════════════════════════════════
+
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BCibI4a7TWgbM97VXFd9u73W-ZwS1FHRLciBfCOPjyMx-CVC8zqQk3DWsoMv-F8eMtR8Fz-2EZ_cJDfdZZgXBCo';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'z0mdG9UnP7HYufX6x9YIJ6-3cZ4GhnwWm384ad1h2kI';
 const VAPID_EMAIL = process.env.VAPID_EMAIL || 'mailto:daniel@ooedn.com';
@@ -30,16 +41,17 @@ try {
   console.warn('[Push] Failed to configure VAPID keys:', e.message);
 }
 
-// --- GCS-backed subscription store ---
+// ═══════════════════════════════════════════════════
+// ── GCS Helpers ──
+// ═══════════════════════════════════════════════════
+
 let pushSubscriptions = [];
 const GCS_BUCKET = process.env.GCS_BUCKET || 'ooedn-tracker-data';
 const MAIN_BUCKET = 'ai-studio-bucket-850668507460-us-west1';
 const SUBS_GCS_PATH = `push_subscriptions.json`;
 
-// Get Cloud Run auth token for GCS access
 async function getGCSAuthToken() {
   try {
-    // On Cloud Run, get token from metadata server
     const res = await fetch(
       'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token',
       { headers: { 'Metadata-Flavor': 'Google' } }
@@ -58,8 +70,6 @@ async function loadSubscriptionsFromGCS() {
   try {
     const token = await getGCSAuthToken();
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-
-    // Try main bucket first (more likely to have permissions)
     const url = `https://storage.googleapis.com/storage/v1/b/${MAIN_BUCKET}/o/${encodeURIComponent(SUBS_GCS_PATH)}?alt=media`;
     const res = await fetch(url, { headers });
     if (res.ok) {
@@ -94,340 +104,18 @@ async function persistSubscriptions() {
 // Load on startup
 loadSubscriptionsFromGCS();
 
-// --- Health Check ---
+// ═══════════════════════════════════════════════════
+// ── Health Check ──
+// ═══════════════════════════════════════════════════
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '4.33', pushSubscribers: pushSubscriptions.length });
 });
 
-// --- Push API Endpoints ---
+// ═══════════════════════════════════════════════════
+// ── Gmail Auth Client (Domain-Wide Delegation) ──
+// ═══════════════════════════════════════════════════
 
-// Return the public VAPID key to the client
-app.get('/api/push/vapid-key', (req, res) => {
-  res.json({ publicKey: VAPID_PUBLIC_KEY });
-});
-
-// Register a new push subscription
-app.post('/api/push/subscribe', (req, res) => {
-  try {
-    const subscription = req.body;
-
-    if (!subscription || !subscription.endpoint) {
-      return res.status(400).json({ error: 'Invalid subscription' });
-    }
-
-    // Deduplicate by endpoint
-    const exists = pushSubscriptions.some(s => s.endpoint === subscription.endpoint);
-    if (!exists) {
-      pushSubscriptions.push(subscription);
-      persistSubscriptions();
-      console.log(`[Push] New subscription registered. Total: ${pushSubscriptions.length}`);
-    }
-
-    res.status(201).json({ success: true, total: pushSubscriptions.length });
-  } catch (e) {
-    console.error('[Push] Subscribe error:', e);
-    res.status(500).json({ error: 'Failed to register subscription' });
-  }
-});
-
-// Send push notification to all subscribers
-app.post('/api/push/send', async (req, res) => {
-  try {
-    const { title, body, url, tag } = req.body;
-
-    if (!title || !body) {
-      return res.status(400).json({ error: 'Title and body are required' });
-    }
-
-    const payload = JSON.stringify({ title, body, url: url || '/', tag: tag || 'ooedn-general' });
-
-    let sent = 0;
-    let failed = 0;
-    const staleEndpoints = [];
-
-    const results = await Promise.allSettled(
-      pushSubscriptions.map(sub =>
-        webpush.sendNotification(sub, payload).then(() => {
-          sent++;
-        }).catch(err => {
-          failed++;
-          // Remove stale subscriptions (410 Gone or 404 Not Found)
-          if (err.statusCode === 410 || err.statusCode === 404) {
-            staleEndpoints.push(sub.endpoint);
-          }
-          console.warn(`[Push] Failed to send to subscriber:`, err.statusCode || err.message);
-        })
-      )
-    );
-
-    // Clean up stale subscriptions
-    if (staleEndpoints.length > 0) {
-      pushSubscriptions = pushSubscriptions.filter(s => !staleEndpoints.includes(s.endpoint));
-      persistSubscriptions();
-      console.log(`[Push] Removed ${staleEndpoints.length} stale subscriptions`);
-    }
-
-    console.log(`[Push] Sent: ${sent}, Failed: ${failed}, Remaining: ${pushSubscriptions.length}`);
-    res.json({ sent, failed, remaining: pushSubscriptions.length });
-  } catch (e) {
-    console.error('[Push] Send error:', e);
-    res.status(500).json({ error: 'Failed to send notifications' });
-  }
-});
-
-// --- Creator Push Subscriptions ---
-let creatorPushSubscriptions = []; // { creatorId, subscription }
-
-// Register a creator's push subscription
-app.post('/api/push/subscribe-creator', (req, res) => {
-  try {
-    const { subscription, creatorId } = req.body;
-    if (!subscription || !creatorId) return res.status(400).json({ error: 'subscription and creatorId required' });
-    // Remove old subscription for this creator
-    creatorPushSubscriptions = creatorPushSubscriptions.filter(s => s.creatorId !== creatorId);
-    creatorPushSubscriptions.push({ creatorId, subscription });
-    console.log(`[Push] Creator ${creatorId} subscribed. Total creator subs: ${creatorPushSubscriptions.length}`);
-    res.status(201).json({ success: true });
-  } catch (e) {
-    console.error('[Push] Creator subscribe error:', e);
-    res.status(500).json({ error: 'Failed to subscribe' });
-  }
-});
-
-// Send push to specific creators
-app.post('/api/push/send-creators', async (req, res) => {
-  try {
-    const { creatorIds, title, body, url } = req.body;
-    if (!title || !body) return res.status(400).json({ error: 'title and body required' });
-    const payload = JSON.stringify({ title, body, url: url || '/creator', tag: 'ooedn-creator' });
-    let sent = 0, failed = 0;
-    const targets = creatorIds
-      ? creatorPushSubscriptions.filter(s => creatorIds.includes(s.creatorId))
-      : creatorPushSubscriptions;
-    await Promise.allSettled(
-      targets.map(s =>
-        webpush.sendNotification(s.subscription, payload).then(() => sent++).catch(err => {
-          failed++;
-          console.warn(`[Push] Creator send failed:`, err.statusCode || err.message);
-        })
-      )
-    );
-    console.log(`[Push] Creator push: sent=${sent}, failed=${failed}`);
-    res.json({ sent, failed });
-  } catch (e) {
-    console.error('[Push] Creator send error:', e);
-    res.status(500).json({ error: 'Failed to send' });
-  }
-});
-
-// ── General-purpose email send via SMTP (create@ooedn.com) ──
-// Used by the team app's gmailService to ensure ALL outgoing emails come from create@ooedn.com
-app.post('/api/send-email', async (req, res) => {
-  try {
-    const { to, subject, body, html, inReplyTo } = req.body;
-    if (!to || !subject) return res.status(400).json({ error: 'to and subject required' });
-    let nodemailer;
-    try { nodemailer = await import('nodemailer'); } catch { return res.status(500).json({ error: 'nodemailer not available' }); }
-    const transporter = nodemailer.default.createTransport({
-      service: 'gmail',
-      auth: { user: process.env.SMTP_USER || 'create@ooedn.com', pass: process.env.SMTP_PASS || '' }
-    });
-    const mailOpts = {
-      from: `"OOEDN Creative Team" <${process.env.SMTP_USER || 'create@ooedn.com'}>`,
-      to, subject,
-    };
-    if (html) mailOpts.html = html;
-    else mailOpts.text = body || '';
-    if (inReplyTo) {
-      mailOpts.inReplyTo = inReplyTo;
-      mailOpts.references = inReplyTo;
-    }
-    const info = await transporter.sendMail(mailOpts);
-    console.log(`[SMTP] Email sent to ${to}: ${subject} (messageId: ${info.messageId})`);
-    res.json({ id: info.messageId, threadId: info.messageId });
-  } catch (e) {
-    console.error('[SMTP] Send error:', e);
-    res.status(500).json({ error: e.message || 'Failed to send' });
-  }
-});
-
-// Send email to creators (bulk)
-app.post('/api/creator/send-email', async (req, res) => {
-  try {
-    const { emails, subject, body } = req.body;
-    if (!emails?.length || !subject || !body) return res.status(400).json({ error: 'emails, subject, and body required' });
-    // Use nodemailer with a simple transporter (configure with real SMTP in production)
-    let nodemailer;
-    try { nodemailer = await import('nodemailer'); } catch { return res.status(500).json({ error: 'nodemailer not available' }); }
-    const transporter = nodemailer.default.createTransport({
-      service: 'gmail',
-      auth: { user: process.env.SMTP_USER || 'create@ooedn.com', pass: process.env.SMTP_PASS || '' }
-    });
-    let sent = 0, failed = 0;
-    for (const email of emails) {
-      try {
-        await transporter.sendMail({
-          from: `"OOEDN Creative Team" <${process.env.SMTP_USER || 'create@ooedn.com'}>`,
-          to: email, subject,
-          html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
-            <div style="background:#000;padding:24px;border-radius:16px">
-              <h1 style="color:#a855f7;font-size:18px;margin:0 0 16px">OOEDN</h1>
-              <h2 style="color:#fff;font-size:16px;margin:0 0 12px">${subject}</h2>
-              <p style="color:#a3a3a3;font-size:14px;line-height:1.6">${body.replace(/\n/g, '<br>')}</p>
-              <hr style="border:1px solid #333;margin:20px 0">
-              <p style="color:#525252;font-size:10px">OOEDN Creator Portal</p>
-            </div>
-          </div>`
-        });
-        sent++;
-      } catch (err) { failed++; console.warn(`[Email] Failed to send to ${email}:`, err.message); }
-    }
-    console.log(`[Email] Sent: ${sent}, Failed: ${failed}`);
-    res.json({ sent, failed });
-  } catch (e) {
-    console.error('[Email] Send error:', e);
-    res.status(500).json({ error: 'Failed to send emails' });
-  }
-});
-
-// --- Morning Reminder (Google Chat Webhook) ---
-
-const GCHAT_WEBHOOK = 'https://chat.googleapis.com/v1/spaces/AAQA7pMfr0Y/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=xM_-nwUZ71vMuf9A0fJeOVF4pCfjwXlscULolyXpb1U';
-
-// Helper: Fetch master DB from GCS
-async function fetchMasterDB() {
-  try {
-    const bucket = process.env.GCS_BUCKET || 'ooedn-tracker-data';
-    const url = `https://storage.googleapis.com/storage/v1/b/${bucket}/o/ooedn_master_db.json?alt=media`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      console.warn('[Reminder] Could not fetch master DB:', res.status);
-      return null;
-    }
-    return await res.json();
-  } catch (e) {
-    console.warn('[Reminder] Fetch failed:', e.message);
-    return null;
-  }
-}
-
-// Helper: Send message to Google Chat
-async function sendToGoogleChat(message) {
-  try {
-    const res = await fetch(GCHAT_WEBHOOK, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: message })
-    });
-    if (!res.ok) {
-      console.warn('[Reminder] Webhook failed:', res.status);
-      return false;
-    }
-    console.log('[Reminder] Google Chat message sent');
-    return true;
-  } catch (e) {
-    console.warn('[Reminder] Webhook error:', e.message);
-    return false;
-  }
-}
-
-// Check for today's scheduled content and tasks, send to Google Chat
-async function checkAndSendMorningReminder() {
-  try {
-    const db = await fetchMasterDB();
-    if (!db) return { sent: false, reason: 'Could not fetch data' };
-
-    const today = new Date().toISOString().split('T')[0];
-    const contentItems = db.contentItems || [];
-    const teamTasks = db.teamTasks || [];
-
-    // Find content scheduled for today
-    const todayContent = contentItems.filter(c =>
-      c.scheduledDate && c.scheduledDate.split('T')[0] === today
-    );
-
-    // Find tasks due today
-    const todayTasks = teamTasks.filter(t =>
-      t.dueDate && t.dueDate.split('T')[0] === today && t.status !== 'Done'
-    );
-
-    // Find overdue tasks
-    const overdueTasks = teamTasks.filter(t =>
-      t.dueDate && t.dueDate.split('T')[0] < today && t.status !== 'Done'
-    );
-
-    if (todayContent.length === 0 && todayTasks.length === 0 && overdueTasks.length === 0) {
-      console.log('[Reminder] Nothing scheduled for today');
-      return { sent: false, reason: 'Nothing scheduled today' };
-    }
-
-    // Build the message
-    let message = `☀️ *OOEDN Morning Briefing — ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}*\n\n`;
-
-    if (todayContent.length > 0) {
-      message += `📅 *Content to Post Today (${todayContent.length}):*\n`;
-      todayContent.forEach(c => {
-        const caption = c.caption ? `\n   📝 Caption: _${c.caption.substring(0, 120)}${c.caption.length > 120 ? '...' : ''}_` : '\n   ⚠️ No caption drafted yet!';
-        message += `• *${c.title}* by @${c.creatorName || 'Unknown'} on ${c.platform}${caption}\n`;
-      });
-      message += '\n';
-    }
-
-    if (todayTasks.length > 0) {
-      message += `📋 *Tasks Due Today (${todayTasks.length}):*\n`;
-      todayTasks.forEach(t => {
-        message += `• ${t.title} → ${t.assignedTo.split('@')[0]}\n`;
-      });
-      message += '\n';
-    }
-
-    if (overdueTasks.length > 0) {
-      message += `🔴 *Overdue Tasks (${overdueTasks.length}):*\n`;
-      overdueTasks.forEach(t => {
-        message += `• ${t.title} (due ${t.dueDate}) → ${t.assignedTo.split('@')[0]}\n`;
-      });
-      message += '\n';
-    }
-
-    message += `\n🔗 Open Tracker: https://ooedn-tracker-356469728393.us-west1.run.app`;
-
-    const sent = await sendToGoogleChat(message);
-    return { sent, todayContent: todayContent.length, todayTasks: todayTasks.length, overdueTasks: overdueTasks.length };
-  } catch (e) {
-    console.error('[Reminder] Check failed:', e);
-    return { sent: false, error: e.message };
-  }
-}
-
-// Endpoint for Cloud Scheduler or manual trigger
-app.get('/api/reminder/morning', async (req, res) => {
-  try {
-    const result = await checkAndSendMorningReminder();
-    res.json({ success: true, ...result });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
-// Auto-schedule: Check every hour, send at 8 AM ET 
-let lastReminderDate = null;
-setInterval(() => {
-  try {
-    const now = new Date();
-    const etHour = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' })).getHours();
-    const todayStr = now.toISOString().split('T')[0];
-
-    if (etHour === 8 && lastReminderDate !== todayStr) {
-      lastReminderDate = todayStr;
-      console.log('[Reminder] 8 AM ET — sending morning briefing');
-      checkAndSendMorningReminder();
-    }
-  } catch (e) {
-    console.warn('[Reminder] Scheduler error (non-blocking):', e.message);
-  }
-}, 60 * 60 * 1000); // Check every hour
-
-// --- Gmail API Proxy (Domain-Wide Delegation) ---
 let gmailAuthClient = null;
 try {
   let credentials = null;
@@ -440,7 +128,6 @@ try {
   }
 
   if (credentials) {
-    // Explicitly use JWT client. GoogleAuth sometimes drops the subject in DWD.
     gmailAuthClient = new google.auth.JWT({
       email: credentials.client_email,
       key: credentials.private_key,
@@ -455,105 +142,24 @@ try {
   console.error('[Gmail Proxy] Failed to initialize GoogleAuth:', e);
 }
 
-app.use('/api/gmail/*', async (req, res) => {
-  if (!gmailAuthClient) {
-    return res.status(500).json({ error: 'Gmail proxy not configured on server (missing service account credentials)' });
-  }
+// ═══════════════════════════════════════════════════
+// ── DB Helpers: Dual-Mode (GCS ↔ Firestore) ──
+// ═══════════════════════════════════════════════════
 
-  try {
-    // JWT client handles the access token explicitly
-    const tokenInfo = await gmailAuthClient.getAccessToken();
-    const token = tokenInfo.token;
-
-    // Construct the real Google API URL by stripping our local prefix
-    const targetUrl = `https://gmail.googleapis.com/gmail${req.originalUrl.replace('/api/gmail', '')}`;
-
-    const fetchOptions = {
-      method: req.method,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': req.headers['content-type'] || 'application/json'
-      }
-    };
-
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      fetchOptions.body = JSON.stringify(req.body);
-    }
-
-    const googleRes = await fetch(targetUrl, fetchOptions);
-    const data = await googleRes.text();
-
-    res.status(googleRes.status);
-    res.set('Content-Type', googleRes.headers.get('content-type'));
-    res.send(data);
-  } catch (error) {
-    console.error('[Gmail Proxy] Error:', error);
-    res.status(500).json({ error: error.message || 'Proxy failed' });
-  }
-});
-
-// --- GCS Receipt Proxy (allows browser to view/download receipts that need auth) ---
-app.get('/api/receipt-proxy', async (req, res) => {
-  const { url } = req.query;
-  if (!url || typeof url !== 'string' || !url.includes('storage.googleapis.com')) {
-    return res.status(400).json({ error: 'Invalid or missing GCS URL' });
-  }
-
-  try {
-    let token = null;
-    if (gmailAuthClient) {
-      const tokenInfo = await gmailAuthClient.getAccessToken();
-      token = tokenInfo.token;
-    }
-
-    const fetchHeaders = {};
-    if (token) fetchHeaders['Authorization'] = `Bearer ${token}`;
-
-    const gcsRes = await fetch(url, { headers: fetchHeaders });
-    if (!gcsRes.ok) {
-      console.error(`[Receipt Proxy] GCS returned ${gcsRes.status} for ${url}`);
-      return res.status(gcsRes.status).json({ error: `GCS error: ${gcsRes.status}` });
-    }
-
-    const contentType = gcsRes.headers.get('content-type') || 'application/octet-stream';
-    res.set('Content-Type', contentType);
-    res.set('Cache-Control', 'public, max-age=86400');
-
-    // Stream the response body
-    const buffer = await gcsRes.arrayBuffer();
-    res.send(Buffer.from(buffer));
-  } catch (error) {
-    console.error('[Receipt Proxy] Error:', error);
-    res.status(500).json({ error: 'Receipt proxy failed' });
-  }
-});
-
-// ===================================================================
-// CREATOR PORTAL AUTH — Phase 1 Server-Side Authentication
-// ===================================================================
-
-// IMPORTANT: Use a STABLE secret so JWTs survive server restarts/deploys.
-// If JWT_SECRET uses Date.now() as fallback, every deploy invalidates all sessions.
 const JWT_SECRET = process.env.JWT_SECRET || 'ooedn-creator-portal-stable-secret-v18';
 const JWT_EXPIRY = '24h';
 const BCRYPT_ROUNDS = 10;
 
-// --- DB Helpers: Dual-Mode (GCS ↔ Firestore) ---
-// DB_SOURCE: 'gcs' (default/legacy), 'firestore' (Phase 2), 'dual-write' (transition)
 const DB_SOURCE = process.env.DB_SOURCE || 'dual-write';
 console.log(`[DB] Source mode: ${DB_SOURCE}`);
 
-// --- GCS read (original implementation) ---
 async function readMasterDB_GCS() {
   try {
     const token = await getGCSAuthToken();
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
     const url = `https://storage.googleapis.com/storage/v1/b/${MAIN_BUCKET}/o/${encodeURIComponent('ooedn_master_db.json')}?alt=media&t=${Date.now()}`;
     const res = await fetch(url, { headers });
-    if (!res.ok) {
-      console.error(`[DB] GCS read failed: ${res.status}`);
-      return null;
-    }
+    if (!res.ok) { console.error(`[DB] GCS read failed: ${res.status}`); return null; }
     return await res.json();
   } catch (e) {
     console.error('[DB] GCS readMasterDB error:', e.message);
@@ -561,7 +167,6 @@ async function readMasterDB_GCS() {
   }
 }
 
-// --- GCS write (original implementation with safeguards) ---
 async function writeMasterDB_GCS(db) {
   try {
     const token = await getGCSAuthToken();
@@ -575,12 +180,8 @@ async function writeMasterDB_GCS(db) {
         const existing = await checkRes.json();
         const existingAccounts = existing?.creatorAccounts || [];
         const newAccounts = db?.creatorAccounts || [];
-        const existingCount = existingAccounts.length;
-        const newCount = newAccounts.length;
-
-        if (existingCount > 0 && newCount < existingCount) {
-          // ALWAYS merge — never allow account count to drop
-          console.warn(`[DB] 🔒 Account protection: merging ${existingCount} existing + ${newCount} incoming accounts`);
+        if (existingAccounts.length > 0 && newAccounts.length < existingAccounts.length) {
+          console.warn(`[DB] 🔒 Account protection: merging ${existingAccounts.length} existing + ${newAccounts.length} incoming accounts`);
           const merged = new Map();
           for (const a of existingAccounts) merged.set(a.id, a);
           for (const a of newAccounts) merged.set(a.id, a);
@@ -595,16 +196,10 @@ async function writeMasterDB_GCS(db) {
     const url = `https://storage.googleapis.com/upload/storage/v1/b/${MAIN_BUCKET}/o?uploadType=media&name=${encodeURIComponent('ooedn_master_db.json')}`;
     const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(db)
     });
-    if (!res.ok) {
-      console.error(`[DB] GCS write failed: ${res.status}`);
-      return false;
-    }
+    if (!res.ok) { console.error(`[DB] GCS write failed: ${res.status}`); return false; }
     return true;
   } catch (e) {
     console.error('[DB] GCS writeMasterDB error:', e.message);
@@ -612,54 +207,36 @@ async function writeMasterDB_GCS(db) {
   }
 }
 
-// --- Firestore read ---
 async function readMasterDB_Firestore() {
-  try {
-    return await firestoreDAL.loadAllData();
-  } catch (e) {
-    console.error('[DB] Firestore readMasterDB error:', e.message);
-    return null;
-  }
+  try { return await firestoreDAL.loadAllData(); }
+  catch (e) { console.error('[DB] Firestore readMasterDB error:', e.message); return null; }
 }
 
-// --- Firestore write ---
 async function writeMasterDB_Firestore(db) {
-  try {
-    await firestoreDAL.saveAllData(db);
-    return true;
-  } catch (e) {
-    console.error('[DB] Firestore writeMasterDB error:', e.message);
-    return false;
-  }
+  try { await firestoreDAL.saveAllData(db); return true; }
+  catch (e) { console.error('[DB] Firestore writeMasterDB error:', e.message); return false; }
 }
 
-// --- UNIFIED readMasterDB / writeMasterDB ---
 async function readMasterDB() {
-  if (DB_SOURCE === 'firestore') {
-    return readMasterDB_Firestore();
-  }
-  // 'gcs' or 'dual-write': read from GCS (trusted source during transition)
-  return readMasterDB_GCS();
+  if (DB_SOURCE === 'firestore') return readMasterDB_Firestore();
+  const gcsData = await readMasterDB_GCS();
+  if (gcsData) return gcsData;
+  console.log('[DB] GCS read failed, falling back to Firestore...');
+  return readMasterDB_Firestore();
 }
 
 async function writeMasterDB(db) {
-  if (DB_SOURCE === 'gcs') {
-    return writeMasterDB_GCS(db);
-  }
-  if (DB_SOURCE === 'firestore') {
-    return writeMasterDB_Firestore(db);
-  }
-  // 'dual-write': write to BOTH
-  const [gcsResult, fsResult] = await Promise.all([
-    writeMasterDB_GCS(db),
-    writeMasterDB_Firestore(db),
-  ]);
+  if (DB_SOURCE === 'gcs') return writeMasterDB_GCS(db);
+  if (DB_SOURCE === 'firestore') return writeMasterDB_Firestore(db);
+  const [gcsResult, fsResult] = await Promise.all([writeMasterDB_GCS(db), writeMasterDB_Firestore(db)]);
   if (!gcsResult) console.warn('[DB] Dual-write: GCS write failed');
   if (!fsResult) console.warn('[DB] Dual-write: Firestore write failed');
-  return gcsResult || fsResult; // succeed if either succeeds
+  return gcsResult || fsResult;
 }
 
-// --- JWT Auth Middleware ---
+// ═══════════════════════════════════════════════════
+// ── JWT Auth Middleware ──
+// ═══════════════════════════════════════════════════
 
 function creatorAuthMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -677,628 +254,52 @@ function creatorAuthMiddleware(req, res, next) {
   }
 }
 
-// --- Helper: Scope data for a single creator ---
-
 function scopeDataForCreator(db, creatorRecord) {
   if (!creatorRecord) return { creator: null, campaigns: [], contentItems: [], teamMessages: db.teamMessages || [], betaTests: db.betaTests || [], betaReleases: [] };
-
-  const myCampaigns = (db.campaigns || []).filter(c =>
-    c.assignedCreatorIds?.includes(creatorRecord.id)
-  );
-
-  const myContent = (db.contentItems || []).filter(c =>
-    c.creatorId === creatorRecord.id
-  );
-
-  const myBetaReleases = (db.betaReleases || []).filter(r =>
-    r.creatorId === creatorRecord.id
-  );
-
+  const myCampaigns = (db.campaigns || []).filter(c => c.assignedCreatorIds?.includes(creatorRecord.id));
+  const myContent = (db.contentItems || []).filter(c => c.creatorId === creatorRecord.id);
+  const myBetaReleases = (db.betaReleases || []).filter(r => r.creatorId === creatorRecord.id);
   return {
-    creator: creatorRecord,
-    campaigns: myCampaigns,
-    contentItems: myContent,
-    teamMessages: db.teamMessages || [],
-    teamTasks: db.teamTasks || [],
-    betaTests: db.betaTests || [],
-    betaReleases: myBetaReleases,
+    creator: creatorRecord, campaigns: myCampaigns, contentItems: myContent,
+    teamMessages: db.teamMessages || [], teamTasks: db.teamTasks || [],
+    betaTests: db.betaTests || [], betaReleases: myBetaReleases,
   };
 }
 
-// --- POST /api/creator/login --- (ACCOUNTS FROM FIRESTORE ONLY)
+// ═══════════════════════════════════════════════════
+// ── Mount Route Modules ──
+// ═══════════════════════════════════════════════════
 
-app.post('/api/creator/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+const sharedDeps = { firestoreDAL, bcrypt, jwt, JWT_SECRET, JWT_EXPIRY, BCRYPT_ROUNDS, readMasterDB, writeMasterDB, readMasterDB_GCS, writeMasterDB_GCS, scopeDataForCreator, creatorAuthMiddleware, getGCSAuthToken, MAIN_BUCKET, gmailAuthClient };
 
-    const inputEmail = email.toLowerCase().trim();
-    const inputPassword = password.trim();
+app.use('/api/push', createPushRoutes(webpush, {
+  getSubscriptions: () => pushSubscriptions,
+  setSubscriptions: (subs) => { pushSubscriptions = subs; },
+  persistSubscriptions,
+  VAPID_PUBLIC_KEY,
+}));
 
-    // ACCOUNTS: Always from Firestore — never from GCS
-    const account = await firestoreDAL.getAccountByEmail(inputEmail);
+app.use('/api/ai', createAiRoutes(firestoreDAL));
 
-    if (!account) {
-      console.log(`[CreatorAuth] Login failed — no account for: ${inputEmail}`);
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
+app.use('/api', createEmailRoutes({ gmailAuthClient, getGCSAuthToken, MAIN_BUCKET }));
 
-    // Support both bcrypt hashed and legacy plain-text passwords
-    let passwordValid = false;
-    if (account.password.startsWith('$2a$') || account.password.startsWith('$2b$')) {
-      passwordValid = await bcrypt.compare(inputPassword, account.password);
-    } else {
-      passwordValid = account.password === inputPassword;
-      if (passwordValid) {
-        console.log(`[CreatorAuth] Auto-upgrading plain-text password for: ${inputEmail}`);
-        const hashed = await bcrypt.hash(inputPassword, BCRYPT_ROUNDS);
-        await firestoreDAL.updateAccount(account.id, { password: hashed });
-      }
-    }
+app.use('/api/creator', createCreatorAuthRoutes(sharedDeps));
 
-    if (!passwordValid) {
-      console.log(`[CreatorAuth] Login failed — wrong password for: ${inputEmail}`);
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
+app.use('/api', createCreatorContentRoutes(sharedDeps));
 
-    // Get other data from GCS/Firestore for scoping
-    const db = await readMasterDB();
-    const creatorRecord = (db?.creators || []).find(c =>
-      c.id === account.linkedCreatorId ||
-      c.email?.toLowerCase() === account.email.toLowerCase() ||
-      c.portalEmail?.toLowerCase() === account.email.toLowerCase()
-    );
+app.use('/api/realtime', createRealtimeRoutes(firestoreDAL));
 
-    const token = jwt.sign(
-      { accountId: account.id, email: account.email, creatorId: creatorRecord?.id },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRY }
-    );
-
-    console.log(`[CreatorAuth] ✅ Login success: ${inputEmail}`);
-
-    const scopedData = db ? scopeDataForCreator(db, creatorRecord) : {};
-
-    res.json({
-      token,
-      account: { id: account.id, email: account.email, displayName: account.displayName, onboardingComplete: account.onboardingComplete, betaLabIntroSeen: account.betaLabIntroSeen, linkedCreatorId: account.linkedCreatorId },
-      ...scopedData
-    });
-  } catch (e) {
-    console.error('[CreatorAuth] Login error:', e);
-    res.status(500).json({ error: 'Server error during login' });
-  }
-});
-
-// --- POST /api/creator/signup ---
-
-app.post('/api/creator/signup', async (req, res) => {
-  try {
-    const { email, password, name } = req.body;
-    if (!email || !password || !name) return res.status(400).json({ error: 'Email, password, and name required' });
-    if (password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
-
-    const inputEmail = email.toLowerCase().trim();
-
-    // ACCOUNTS: Check Firestore
-    const existingAccount = await firestoreDAL.getAccountByEmail(inputEmail);
-    if (existingAccount) {
-      return res.status(409).json({ error: 'An account with this email already exists' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password.trim(), BCRYPT_ROUNDS);
-
-    const newCreator = {
-      id: crypto.randomUUID(),
-      name: name.trim(),
-      handle: '@' + inputEmail.split('@')[0],
-      platform: 'Instagram',
-      profileImage: '',
-      notes: 'Self-registered via Creator Portal',
-      status: 'Active',
-      paymentStatus: 'Unpaid',
-      paymentOptions: [],
-      rate: 0,
-      email: inputEmail,
-      dateAdded: new Date().toISOString(),
-      rating: null,
-      flagged: false,
-      shipmentStatus: 'None',
-      role: 'creator',
-      portalEmail: inputEmail,
-      notificationsEnabled: false,
-      totalEarned: 0,
-      lastActiveDate: new Date().toISOString(),
-    };
-
-    const newAccount = {
-      id: crypto.randomUUID(),
-      email: inputEmail,
-      password: hashedPassword,
-      displayName: name.trim(),
-      createdAt: new Date().toISOString(),
-      linkedCreatorId: newCreator.id,
-    };
-
-    // Write account to Firestore FIRST (source of truth)
-    await firestoreDAL.addAccount(newAccount);
-
-    // Write creator to GCS (for admin app visibility)
-    const db = await readMasterDB();
-    if (db) {
-      db.creators = [...(db.creators || []), newCreator];
-      db.lastUpdated = new Date().toISOString();
-      db.version = Date.now();
-      writeMasterDB(db).catch(e => console.warn('[CreatorAuth] GCS write failed:', e));
-    }
-
-    const token = jwt.sign(
-      { accountId: newAccount.id, email: newAccount.email, creatorId: newCreator.id },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRY }
-    );
-
-    console.log(`[CreatorAuth] ✅ Signup success: ${inputEmail} (Firestore)`);
-
-    const scopedData = db ? scopeDataForCreator(db, newCreator) : {};
-
-    res.status(201).json({
-      token,
-      account: { id: newAccount.id, email: newAccount.email, displayName: newAccount.displayName, onboardingComplete: false, linkedCreatorId: newCreator.id },
-      ...scopedData
-    });
-  } catch (e) {
-    console.error('[CreatorAuth] Signup error:', e);
-    res.status(500).json({ error: 'Server error during signup' });
-  }
-});
-
-// --- GET /api/creator/me --- (JWT protected)
-
-app.get('/api/creator/me', creatorAuthMiddleware, async (req, res) => {
-  try {
-    // ACCOUNTS: Always from Firestore
-    const account = await firestoreDAL.getAccountById(req.creatorAccountId);
-    if (!account) return res.status(404).json({ error: 'Account not found' });
-
-    const db = await readMasterDB();
-    const creatorRecord = (db?.creators || []).find(c =>
-      c.id === account.linkedCreatorId ||
-      c.email?.toLowerCase() === account.email.toLowerCase() ||
-      c.portalEmail?.toLowerCase() === account.email.toLowerCase()
-    );
-
-    const scopedData = db ? scopeDataForCreator(db, creatorRecord) : {};
-
-    res.json({
-      account: { id: account.id, email: account.email, displayName: account.displayName, onboardingComplete: account.onboardingComplete, betaLabIntroSeen: account.betaLabIntroSeen, linkedCreatorId: account.linkedCreatorId },
-      ...scopedData
-    });
-  } catch (e) {
-    console.error('[CreatorAuth] /me error:', e);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// --- POST /api/creator/invite --- (used by admin to invite creators)
-
-app.post('/api/creator/invite', async (req, res) => {
-  try {
-    const { email, name, creatorId, plainPassword } = req.body;
-    if (!email || !name || !plainPassword) return res.status(400).json({ error: 'Email, name, and password required' });
-
-    const inputEmail = email.toLowerCase().trim();
-
-    // ACCOUNTS: Check Firestore directly
-    const existing = await firestoreDAL.getAccountByEmail(inputEmail);
-    if (existing) {
-      return res.status(409).json({ error: 'Account already exists for this email' });
-    }
-
-    const hashedPassword = await bcrypt.hash(plainPassword, BCRYPT_ROUNDS);
-
-    const newAccount = {
-      id: crypto.randomUUID(),
-      email: inputEmail,
-      password: hashedPassword,
-      displayName: name,
-      createdAt: new Date().toISOString(),
-      linkedCreatorId: creatorId || undefined,
-      invitedByTeam: true,
-      inviteEmailSent: false,
-    };
-
-    // Write account to Firestore FIRST (source of truth)
-    await firestoreDAL.addAccount(newAccount);
-
-    // Also update GCS for other data (portalEmail on creator)
-    if (creatorId) {
-      const db = await readMasterDB();
-      if (db) {
-        db.creators = (db.creators || []).map(c =>
-          c.id === creatorId ? { ...c, portalEmail: inputEmail } : c
-        );
-        db.lastUpdated = new Date().toISOString();
-        db.version = Date.now();
-        writeMasterDB(db).catch(e => console.warn('[CreatorAuth] GCS update failed:', e));
-      }
-    }
-
-    console.log(`[CreatorAuth] ✅ Invite created for: ${inputEmail} (Firestore)`);
-
-    res.status(201).json({ success: true, accountId: newAccount.id });
-  } catch (e) {
-    console.error('[CreatorAuth] Invite error:', e);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// --- POST /api/creator/change-password --- (self-service, JWT protected)
-app.post('/api/creator/change-password', creatorAuthMiddleware, async (req, res) => {
-  try {
-    const { newPassword } = req.body;
-    if (!newPassword || newPassword.trim().length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters' });
-    }
-
-    // ACCOUNTS: Firestore only
-    const account = await firestoreDAL.getAccountById(req.creatorAccountId);
-    if (!account) return res.status(404).json({ error: 'Account not found' });
-
-    const hashed = await bcrypt.hash(newPassword.trim(), BCRYPT_ROUNDS);
-    await firestoreDAL.updateAccount(account.id, { password: hashed });
-
-    console.log(`[CreatorAuth] ✅ Password changed by creator: ${account.email}`);
-    res.json({ success: true });
-  } catch (e) {
-    console.error('[CreatorAuth] Change password error:', e);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// --- POST /api/creator/migrate-passwords --- (one-time admin utility)
-
-app.post('/api/creator/migrate-passwords', async (req, res) => {
-  try {
-    const { adminKey } = req.body;
-    if (adminKey !== 'ooedn-migrate-2026') return res.status(403).json({ error: 'Unauthorized' });
-
-    const db = await readMasterDB();
-    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
-
-    const accounts = db.creatorAccounts || [];
-    let migrated = 0;
-
-    for (const account of accounts) {
-      if (!account.password.startsWith('$2a$') && !account.password.startsWith('$2b$')) {
-        account.password = await bcrypt.hash(account.password, BCRYPT_ROUNDS);
-        migrated++;
-      }
-    }
-
-    if (migrated > 0) {
-      db.creatorAccounts = accounts;
-      db.lastUpdated = new Date().toISOString();
-      db.version = Date.now();
-      await writeMasterDB(db);
-    }
-
-    console.log(`[CreatorAuth] Migrated ${migrated}/${accounts.length} passwords to bcrypt`);
-    res.json({ success: true, migrated, total: accounts.length });
-  } catch (e) {
-    console.error('[CreatorAuth] Migration error:', e);
-    res.status(500).json({ error: 'Migration failed' });
-  }
-});
-
-// --- POST /api/creator/reset-password --- (admin utility)
-app.post('/api/creator/reset-password', async (req, res) => {
-  try {
-    const { email, newPassword } = req.body;
-    if (!email || !newPassword) return res.status(400).json({ error: 'email and newPassword required' });
-
-    // ACCOUNTS: Firestore only
-    const account = await firestoreDAL.getAccountByEmail(email.toLowerCase().trim());
-    if (!account) return res.status(404).json({ error: `No account found for ${email}` });
-
-    const hashed = await bcrypt.hash(newPassword.trim(), BCRYPT_ROUNDS);
-    await firestoreDAL.updateAccount(account.id, { password: hashed });
-
-    console.log(`[CreatorAuth] ✅ Password reset for: ${email}`);
-    res.json({ success: true, email, accountId: account.id });
-  } catch (e) {
-    console.error('[CreatorAuth] Reset password error:', e);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// --- POST /api/creator/delete-account --- (admin utility)
-app.post('/api/creator/delete-account', async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'email required' });
-
-    // ACCOUNTS: Firestore only
-    const account = await firestoreDAL.getAccountByEmail(email.toLowerCase().trim());
-    if (!account) return res.status(404).json({ error: `No account found for ${email}` });
-
-    await firestoreDAL.deleteAccount(account.id);
-
-    console.log(`[CreatorAuth] 🗑️ Deleted account: ${email}`);
-    const remaining = await firestoreDAL.getAllAccounts();
-    res.json({ success: true, deleted: email, remaining: remaining.length });
-  } catch (e) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// --- POST /api/creator/debug-login --- (debug: test password without logging in)
-app.post('/api/creator/debug-login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    // ACCOUNTS: Firestore only
-    const account = await firestoreDAL.getAccountByEmail(email.toLowerCase().trim());
-    if (!account) return res.json({ found: false, message: 'No account found', source: 'firestore' });
-
-    const storedHash = account.password;
-    const isBcrypt = storedHash.startsWith('$2a$') || storedHash.startsWith('$2b$');
-    const inputTrimmed = password.trim();
-
-    let result = false;
-    if (isBcrypt) {
-      result = await bcrypt.compare(inputTrimmed, storedHash);
-    } else {
-      result = storedHash === inputTrimmed;
-    }
-
-    res.json({
-      found: true,
-      source: 'firestore',
-      email: account.email,
-      isBcrypt,
-      hashPrefix: storedHash.substring(0, 10) + '...',
-      inputLength: inputTrimmed.length,
-      passwordMatch: result
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// --- GET /api/creator/accounts-check --- (admin debug - no passwords)
-app.get('/api/creator/accounts-check', async (req, res) => {
-  try {
-    // ACCOUNTS: Always from Firestore
-    const allAccounts = await firestoreDAL.getAllAccounts();
-    const accounts = allAccounts.map(a => ({
-      id: a.id, email: a.email, displayName: a.displayName, createdAt: a.createdAt,
-      linkedCreatorId: a.linkedCreatorId, invitedByTeam: a.invitedByTeam,
-      hasHashedPassword: a.password?.startsWith('$2') || false
-    }));
-    res.json({ count: accounts.length, accounts, source: 'firestore' });
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to check accounts' });
-  }
-});
-
-// --- POST /api/creator/upload-file --- (JWT protected, uploads file to GCS)
-app.post('/api/creator/upload-file', creatorAuthMiddleware, async (req, res) => {
-  try {
-    const { fileData, fileName, contentType } = req.body;
-    if (!fileData || !fileName) return res.status(400).json({ error: 'fileData and fileName required' });
-
-    const token = await getGCSAuthToken();
-    if (!token) return res.status(503).json({ error: 'GCS auth unavailable' });
-
-    // Determine the account's linked creator ID — from Firestore
-    const account = await firestoreDAL.getAccountById(req.creatorAccountId);
-    const creatorId = account?.linkedCreatorId || req.creatorAccountId;
-
-    // Build GCS path: creator-uploads/{creatorId}/{timestamp}-{filename}
-    const sanitizedName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const gcsPath = `creator-uploads/${creatorId}/${Date.now()}-${sanitizedName}`;
-
-    // Decode base64 and upload to GCS
-    const buffer = Buffer.from(fileData, 'base64');
-    const mimeType = contentType || 'application/octet-stream';
-
-    const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${MAIN_BUCKET}/o?uploadType=media&name=${encodeURIComponent(gcsPath)}`;
-    const uploadRes = await fetch(uploadUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': mimeType,
-      },
-      body: buffer,
-    });
-
-    if (!uploadRes.ok) {
-      const err = await uploadRes.text();
-      console.error('[Upload] GCS upload failed:', err);
-      return res.status(500).json({ error: 'File upload failed' });
-    }
-
-    // Make the object publicly readable
-    const aclUrl = `https://storage.googleapis.com/storage/v1/b/${MAIN_BUCKET}/o/${encodeURIComponent(gcsPath)}/acl`;
-    await fetch(aclUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ entity: 'allUsers', role: 'READER' }),
-    }).catch(e => console.warn('[Upload] ACL set failed (file may not be public):', e));
-
-    const publicUrl = `https://storage.googleapis.com/${MAIN_BUCKET}/${gcsPath}`;
-    console.log(`[Upload] ✅ File uploaded: ${publicUrl}`);
-
-    res.json({ success: true, url: publicUrl, gcsPath });
-  } catch (e) {
-    console.error('[Upload] Error:', e);
-    res.status(500).json({ error: 'Upload failed' });
-  }
-});
-
-// --- GET /api/media-proxy --- Stream GCS files with proper CORS/Content-Type headers
-// Used by the video/image preview in Pending Review since <video> tags can't play cross-origin GCS files
-app.get('/api/media-proxy', async (req, res) => {
-  try {
-    const { url } = req.query;
-    if (!url || typeof url !== 'string') return res.status(400).send('url query param required');
-    // Only proxy our own GCS bucket URLs
-    if (!url.includes('storage.googleapis.com') && !url.includes(MAIN_BUCKET)) {
-      return res.status(403).send('Only GCS URLs allowed');
-    }
-    const token = await getGCSAuthToken();
-    const headers = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    const gcsRes = await fetch(url, { headers });
-    if (!gcsRes.ok) return res.status(gcsRes.status).send('GCS fetch failed');
-    const ct = gcsRes.headers.get('content-type') || 'application/octet-stream';
-    const cl = gcsRes.headers.get('content-length');
-    res.setHeader('Content-Type', ct);
-    if (cl) res.setHeader('Content-Length', cl);
-    res.setHeader('Accept-Ranges', 'bytes');
-    // Use node-fetch body as a readable stream
-    const arrayBuf = await gcsRes.arrayBuffer();
-    res.send(Buffer.from(arrayBuf));
-  } catch (e) {
-    console.error('[MediaProxy] Error:', e);
-    res.status(500).send('Proxy error');
-  }
-});
-
-// --- POST /api/content/delete --- (delete content from both GCS and Firestore)
-app.post('/api/content/delete', async (req, res) => {
-  try {
-    const { contentId } = req.body;
-    if (!contentId) return res.status(400).json({ error: 'contentId required' });
-
-    console.log(`[ContentDelete] Deleting content ${contentId} from all sources`);
-
-    // 1. Delete from GCS master DB
-    const db = await readMasterDB_GCS();
-    if (db) {
-      const before = (db.contentItems || []).length;
-      db.contentItems = (db.contentItems || []).filter(c => c.id !== contentId);
-      const after = db.contentItems.length;
-      if (before !== after) {
-        db.lastUpdated = new Date().toISOString();
-        db.version = Date.now();
-        await writeMasterDB_GCS(db);
-        console.log(`[ContentDelete] Removed from GCS (${before} → ${after})`);
-      }
-    }
-
-    // 2. Delete from Firestore directly
-    try {
-      await firestoreDAL.deleteContentItem(contentId);
-      console.log(`[ContentDelete] ✅ Removed from Firestore: ${contentId}`);
-    } catch (e) {
-      console.warn(`[ContentDelete] Firestore delete failed: ${e.message}`);
-    }
-
-    res.json({ success: true, contentId });
-  } catch (e) {
-    console.error('[ContentDelete] Error:', e);
-    res.status(500).json({ error: 'Delete failed' });
-  }
-});
-
-// --- POST /api/creator/save --- (JWT protected, creator writes their own changes)
-
-app.post('/api/creator/save', creatorAuthMiddleware, async (req, res) => {
-  try {
-    const { updates } = req.body; // { creator?, content?, messages?, campaigns?, betaReleases?, account? }
-    if (!updates) return res.status(400).json({ error: 'No updates provided' });
-
-    const db = await readMasterDB();
-    if (!db) return res.status(503).json({ error: 'Unable to connect to database' });
-
-    // ACCOUNTS: Firestore only
-    const account = await firestoreDAL.getAccountById(req.creatorAccountId);
-    if (!account) return res.status(404).json({ error: 'Account not found' });
-
-    // Only allow updating the creator's OWN data
-    if (updates.creator && account.linkedCreatorId) {
-      db.creators = (db.creators || []).map(c =>
-        c.id === account.linkedCreatorId ? { ...c, ...updates.creator } : c
-      );
-    }
-
-    // Content: only add/update items owned by this creator
-    if (updates.contentItems) {
-      const existingIds = new Set((db.contentItems || []).map(c => c.id));
-      for (const item of updates.contentItems) {
-        if (item.creatorId !== account.linkedCreatorId) continue; // Safety: only own content
-        if (existingIds.has(item.id)) {
-          db.contentItems = db.contentItems.map(c => c.id === item.id ? { ...c, ...item } : c);
-        } else {
-          db.contentItems = [...(db.contentItems || []), item];
-        }
-      }
-    }
-
-    // Messages: append new messages from this creator
-    if (updates.teamMessages) {
-      const existingMsgIds = new Set((db.teamMessages || []).map(m => m.id));
-      const newMessages = updates.teamMessages.filter(m => !existingMsgIds.has(m.id));
-      db.teamMessages = [...(db.teamMessages || []), ...newMessages];
-    }
-
-    // Beta releases: update only this creator's entries
-    if (updates.betaReleases) {
-      for (const release of updates.betaReleases) {
-        if (release.creatorId !== account.linkedCreatorId) continue;
-        const existing = (db.betaReleases || []).find(r => r.id === release.id);
-        if (existing) {
-          db.betaReleases = db.betaReleases.map(r => r.id === release.id ? { ...r, ...release } : r);
-        } else {
-          db.betaReleases = [...(db.betaReleases || []), release];
-        }
-      }
-    }
-
-    // Campaigns: allow updating acceptedByCreatorIds (accepting) AND assignedCreatorIds (declining)
-    if (updates.campaigns) {
-      for (const campaign of updates.campaigns) {
-        db.campaigns = (db.campaigns || []).map(c => {
-          if (c.id !== campaign.id) return c;
-          const patch = { acceptedByCreatorIds: campaign.acceptedByCreatorIds };
-          // Allow removing self from assignedCreatorIds (decline)
-          if (campaign.assignedCreatorIds) patch.assignedCreatorIds = campaign.assignedCreatorIds;
-          return { ...c, ...patch };
-        });
-      }
-    }
-
-    // Account updates (onboarding, betaLabIntro) — write to Firestore
-    if (updates.account) {
-      const { password, ...safeUpdates } = updates.account; // never allow password override
-      await firestoreDAL.updateAccount(req.creatorAccountId, safeUpdates);
-    }
-
-    db.lastUpdated = new Date().toISOString();
-    db.version = Date.now();
-
-    const saved = await writeMasterDB(db);
-    if (!saved) return res.status(500).json({ error: 'Failed to save' });
-
-    res.json({ success: true });
-  } catch (e) {
-    console.error('[CreatorAuth] Save error:', e);
-    res.status(500).json({ error: 'Server error during save' });
-  }
-});
-
+console.log('[Server] All route modules mounted (including SSE realtime)');
 console.log('[CreatorAuth] Creator Portal auth endpoints registered');
 
-// --- CREATOR_MODE: serve creator-only build or full admin build ---
+// ═══════════════════════════════════════════════════
+// ── Static File Serving ──
+// ═══════════════════════════════════════════════════
+
 const CREATOR_MODE = process.env.CREATOR_MODE === 'true';
 const DIST_DIR = CREATOR_MODE ? 'dist-creator' : 'dist';
 const INDEX_HTML = CREATOR_MODE ? 'creator-index.html' : 'index.html';
 
-// --- Static File Serving ---
 app.set('etag', false);
 
 app.use(express.static(path.join(__dirname, DIST_DIR), {
@@ -1311,7 +312,6 @@ app.use(express.static(path.join(__dirname, DIST_DIR), {
   }
 }));
 
-// Serve service worker from root path (must be at root for scope)
 app.get('/sw.js', (req, res) => {
   const swPath = path.join(__dirname, DIST_DIR, 'sw.js');
   if (fs.existsSync(swPath)) {
@@ -1329,7 +329,6 @@ app.get('/sw.js', (req, res) => {
   }
 });
 
-// In creator mode, redirect root to /creator
 if (CREATOR_MODE) {
   app.get('/', (req, res) => {
     res.redirect('/creator');
@@ -1354,19 +353,18 @@ app.get('*', (req, res) => {
     const injection = `
       <script>
         window.env = { 
-            API_KEY: "${process.env.API_KEY || ''}",
             CLIENT_ID: "${process.env.CLIENT_ID || ''}"
         };
-        window.APP_VERSION = "4.32";
+        window.APP_VERSION = "4.33";
         
         const currentV = localStorage.getItem('ooedn_version');
-        if (currentV !== '4.32') {
-            console.log('Detected version upgrade to 4.32. Clearing legacy config to restore correct bucket.');
+        if (currentV !== '4.33') {
+            console.log('Detected version upgrade to 4.33. Clearing legacy config.');
             localStorage.removeItem('ooedn_settings');
-            localStorage.setItem('ooedn_version', '4.32');
+            localStorage.setItem('ooedn_version', '4.33');
         }
         
-        console.log("${CREATOR_MODE ? 'OOEDN Creator Portal' : 'OOEDN Tracker'} v4.32 Loaded");
+        console.log("${CREATOR_MODE ? 'OOEDN Creator Portal' : 'OOEDN Tracker'} v4.33 Loaded");
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js')
@@ -1382,10 +380,8 @@ app.get('*', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`${CREATOR_MODE ? 'OOEDN Creator Portal' : 'OOEDN Tracker'} v4.32 listening on port ${port}`);
+  console.log(`${CREATOR_MODE ? 'OOEDN Creator Portal' : 'OOEDN Tracker'} v4.33 listening on port ${port}`);
   if (!CREATOR_MODE) {
     console.log(`[Push] ${pushSubscriptions.length} active push subscriptions`);
   }
 });
-
-

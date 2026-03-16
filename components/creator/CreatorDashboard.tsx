@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Creator, Campaign, ContentItem, ContentStatus, TeamMessage, PaymentStatus } from '../../types';
 import {
-    LayoutDashboard, MessageCircle, Upload, CreditCard, Package, Briefcase,
-    ArrowRight, Bell, BellOff, Zap, Trophy, TrendingUp, Calendar, Sparkles, Star, AlertTriangle, CheckCircle, X
+    DollarSign, CheckCircle, Upload, MessageCircle, Flame, ArrowRight, Bell, ChevronRight, Zap
 } from 'lucide-react';
 
 interface Props {
@@ -14,430 +13,357 @@ interface Props {
     onEnableNotifications?: () => void;
 }
 
-// Fun confetti component
-const Confetti: React.FC<{ active: boolean }> = ({ active }) => {
-    if (!active) return null;
-    const colors = ['#a855f7', '#facc15', '#34d399', '#f472b6', '#60a5fa'];
-    return (
-        <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
-            {Array.from({ length: 50 }).map((_, i) => (
-                <div
-                    key={i}
-                    className="absolute animate-confetti"
-                    style={{
-                        left: `${Math.random() * 100}%`,
-                        top: `-${Math.random() * 20}px`,
-                        width: `${6 + Math.random() * 8}px`,
-                        height: `${6 + Math.random() * 8}px`,
-                        backgroundColor: colors[Math.floor(Math.random() * colors.length)],
-                        borderRadius: Math.random() > 0.5 ? '50%' : '2px',
-                        animationDelay: `${Math.random() * 2}s`,
-                        animationDuration: `${2 + Math.random() * 2}s`,
-                    }}
-                />
-            ))}
-            <style>{`
-        @keyframes confetti {
-          0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-          100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
-        }
-        .animate-confetti { animation: confetti 3s ease-in-out forwards; }
-      `}</style>
-        </div>
-    );
-};
-
-// Animated number counter
-const AnimatedNumber: React.FC<{ value: number; prefix?: string; duration?: number }> = ({
-    value, prefix = '', duration = 1500
-}) => {
+/* ─── Animated Number ─────────────────────────────────── */
+const AnimNum: React.FC<{ value: number; prefix?: string }> = ({ value, prefix = '' }) => {
     const [display, setDisplay] = useState(0);
     useEffect(() => {
         if (value === 0) { setDisplay(0); return; }
-        const step = value / (duration / 16);
-        let current = 0;
-        const timer = setInterval(() => {
-            current += step;
-            if (current >= value) { setDisplay(value); clearInterval(timer); }
-            else setDisplay(Math.floor(current));
+        const step = Math.max(1, value / 60);
+        let cur = 0;
+        const id = setInterval(() => {
+            cur += step;
+            if (cur >= value) { setDisplay(value); clearInterval(id); }
+            else setDisplay(Math.floor(cur));
         }, 16);
-        return () => clearInterval(timer);
-    }, [value, duration]);
-    return <span>{prefix}{display.toLocaleString()}</span>;
+        return () => clearInterval(id);
+    }, [value]);
+    return <>{prefix}{display}</>;
 };
 
-const CreatorDashboard: React.FC<Props> = ({ creator, campaigns, contentItems, teamMessages, onNavigate, onEnableNotifications }) => {
+/* ─── Stat Card (frosted glass with pastel tint) ──────── */
+const StatCard: React.FC<{
+    label: string;
+    value: string | number;
+    icon: React.ReactNode;
+    tint: string; // e.g. '167,139,250' (rgba channels)
+    suffix?: string;
+    onClick?: () => void;
+    delay?: number;
+}> = ({ label, value, icon, tint, suffix, onClick, delay = 0 }) => (
+    <div
+        onClick={onClick}
+        style={{
+            flex: '1 1 0',
+            minWidth: '120px',
+            background: `linear-gradient(135deg, rgba(${tint},0.12) 0%, rgba(${tint},0.04) 100%)`,
+            backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+            border: `1px solid rgba(${tint},0.15)`,
+            borderRadius: '20px',
+            padding: '20px 18px',
+            cursor: onClick ? 'pointer' : 'default',
+            transition: 'all 0.3s cubic-bezier(0.22,1,0.36,1)',
+            animation: `dashFadeUp 0.6s ease ${delay}s both`,
+        }}
+        onMouseEnter={e => {
+            e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
+            e.currentTarget.style.borderColor = `rgba(${tint},0.3)`;
+            e.currentTarget.style.boxShadow = `0 12px 32px rgba(${tint},0.15)`;
+        }}
+        onMouseLeave={e => {
+            e.currentTarget.style.transform = 'translateY(0) scale(1)';
+            e.currentTarget.style.borderColor = `rgba(${tint},0.15)`;
+            e.currentTarget.style.boxShadow = 'none';
+        }}
+    >
+        <p style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 10px' }}>
+            {label}
+        </p>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+            <span style={{ fontSize: '28px', fontWeight: 800, color: 'white', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                {typeof value === 'number' ? <AnimNum value={value} /> : value}
+            </span>
+            {suffix && <span style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.35)' }}>{suffix}</span>}
+        </div>
+        <div style={{ marginTop: '10px', color: `rgba(${tint},0.7)` }}>{icon}</div>
+    </div>
+);
+
+export default function CreatorDashboard({ creator, campaigns, contentItems, teamMessages, onNavigate, onEnableNotifications }: Props) {
+    const myContent = contentItems.filter(c => c.creatorId === creator.id);
+    const myMessages = teamMessages.filter(m => m.creatorId === creator.id);
     const myCampaigns = campaigns.filter(c => c.assignedCreatorIds?.includes(creator.id));
-    const myContent = contentItems.filter(c => c.creatorId === creator.id || c.creatorName === creator.name);
-    const needsEditing = myContent.filter(c => c.status === ContentStatus.Editing);
-    const recentlyApproved = myContent.filter(c => c.status === ContentStatus.Approved);
-    const pendingTasks = myCampaigns.flatMap(c => c.tasks?.filter(t => !t.isDone) || []);
-    const allTasks = myCampaigns.flatMap(c => c.tasks || []);
-    const completedTasks = allTasks.filter(t => t.isDone).length;
-    const allDone = allTasks.length > 0 && completedTasks === allTasks.length;
-    const [showConfetti, setShowConfetti] = useState(false);
-    const confettiShownRef = useRef(false);
+    const pendingCampaigns = myCampaigns.filter(c => !c.acceptedByCreatorIds?.includes(creator.id));
+    const acceptedCampaigns = myCampaigns.filter(c => c.acceptedByCreatorIds?.includes(creator.id));
 
-    // Trigger confetti when all tasks done
-    useEffect(() => {
-        if (allDone && !confettiShownRef.current) {
-            confettiShownRef.current = true;
-            setShowConfetti(true);
-            setTimeout(() => setShowConfetti(false), 4000);
-        }
-    }, [allDone]);
+    const completedCount = myContent.filter(c => c.status === ContentStatus.Approved || c.status === ContentStatus.Posted).length;
+    const totalUploads = myContent.length;
+    const unreadMessages = myMessages.filter(m => !m.isCreatorMessage).length;
+    const totalEarned = creator.totalEarned || 0;
 
-    const feedbackCount = myContent.reduce((acc, c) => acc + (c.teamNotes?.length || 0), 0);
+    // XP system — based on actions
+    const xpTotal = completedCount * 25 + totalUploads * 10 + acceptedCampaigns.length * 50;
+    const xpLevel = Math.floor(xpTotal / 100) + 1;
+    const xpProgress = (xpTotal % 100); // 0–99
 
-    // Dismissed campaigns persisted in localStorage so they don't come back
-    const [dismissedCampaignIds, setDismissedCampaignIds] = useState<Set<string>>(() => {
-        try {
-            const saved = localStorage.getItem(`ooedn_dismissed_campaigns_${creator.id}`);
-            return saved ? new Set(JSON.parse(saved)) : new Set();
-        } catch { return new Set(); }
-    });
-    const dismissCampaign = (id: string) => {
-        setDismissedCampaignIds(prev => {
-            const next = new Set(prev).add(id);
-            localStorage.setItem(`ooedn_dismissed_campaigns_${creator.id}`, JSON.stringify([...next]));
-            return next;
-        });
-    };
-    const newCampaigns = myCampaigns.filter(c =>
-        !c.acceptedByCreatorIds?.includes(creator.id) && !dismissedCampaignIds.has(c.id)
-    );
+    // Streak
+    const lastActive = creator.lastActiveDate ? new Date(creator.lastActiveDate) : new Date(creator.dateAdded);
+    const daysSinceActive = Math.floor((Date.now() - lastActive.getTime()) / 86400000);
+    const streak = daysSinceActive <= 7 ? Math.min(99, Math.max(1, completedCount + acceptedCampaigns.length)) : 0;
 
-    // Time-based greeting
+    // Greeting
     const hour = new Date().getHours();
-    const greetingEmoji = hour < 12 ? '☀️' : hour < 17 ? '🔥' : hour < 21 ? '🌙' : '✨';
-    const greetingText = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : hour < 21 ? 'Good evening' : 'Night owl mode';
+    const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    const firstName = creator.name?.split(' ')[0] || 'Creator';
 
-    // Streak calculation (simplified — days since dateAdded or lastActiveDate)
-    const daysSinceJoin = Math.floor((Date.now() - new Date(creator.dateAdded).getTime()) / (1000 * 60 * 60 * 24));
-    const streak = Math.min(daysSinceJoin + 1, 30); // Cap at 30
+    // Campaign progress for first accepted campaign
+    const activeCampaign = acceptedCampaigns[0];
+    const campaignTasks = activeCampaign?.tasks || [];
+    const doneTasks = campaignTasks.filter((t: any) => t.done || t.completedByCreatorIds?.includes(creator.id)).length;
+    const campaignProgress = campaignTasks.length > 0 ? Math.round((doneTasks / campaignTasks.length) * 100) : 0;
 
-    // Compute earnings: use totalEarned if set, otherwise derive from paid status + rate
-    const earnings = (() => {
-        if (creator.totalEarned && creator.totalEarned > 0) return creator.totalEarned;
-        if (creator.paymentStatus === PaymentStatus.Paid && creator.rate > 0) return creator.rate;
-        return 0;
-    })();
-
-    const statusColor = creator.paymentStatus === 'Paid' ? 'text-emerald-400' :
-        creator.paymentStatus === 'Processing' ? 'text-yellow-400' : 'text-red-400';
+    // Recent activity (last content items + messages)
+    const recentActivity = [
+        ...myContent.slice(-3).map(c => ({
+            id: c.id,
+            label: c.title || 'Content',
+            status: c.status,
+            color: c.status === ContentStatus.Approved ? '134,239,172' : c.status === ContentStatus.Posted ? '103,232,249' : '167,139,250',
+            time: c.uploadDate || '',
+        })),
+    ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 4);
 
     return (
-        <div className="space-y-6 max-w-4xl mx-auto">
-            <Confetti active={showConfetti} />
-
-            {/* NOTIFICATION BANNER */}
-            {!creator.notificationsEnabled && (
-                <button
-                    onClick={onEnableNotifications}
-                    className="w-full flex items-center gap-3 p-4 bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-orange-500/10 border border-purple-500/20 rounded-2xl hover:border-purple-500/40 transition-all group animate-pulse-slow"
-                >
-                    <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Bell size={18} className="text-purple-400" />
-                    </div>
-                    <div className="text-left flex-1">
-                        <p className="text-sm font-bold text-white">Enable Notifications 🔔</p>
-                        <p className="text-[10px] text-neutral-400">Get instant alerts when campaigns are assigned, payments update, and more</p>
-                    </div>
-                    <ArrowRight size={14} className="text-neutral-600 group-hover:text-purple-400 transition-colors" />
-                </button>
-            )}
-
-            {/* WELCOME BANNER */}
-            <div className="bg-gradient-to-br from-purple-600/20 via-indigo-500/10 to-pink-500/10 border border-purple-500/20 rounded-3xl p-6 relative overflow-hidden">
-                <div className="absolute -top-10 -right-10 w-40 h-40 bg-purple-500/5 rounded-full blur-3xl" />
-                <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-pink-500/5 rounded-full blur-3xl" />
-                <div className="relative">
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="text-2xl">{greetingEmoji}</span>
-                        <h1 className="text-2xl font-black text-white">
-                            {greetingText}, {creator.name.split(' ')[0]}!
-                        </h1>
-                    </div>
-                    <p className="text-neutral-400 text-sm mb-4">
-                        {creator.status === 'Active' ? "You're crushing it" : `Status: ${creator.status}`}
-                        {creator.campaign && <> • <span className="text-purple-400 font-bold">{creator.campaign}</span></>}
-                    </p>
-
-                    {/* Streak & Earnings Row */}
-                    <div className="flex items-center gap-4 flex-wrap">
-                        <div className="flex items-center gap-2 bg-black/30 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/5">
-                            <Zap size={14} className="text-yellow-400" />
-                            <span className="text-sm font-black text-white">{streak}</span>
-                            <span className="text-[10px] text-neutral-500 font-bold uppercase">Day Streak</span>
-                        </div>
-                        {earnings > 0 && (
-                            <div className="flex items-center gap-2 bg-black/30 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/5">
-                                <TrendingUp size={14} className="text-emerald-400" />
-                                <span className="text-sm font-black text-emerald-400">
-                                    <AnimatedNumber value={earnings} prefix="$" />
-                                </span>
-                                <span className="text-[10px] text-neutral-500 font-bold uppercase">Earned</span>
-                            </div>
-                        )}
-                        {completedTasks > 0 && (
-                            <div className="flex items-center gap-2 bg-black/30 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/5">
-                                <Trophy size={14} className="text-purple-400" />
-                                <span className="text-sm font-black text-white">{completedTasks}</span>
-                                <span className="text-[10px] text-neutral-500 font-bold uppercase">Tasks Done</span>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* REVISION REQUESTED BANNER */}
-            {needsEditing.length > 0 && (
-                <div className="space-y-3">
-                    {needsEditing.map(item => {
-                        const latestTeamNote = [...(item.teamNotes || [])].reverse().find(n => !n.isCreatorReply);
-                        return (
-                            <button
-                                key={item.id}
-                                onClick={() => onNavigate('upload')}
-                                className="w-full text-left bg-gradient-to-r from-orange-500/15 to-amber-500/10 border-2 border-orange-500/40 rounded-2xl p-5 hover:border-orange-500/60 transition-all group"
-                            >
-                                <div className="flex items-start gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <AlertTriangle size={18} className="text-orange-400" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-orange-400">
-                                                Revision Requested{item.revisionCount ? ` (Revision #${item.revisionCount})` : ''}
-                                            </span>
-                                        </div>
-                                        <p className="text-sm font-bold text-white mb-1">{item.title}</p>
-                                        {latestTeamNote && (
-                                            <div className="bg-black/30 rounded-lg px-3 py-2 border border-orange-500/10">
-                                                <p className="text-[10px] text-orange-300/80 font-bold uppercase tracking-widest mb-0.5">Team Notes:</p>
-                                                <p className="text-xs text-neutral-300 leading-relaxed">{latestTeamNote.text}</p>
-                                            </div>
-                                        )}
-                                        <p className="text-[10px] text-orange-400/60 mt-2 group-hover:text-orange-400 transition-colors flex items-center gap-1">
-                                            Tap to open Content Hub and re-upload <ArrowRight size={10} />
-                                        </p>
-                                    </div>
-                                </div>
-                            </button>
-                        );
-                    })}
-                </div>
-            )}
-
-            {/* CONTENT APPROVED BANNER */}
-            {recentlyApproved.length > 0 && (
-                <div className="space-y-3">
-                    {recentlyApproved.map(item => (
-                        <div
-                            key={item.id}
-                            className="w-full text-left bg-gradient-to-r from-emerald-500/15 to-green-500/10 border-2 border-emerald-500/40 rounded-2xl p-5"
-                        >
-                            <div className="flex items-start gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                    <CheckCircle size={18} className="text-emerald-400" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">
-                                            Content Approved! 🎉
-                                        </span>
-                                    </div>
-                                    <p className="text-sm font-bold text-white mb-1">{item.title}</p>
-                                    <p className="text-[10px] text-emerald-400/60">
-                                        {item.paymentRequested ? '💰 Payment has been queued!' : 'Great work — your content is ready!'}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* NEW CAMPAIGNS ALERT */}
-            {newCampaigns.length > 0 && (
-                <div className="space-y-2">
-                    {newCampaigns.map(campaign => (
-                        <div key={campaign.id} className="relative w-full flex items-center gap-3 p-4 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-2xl group">
-                            <button
-                                onClick={() => onNavigate('campaigns')}
-                                className="flex items-center gap-3 flex-1 text-left"
-                            >
-                                <div className="w-10 h-10 rounded-xl bg-yellow-500/20 flex items-center justify-center">
-                                    <Sparkles size={18} className="text-yellow-400" />
-                                </div>
-                                <div className="flex-1">
-                                    <p className="text-sm font-bold text-white">
-                                        New Campaign: {campaign.title} 🎉
-                                    </p>
-                                    <p className="text-[10px] text-neutral-400">Tap to view and accept</p>
-                                </div>
-                                <ArrowRight size={14} className="text-neutral-600 group-hover:text-yellow-400 transition-colors" />
-                            </button>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); dismissCampaign(campaign.id); }}
-                                className="absolute top-2 right-2 p-1 text-neutral-600 hover:text-red-400 transition-colors rounded-full hover:bg-red-500/10"
-                                title="Dismiss this alert"
-                            >
-                                <X size={12} />
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* QUICK STATS GRID */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                    { label: 'Payment', value: creator.paymentStatus, color: statusColor, view: 'payments', icon: CreditCard, glow: 'hover:shadow-purple-500/10' },
-                    { label: 'Messages', value: `${feedbackCount || 0}`, color: feedbackCount > 0 ? 'text-blue-400' : 'text-neutral-500', view: 'chat', icon: MessageCircle, glow: 'hover:shadow-blue-500/10' },
-                    { label: 'Uploads', value: `${myContent.length}`, color: 'text-purple-400', view: 'upload', icon: Upload, glow: 'hover:shadow-purple-500/10' },
-                    { label: 'Tasks', value: `${pendingTasks.length} open`, color: pendingTasks.length > 0 ? 'text-yellow-400' : 'text-emerald-400', view: 'campaigns', icon: Briefcase, glow: 'hover:shadow-yellow-500/10' },
-                ].map(stat => (
-                    <button
-                        key={stat.label}
-                        onClick={() => onNavigate(stat.view)}
-                        className={`bg-neutral-900/80 backdrop-blur-sm border border-neutral-800 rounded-2xl p-4 text-left hover:border-purple-500/30 transition-all duration-300 group hover:scale-[1.02] hover:shadow-xl ${stat.glow}`}
-                    >
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="w-8 h-8 rounded-lg bg-neutral-800 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
-                                <stat.icon size={14} className="text-neutral-500 group-hover:text-purple-400 transition-colors" />
-                            </div>
-                            <ArrowRight size={10} className="text-neutral-700 group-hover:text-purple-400 transition-colors group-hover:translate-x-1 duration-200" />
-                        </div>
-                        <p className={`text-xl font-black ${stat.color}`}>{stat.value}</p>
-                        <p className="text-[9px] text-neutral-600 font-bold uppercase tracking-widest mt-0.5">{stat.label}</p>
-                    </button>
-                ))}
-            </div>
-
-            {/* ACTIVE CAMPAIGNS TIMELINE */}
-            {myCampaigns.length > 0 && (
-                <div className="bg-neutral-900/80 backdrop-blur-sm border border-neutral-800 rounded-2xl p-5">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-purple-400 mb-4 flex items-center gap-2">
-                        <Briefcase size={14} /> My Campaigns
-                    </h3>
-                    <div className="space-y-3">
-                        {myCampaigns.map(campaign => {
-                            const doneTasks = campaign.tasks?.filter(t => t.isDone).length || 0;
-                            const totalTasks = campaign.tasks?.length || 0;
-                            const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
-                            const isComplete = progress === 100;
-                            const hasDeadline = campaign.deadline;
-                            const daysLeft = hasDeadline ? Math.max(0, Math.ceil((new Date(campaign.deadline!).getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : null;
-
-                            return (
-                                <button
-                                    key={campaign.id}
-                                    onClick={() => onNavigate('campaigns')}
-                                    className={`w-full text-left p-4 rounded-xl border transition-all group hover:scale-[1.01] ${isComplete
-                                        ? 'bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/40'
-                                        : 'bg-black/50 border-neutral-800 hover:border-purple-500/30'
-                                        }`}
-                                >
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-2">
-                                            {isComplete && <span className="text-lg">🏆</span>}
-                                            <span className="text-sm font-bold text-white group-hover:text-purple-400 transition-colors">{campaign.title}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {daysLeft !== null && !isComplete && (
-                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${daysLeft <= 2 ? 'bg-red-500/10 text-red-400' :
-                                                    daysLeft <= 5 ? 'bg-yellow-500/10 text-yellow-400' :
-                                                        'bg-neutral-500/10 text-neutral-400'
-                                                    }`}>
-                                                    <Calendar size={8} className="inline mr-1" />{daysLeft}d left
-                                                </span>
-                                            )}
-                                            <span className="text-[10px] font-bold text-neutral-500 uppercase">{campaign.status}</span>
-                                        </div>
-                                    </div>
-                                    {totalTasks > 0 && (
-                                        <div className="flex items-center gap-3">
-                                            <div className="flex-1 h-2 bg-neutral-800 rounded-full overflow-hidden">
-                                                <div
-                                                    className={`h-full rounded-full transition-all duration-700 ${isComplete ? 'bg-emerald-500' : 'bg-gradient-to-r from-purple-500 to-pink-500'}`}
-                                                    style={{ width: `${progress}%` }}
-                                                />
-                                            </div>
-                                            <span className="text-[10px] text-neutral-400 font-bold whitespace-nowrap">{doneTasks}/{totalTasks}</span>
-                                        </div>
-                                    )}
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
-
-            {/* RECENT VIDEO FEEDBACK */}
-            {myContent.some(c => c.teamNotes && c.teamNotes.length > 0) && (
-                <div className="bg-neutral-900/80 backdrop-blur-sm border border-neutral-800 rounded-2xl p-5">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-purple-400 mb-4 flex items-center gap-2">
-                        <Star size={14} /> Recent Feedback
-                    </h3>
-                    <div className="space-y-2">
-                        {myContent
-                            .filter(c => c.teamNotes && c.teamNotes.length > 0)
-                            .slice(0, 3)
-                            .map(content => {
-                                const latestNote = content.teamNotes![content.teamNotes!.length - 1];
-                                return (
-                                    <button
-                                        key={content.id}
-                                        onClick={() => onNavigate('upload')}
-                                        className="w-full text-left p-3 bg-black/50 rounded-xl border border-neutral-800 hover:border-purple-500/30 transition-all group"
-                                    >
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-xs font-bold text-white">{content.title}</span>
-                                            <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${content.status === ContentStatus.Approved ? 'bg-emerald-500/10 text-emerald-400' :
-                                                content.status === ContentStatus.Editing ? 'bg-orange-500/10 text-orange-400' :
-                                                    'bg-neutral-500/10 text-neutral-400'
-                                                }`}>{content.status}</span>
-                                        </div>
-                                        <p className="text-[10px] text-neutral-400 truncate">💬 {latestNote.user}: {latestNote.text}</p>
-                                    </button>
-                                );
-                            })}
-                    </div>
-                </div>
-            )}
-
-            {/* SHIPMENTS */}
-            {creator.shipments && creator.shipments.length > 0 && (
-                <div className="bg-neutral-900/80 backdrop-blur-sm border border-neutral-800 rounded-2xl p-5">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-purple-400 mb-4 flex items-center gap-2">
-                        <Package size={14} /> Incoming Shipments 📦
-                    </h3>
-                    <div className="space-y-2">
-                        {creator.shipments.slice(0, 3).map(shipment => (
-                            <div key={shipment.id} className="flex items-center justify-between p-3 bg-black/50 rounded-xl border border-neutral-800">
-                                <div>
-                                    <p className="text-xs font-bold text-white">{shipment.title}</p>
-                                    <p className="text-[10px] text-neutral-500">{shipment.carrier} • {shipment.trackingNumber}</p>
-                                </div>
-                                <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-lg ${shipment.status === 'Delivered' ? 'bg-emerald-500/10 text-emerald-400' :
-                                    shipment.status === 'In Transit' ? 'bg-blue-500/10 text-blue-400' :
-                                        'bg-yellow-500/10 text-yellow-400'
-                                    }`}>
-                                    {shipment.status === 'Delivered' ? '✅ ' : shipment.status === 'In Transit' ? '🚚 ' : '📦 '}{shipment.status}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
+        <>
             <style>{`
-        @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.85; } }
-        .animate-pulse-slow { animation: pulse-slow 3s ease-in-out infinite; }
-      `}</style>
-        </div>
-    );
-};
+                @keyframes dashFadeUp {
+                    from { opacity: 0; transform: translateY(16px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                @keyframes dashProgressFill {
+                    from { width: 0; }
+                }
+                @keyframes dashXpShimmer {
+                    0% { background-position: -200% center; }
+                    100% { background-position: 200% center; }
+                }
+            `}</style>
 
-export default CreatorDashboard;
+            <div style={{ maxWidth: '640px', margin: '0 auto', paddingBottom: '40px' }}>
+
+                {/* ═══ TOP BAR — Avatar + XP ═══ */}
+                <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    marginBottom: '32px', animation: 'dashFadeUp 0.5s ease 0.1s both',
+                }}>
+                    {/* Avatar */}
+                    <div style={{
+                        width: '44px', height: '44px', borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #a78bfa, #ec4899)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: '2px solid rgba(255,255,255,0.15)',
+                        boxShadow: '0 4px 16px rgba(167,139,250,0.25)',
+                        overflow: 'hidden',
+                    }}>
+                        {creator.profileImage
+                            ? <img src={creator.profileImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            : <span style={{ color: 'white', fontWeight: 800, fontSize: '16px' }}>{firstName[0]?.toUpperCase()}</span>
+                        }
+                    </div>
+
+                    {/* XP Bar + Level */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>XP</span>
+                        <div style={{
+                            width: '100px', height: '6px', borderRadius: '3px',
+                            background: 'rgba(255,255,255,0.08)',
+                            overflow: 'hidden',
+                        }}>
+                            <div style={{
+                                height: '100%', borderRadius: '3px',
+                                width: `${xpProgress}%`,
+                                background: 'linear-gradient(90deg, #a78bfa, #67e8f9)',
+                                backgroundSize: '200% 100%',
+                                animation: 'dashProgressFill 1s ease 0.5s both, dashXpShimmer 3s ease-in-out infinite',
+                            }} />
+                        </div>
+                        <div style={{
+                            background: 'linear-gradient(135deg, #a78bfa, #67e8f9)',
+                            borderRadius: '10px', padding: '3px 10px',
+                            display: 'flex', alignItems: 'center', gap: '4px',
+                        }}>
+                            <Zap size={10} style={{ color: 'white' }} />
+                            <span style={{ fontSize: '11px', fontWeight: 800, color: 'white' }}>{xpLevel}</span>
+                        </div>
+
+                        {/* Streak badge */}
+                        {streak > 0 && (
+                            <div style={{
+                                display: 'flex', alignItems: 'center', gap: '3px',
+                                background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.2)',
+                                borderRadius: '10px', padding: '3px 8px',
+                            }}>
+                                <span style={{ fontSize: '11px', fontWeight: 800, color: '#fbbf24' }}>{streak}</span>
+                                <Flame size={11} style={{ color: '#fb923c' }} />
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* ═══ GREETING ═══ */}
+                <div style={{ marginBottom: '28px', animation: 'dashFadeUp 0.6s ease 0.15s both' }}>
+                    <h1 style={{
+                        fontSize: '32px', fontWeight: 800, color: 'white',
+                        letterSpacing: '-0.03em', margin: '0 0 6px', lineHeight: 1.2,
+                    }}>
+                        {greeting},<br />{firstName}
+                    </h1>
+                    <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.35)', fontWeight: 500, margin: 0 }}>
+                        {creator.status === 'Long Term' ? 'Long-term partner' : creator.status === 'Active' ? 'Active creator' : `Status: ${creator.status || 'Active'}`}
+                        {totalEarned > 0 ? ` · $${totalEarned} lifetime` : ''}
+                    </p>
+                </div>
+
+                {/* ═══ STAT CARDS ROW ═══ */}
+                <div style={{ marginBottom: '28px' }}>
+                    <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px',
+                        animation: 'dashFadeUp 0.5s ease 0.25s both',
+                    }}>
+                        <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', margin: 0 }}>Stats</h3>
+                        {streak > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>Streak</span>
+                                <div style={{
+                                    display: 'flex', alignItems: 'center', gap: '3px',
+                                    background: 'rgba(251,191,36,0.1)', borderRadius: '8px', padding: '2px 8px',
+                                }}>
+                                    <span style={{ fontSize: '12px', fontWeight: 800, color: '#fbbf24' }}>{streak}</span>
+                                    <Flame size={11} style={{ color: '#fb923c' }} />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        <StatCard label="Earnings" value={totalEarned > 0 ? `$${totalEarned}` : '$0'} icon={<DollarSign size={16} />}
+                            tint="167,139,250" suffix={totalEarned > 0 ? '↑' : ''} onClick={() => onNavigate('payments')} delay={0.3} />
+                        <StatCard label="Tasks" value={completedCount} icon={<CheckCircle size={16} />}
+                            tint="251,191,36" suffix="↓" onClick={() => onNavigate('campaigns')} delay={0.35} />
+                        <StatCard label="Uploads" value={totalUploads} icon={<Upload size={16} />}
+                            tint="134,239,172" suffix="↑" onClick={() => onNavigate('upload')} delay={0.4} />
+                        <StatCard label="Messages" value={unreadMessages} icon={<MessageCircle size={16} />}
+                            tint="103,232,249" suffix="✉" onClick={() => onNavigate('chat')} delay={0.45} />
+                    </div>
+                </div>
+
+                {/* ═══ CAMPAIGN ALERT (NEW) ═══ */}
+                {pendingCampaigns.length > 0 && (
+                    <div
+                        onClick={() => onNavigate('campaigns')}
+                        style={{
+                            background: 'linear-gradient(135deg, rgba(167,139,250,0.15), rgba(236,72,153,0.1))',
+                            border: '1px solid rgba(167,139,250,0.2)',
+                            borderRadius: '18px', padding: '16px 20px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            cursor: 'pointer', marginBottom: '28px',
+                            transition: 'all 0.3s',
+                            animation: 'dashFadeUp 0.6s ease 0.5s both',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'rgba(167,139,250,0.35)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(167,139,250,0.2)'; }}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span style={{ fontSize: '20px' }}>🎉</span>
+                            <div>
+                                <p style={{ fontWeight: 700, color: 'white', fontSize: '13px', margin: 0 }}>
+                                    {pendingCampaigns.length === 1 ? `New Campaign: ${pendingCampaigns[0].title}` : `${pendingCampaigns.length} new campaigns`}
+                                </p>
+                                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', margin: '2px 0 0', fontWeight: 500 }}>Tap to view & accept</p>
+                            </div>
+                        </div>
+                        <ChevronRight size={16} style={{ color: 'rgba(255,255,255,0.3)' }} />
+                    </div>
+                )}
+
+                {/* ═══ CAMPAIGN PROGRESS ═══ */}
+                {activeCampaign && (
+                    <div style={{ marginBottom: '28px', animation: 'dashFadeUp 0.6s ease 0.55s both' }}>
+                        <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', margin: '0 0 12px' }}>Campaign Progress</h3>
+                        <div
+                            onClick={() => onNavigate('campaigns')}
+                            style={{
+                                background: 'rgba(255,255,255,0.03)',
+                                border: '1px solid rgba(255,255,255,0.06)',
+                                borderRadius: '18px', padding: '18px 20px',
+                                cursor: 'pointer', transition: 'all 0.3s',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+                        >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                                <span style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>{activeCampaign.title}</span>
+                                <span style={{ fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{campaignProgress}%</span>
+                            </div>
+                            <div style={{ height: '6px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                                <div style={{
+                                    height: '100%', borderRadius: '3px',
+                                    width: `${campaignProgress}%`,
+                                    background: 'linear-gradient(90deg, #a78bfa, #67e8f9)',
+                                    transition: 'width 1s ease',
+                                    animation: 'dashProgressFill 1.2s ease 0.8s both',
+                                }} />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ═══ RECENT ACTIVITY ═══ */}
+                {recentActivity.length > 0 && (
+                    <div style={{ animation: 'dashFadeUp 0.6s ease 0.6s both' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', margin: 0 }}>Recent Activity</h3>
+                            <button onClick={() => onNavigate('upload')}
+                                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                                See All
+                            </button>
+                        </div>
+                        <div style={{
+                            background: 'rgba(255,255,255,0.03)',
+                            border: '1px solid rgba(255,255,255,0.06)',
+                            borderRadius: '18px', overflow: 'hidden',
+                        }}>
+                            {recentActivity.map((item, i) => (
+                                <div key={item.id} style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                    padding: '14px 20px',
+                                    borderBottom: i < recentActivity.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{
+                                            width: '8px', height: '8px', borderRadius: '50%',
+                                            background: `rgba(${item.color},0.8)`,
+                                            boxShadow: `0 0 8px rgba(${item.color},0.4)`,
+                                        }} />
+                                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>{item.label}</span>
+                                    </div>
+                                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.3)' }}>{item.status}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* ═══ ENABLE NOTIFICATIONS ═══ */}
+                {onEnableNotifications && !creator.notificationsEnabled && (
+                    <div
+                        onClick={onEnableNotifications}
+                        style={{
+                            marginTop: '28px', background: 'rgba(255,255,255,0.03)',
+                            border: '1px solid rgba(255,255,255,0.06)', borderRadius: '18px',
+                            padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '12px',
+                            cursor: 'pointer', transition: 'all 0.3s',
+                            animation: 'dashFadeUp 0.6s ease 0.7s both',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+                    >
+                        <Bell size={18} style={{ color: '#a78bfa' }} />
+                        <div>
+                            <p style={{ fontWeight: 600, color: 'rgba(255,255,255,0.7)', fontSize: '13px', margin: 0 }}>Enable notifications</p>
+                            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: '2px 0 0' }}>Get alerts for campaigns, payments & messages</p>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </>
+    );
+}

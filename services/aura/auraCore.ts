@@ -1,25 +1,17 @@
 /**
- * AURA Core — Unified AI Gateway
+ * AURA Core — Unified AI Gateway (Server-Proxied)
  * 
  * Every AI interaction in the app flows through here.
- * Loads soul + knowledge + memory → builds context → calls Gemini → stores memory.
+ * Loads soul + knowledge + memory → builds context → calls server proxy → stores memory.
+ * 
+ * SECURITY: All Gemini API calls go through server.js /api/ai/* routes.
+ * The API key NEVER reaches the browser.
  */
 
-import { GoogleGenAI } from "@google/genai";
 import { Creator, Campaign, ContentItem, TeamTask, TeamMessage, BetaTest, BetaRelease } from "../../types";
-import {
-    recall,
-    addToSessionConversation,
-    buildConversationHistory,
-    rememberShortTerm,
-    restoreSessionFromSTM,
-    getSessionConversation,
-} from "./auraMemory";
+import { aiGenerate, aiChat, saveMemory, recallMemories } from "../aiProxy";
 
 // ── Soul & Knowledge (loaded once, cached) ──
-
-// These are imported as raw strings via Vite's ?raw import
-// We'll inline them as constants since .md files can't be dynamically imported client-side
 import COCO_SOUL_RAW from "./COCO_SOUL.md?raw";
 import COCO_KNOWLEDGE_RAW from "./COCO_KNOWLEDGE.md?raw";
 
@@ -51,11 +43,18 @@ export interface AuraResponse {
 
 export type AuraMode = 'chat' | 'task' | 'email' | 'brief' | 'polish' | 'caption' | 'digest';
 
-// ── Helpers ──
+// ── Local session memory (in-memory for current tab) ──
+let sessionConversation: { role: string; parts: { text: string }[] }[] = [];
 
-function getApiKey(): string {
-    return (window as any).env?.API_KEY || (window as any).env?.GEMINI_API_KEY || (import.meta as any).env?.VITE_API_KEY || '';
+function addToSession(role: string, text: string) {
+    sessionConversation.push({ role, parts: [{ text }] });
+    // Keep last 20 turns to stay within context limits
+    if (sessionConversation.length > 40) {
+        sessionConversation = sessionConversation.slice(-40);
+    }
 }
+
+// ── Helpers ──
 
 function truncateArray<T>(arr: T[], max: number, mapper: (item: T) => any): string {
     return JSON.stringify(arr.slice(0, max).map(mapper));
@@ -135,25 +134,29 @@ function buildAppStateContext(ctx: AuraContext): string {
         })));
     }
 
-    if (ctx.currentUser) {
-        parts.push(`## Current User: ${ctx.currentUser}`);
-    }
-
-    if (ctx.currentView) {
-        parts.push(`## Current View: ${ctx.currentView}`);
-    }
+    if (ctx.currentUser) parts.push(`## Current User: ${ctx.currentUser}`);
+    if (ctx.currentView) parts.push(`## Current View: ${ctx.currentView}`);
 
     return parts.join('\n\n');
 }
 
-function buildSystemPrompt(mode: AuraMode, ctx: AuraContext): string {
+async function buildMemoryContext(userId?: string): Promise<string> {
+    if (!userId) return '(No user context for memory)';
+    try {
+        const memories = await recallMemories(userId);
+        if (!memories.length) return '(No prior memories yet)';
+        return memories.map(m => `- [${m.category}] ${m.value}`).join('\n');
+    } catch {
+        return '(Memory unavailable)';
+    }
+}
+
+function buildSystemPrompt(mode: AuraMode, ctx: AuraContext, memoryContext: string): string {
     const soul = COCO_SOUL_RAW || '';
     const knowledge = COCO_KNOWLEDGE_RAW || '';
-    const memoryContext = recall();
     const appState = buildAppStateContext(ctx);
     const brandOverride = ctx.brandInfo ? `\n\n## Brand Bible Override\n${ctx.brandInfo}` : '';
 
-    // Mode-specific instructions
     const modeInstructions: Record<AuraMode, string> = {
         chat: `You are in CHAT mode. Have a natural conversation. Reference data when relevant. Be proactive about suggesting next steps.`,
         task: `You are in TASK mode. Help the user accomplish a specific task. Be efficient and action-oriented.`,
@@ -186,7 +189,7 @@ If the user mentions a creator by name, look up their email from the creator dat
         brandOverride,
         ``,
         `## Memory & Context`,
-        memoryContext || '(No prior memories yet)',
+        memoryContext,
         ``,
         `## Live App Data`,
         appState || '(No app data available)',
@@ -209,105 +212,81 @@ export async function askAura(
         mode?: AuraMode;
         history?: { role: string; parts: { text: string }[] }[];
         useMemory?: boolean;
+        mediaParts?: { mimeType: string; data: string }[];
     }
 ): Promise<AuraResponse> {
     const mode = options?.mode || 'chat';
     const useMemory = options?.useMemory !== false;
-    const apiKey = getApiKey();
+    const userId = context.currentUser || 'anonymous';
 
-    if (!apiKey) {
-        return { text: "I can't connect right now — API key is missing. Check your environment config." };
-    }
+    // Build memory context from Firestore
+    const memoryContext = useMemory ? await buildMemoryContext(userId) : '(Memory disabled)';
+    const systemInstruction = buildSystemPrompt(mode, context, memoryContext);
 
-    // Restore conversation from last session if needed
-    if (useMemory && getSessionConversation().length === 0) {
-        restoreSessionFromSTM();
-    }
+    // Build history for chat mode
+    const history = options?.history || (mode === 'chat' ? sessionConversation : []);
 
-    const ai = new GoogleGenAI({ apiKey });
-    const systemInstruction = buildSystemPrompt(mode, context);
+    try {
+        let responseText: string;
 
-    // Build history: either provided explicitly or from memory
-    const history = options?.history || (useMemory ? buildConversationHistory() : []);
-
-    // Smart model selection: Pro for important modes, Flash for quick utilities
-    // Using gemini-3-flash-preview as the primary model (matches working geminiService)
-    const primaryModel = "gemini-3-flash-preview";
-
-    // Fallback chain in case primary model is unavailable
-    const modelsToTry = [primaryModel, "gemini-2.0-flash"];
-
-    for (const model of modelsToTry) {
-        try {
-            let responseText: string;
-
-            if (history.length > 0 && mode === 'chat') {
-                // Use chat mode for conversational flow
-                const chat = ai.chats.create({
-                    model,
-                    config: { systemInstruction },
-                    history,
-                });
-                const result = await chat.sendMessage({ message: input });
-                responseText = result.text || "I couldn't process that.";
-            } else {
-                // Single-shot for tasks, emails, polish, etc.
-                const result = await ai.models.generateContent({
-                    model,
-                    contents: input,
-                    config: { systemInstruction },
-                });
-                responseText = result.text || "I couldn't process that.";
-            }
-
-            // Store in memory
-            if (useMemory) {
-                addToSessionConversation('user', input);
-                addToSessionConversation('model', responseText);
-                rememberShortTerm('conversation', `User: ${input.slice(0, 100)} → Coco: ${responseText.slice(0, 100)}`, 'conversation');
-            }
-
-            // Parse email mode response
-            if (mode === 'email') {
-                const emailDraft = parseEmailResponse(responseText, context);
-                if (emailDraft) {
-                    return { text: responseText, emailDraft };
-                }
-            }
-
-            return { text: responseText };
-        } catch (error: any) {
-            console.error(`[Coco Core] Error with model ${model}:`, error?.message || error);
-
-            // If this wasn't the last model, try the next one
-            if (model !== modelsToTry[modelsToTry.length - 1]) {
-                console.log(`[Coco Core] Falling back from ${model} to next model...`);
-                continue;
-            }
-
-            // Last model failed — return helpful error
-            if (error.message?.includes('quota') || error.message?.includes('429')) {
-                return { text: "I'm hitting my rate limit right now — give me a minute and try again. 🔄" };
-            }
-            if (error.message?.includes('API_KEY') || error.message?.includes('API key')) {
-                return { text: "My API key seems misconfigured. Check the system settings." };
-            }
-            if (error.message?.includes('not found') || error.message?.includes('404')) {
-                return { text: "The AI model I need isn't available right now. Try again in a moment." };
-            }
-
-            return { text: "Something went wrong on my end. Try again in a sec." };
+        if (history.length > 0 && mode === 'chat') {
+            // Multi-turn chat via server proxy
+            responseText = await aiChat({
+                message: input,
+                systemInstruction,
+                model: 'gemini-3.1-pro-preview',
+                history,
+                mediaParts: options?.mediaParts,
+            });
+        } else {
+            // Single-shot via server proxy
+            responseText = await aiGenerate({
+                prompt: input,
+                systemInstruction,
+                model: mode === 'chat' ? 'gemini-3.1-pro-preview' : 'gemini-3-flash',
+                mediaParts: options?.mediaParts,
+            });
         }
-    }
 
-    return { text: "Something went wrong on my end. Try again in a sec." };
+        // Store in session memory
+        if (useMemory) {
+            addToSession('user', input);
+            addToSession('model', responseText);
+
+            // Persist notable interactions to Firestore (async, non-blocking)
+            saveMemory(userId, `conv_${Date.now()}`, `User: ${input.slice(0, 100)} → Coco: ${responseText.slice(0, 100)}`, 'conversation', 7).catch(() => {});
+        }
+
+        // Parse email mode response
+        if (mode === 'email') {
+            const emailDraft = parseEmailResponse(responseText, context);
+            if (emailDraft) {
+                return { text: responseText, emailDraft };
+            }
+        }
+
+        return { text: responseText };
+    } catch (error: any) {
+        console.error(`[Coco Core] Error:`, error?.message || error);
+
+        if (error.message?.includes('quota') || error.message?.includes('429')) {
+            return { text: "I'm hitting my rate limit right now — give me a minute and try again. 🔄" };
+        }
+        if (error.message?.includes('API key') || error.message?.includes('not configured')) {
+            return { text: "My API key seems misconfigured. Check the system settings." };
+        }
+        if (error.message?.includes('not found') || error.message?.includes('404')) {
+            return { text: "The AI model I need isn't available right now. Try again in a moment." };
+        }
+
+        return { text: "Something went wrong on my end. Try again in a sec." };
+    }
 }
 
 // ── Email Parser ──
 
 function parseEmailResponse(response: string, context: AuraContext): AuraResponse['emailDraft'] | null {
     try {
-        // Try to parse structured email format
         const toMatch = response.match(/TO:\s*(.+)/i);
         const subjectMatch = response.match(/SUBJECT:\s*(.+)/i);
         const bodyMatch = response.split('---');
@@ -315,15 +294,12 @@ function parseEmailResponse(response: string, context: AuraContext): AuraRespons
         if (toMatch && subjectMatch && bodyMatch.length > 1) {
             let to = toMatch[1].trim();
 
-            // If 'to' is a name, try to look up email from creators
             if (!to.includes('@') && context.creators) {
                 const creator = context.creators.find(c =>
                     c.name.toLowerCase().includes(to.toLowerCase()) ||
                     c.handle.toLowerCase().includes(to.toLowerCase())
                 );
-                if (creator?.email) {
-                    to = creator.email;
-                }
+                if (creator?.email) to = creator.email;
             }
 
             return {
@@ -352,7 +328,8 @@ export async function auraChat(
         betaReleases?: BetaRelease[];
     },
     brandInfo?: string,
-    currentUser?: string
+    currentUser?: string,
+    mediaParts?: { mimeType: string; data: string }[]
 ): Promise<string> {
     const response = await askAura(message, {
         creators: appState.creators,
@@ -364,7 +341,7 @@ export async function auraChat(
         betaReleases: appState.betaReleases,
         brandInfo,
         currentUser,
-    }, { mode: 'chat' });
+    }, { mode: 'chat', mediaParts });
     return response.text;
 }
 

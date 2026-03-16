@@ -485,60 +485,97 @@ function CreatorApp() {
     // --- LOGIN / SIGN-UP SCREEN ---
     if (!isConnected) {
         return (
-            <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 relative overflow-hidden">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900/20 via-black to-black"></div>
-                {/* Floating orbs */}
-                <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-purple-500/5 rounded-full blur-[100px] animate-pulse" />
-                <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-pink-500/5 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '1s' }} />
+            <div style={{ minHeight: '100vh', background: '#07070a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', position: 'relative', overflow: 'hidden', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif' }}>
+                {/* Animated gradient orbs */}
+                <div style={{ position: 'absolute', top: '15%', left: '20%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(139,92,246,0.15), transparent 70%)', borderRadius: '50%', filter: 'blur(60px)', animation: 'creatorOrb1 8s ease-in-out infinite' }} />
+                <div style={{ position: 'absolute', bottom: '15%', right: '15%', width: '350px', height: '350px', background: 'radial-gradient(circle, rgba(236,72,153,0.12), transparent 70%)', borderRadius: '50%', filter: 'blur(60px)', animation: 'creatorOrb2 10s ease-in-out infinite' }} />
+                <div style={{ position: 'absolute', top: '50%', left: '60%', width: '250px', height: '250px', background: 'radial-gradient(circle, rgba(103,232,249,0.08), transparent 70%)', borderRadius: '50%', filter: 'blur(60px)', animation: 'creatorOrb3 12s ease-in-out infinite' }} />
 
-                <div className="z-10 w-full max-w-md bg-neutral-900/50 border border-neutral-800 p-8 rounded-3xl backdrop-blur-xl shadow-2xl">
-                    <div className="flex justify-center mb-5">
+                {/* Login card — frosted glass */}
+                <div style={{
+                    position: 'relative', zIndex: 10, width: '100%', maxWidth: '400px',
+                    background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(40px) saturate(1.8)',
+                    WebkitBackdropFilter: 'blur(40px) saturate(1.8)',
+                    border: '1px solid rgba(255,255,255,0.08)', borderRadius: '28px',
+                    padding: '40px 32px', boxShadow: '0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)',
+                    animation: 'creatorSlideUp 0.8s cubic-bezier(0.22,1,0.36,1) forwards',
+                    opacity: 0, transform: 'translateY(20px)',
+                }}>
+                    {/* Top light accent line */}
+                    <div style={{ position: 'absolute', top: 0, left: '20%', right: '20%', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(167,139,250,0.4), transparent)' }} />
+
+                    <div style={{ textAlign: 'center', marginBottom: '28px' }}>
                         {settings.logoUrl
-                            ? <img src={settings.logoUrl} alt="OOEDN Logo" className="h-12 object-contain opacity-90" />
-                            : <Flame size={48} className="text-purple-500" />}
+                            ? <img src={settings.logoUrl} alt="OOEDN Logo" style={{ height: '40px', objectFit: 'contain', margin: '0 auto 16px', opacity: 0.9 }} />
+                            : <Flame size={40} style={{ color: '#a78bfa', margin: '0 auto 16px' }} />}
+                        <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'white', letterSpacing: '-0.03em', margin: '0 0 4px' }}>Creator Portal</h1>
+                        <p style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.2em' }}>OOEDN Partner Access</p>
                     </div>
-                    <h1 className="text-2xl font-black text-white text-center mb-1 uppercase tracking-tighter">Creator Portal</h1>
-                    <p className="text-neutral-500 text-center mb-6 text-xs font-bold uppercase tracking-widest">OOEDN Partner Access</p>
 
-                    <div className="space-y-3">
-                        <div className="relative">
-                            <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-600" />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ position: 'relative' }}>
+                            <Mail size={14} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.2)' }} />
                             <input value={formEmail} onChange={e => setFormEmail(e.target.value)} placeholder="Email address" type="email"
-                                className="w-full bg-black border border-neutral-800 rounded-xl pl-10 pr-4 py-3.5 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-purple-500/50" />
+                                style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '14px 16px 14px 40px', fontSize: '14px', color: 'white', outline: 'none', transition: 'border-color 0.3s', boxSizing: 'border-box' }}
+                                onFocus={e => e.target.style.borderColor = 'rgba(167,139,250,0.4)'}
+                                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
                         </div>
-                        <div className="relative">
-                            <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-600" />
+                        <div style={{ position: 'relative' }}>
+                            <Lock size={14} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.2)' }} />
                             <input value={formPassword} onChange={e => setFormPassword(e.target.value)} placeholder="Password"
                                 type={showPassword ? 'text' : 'password'}
                                 onKeyDown={e => e.key === 'Enter' && handleSignIn()}
-                                className="w-full bg-black border border-neutral-800 rounded-xl pl-10 pr-10 py-3.5 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-purple-500/50" />
-                            <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-white" type="button">
+                                style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '14px 42px 14px 40px', fontSize: '14px', color: 'white', outline: 'none', transition: 'border-color 0.3s', boxSizing: 'border-box' }}
+                                onFocus={e => e.target.style.borderColor = 'rgba(167,139,250,0.4)'}
+                                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
+                            <button onClick={() => setShowPassword(!showPassword)} type="button"
+                                style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'pointer', padding: 0 }}>
                                 {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                             </button>
                         </div>
                         <button onClick={handleSignIn} disabled={isLoading}
-                            className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3.5 rounded-xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 hover:from-purple-400 hover:to-pink-400 transition-all shadow-xl shadow-purple-500/20 active:scale-95 disabled:opacity-50 mt-2">
+                            style={{
+                                width: '100%', padding: '14px', borderRadius: '14px', border: 'none', cursor: 'pointer',
+                                background: 'linear-gradient(135deg, #8b5cf6, #ec4899)', color: 'white',
+                                fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                boxShadow: '0 8px 32px rgba(139,92,246,0.25)', transition: 'all 0.3s cubic-bezier(0.22,1,0.36,1)',
+                                marginTop: '4px', opacity: isLoading ? 0.5 : 1,
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(139,92,246,0.35)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 8px 32px rgba(139,92,246,0.25)'; }}>
                             {isLoading ? <Loader2 className="animate-spin" size={16} /> : <><ArrowRight size={14} /> Sign In</>}
                         </button>
                     </div>
 
                     {loginError && (
-                        <div className="mt-5 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-center">
-                            <p className="text-red-400 text-xs flex items-center justify-center gap-2"><AlertTriangle size={12} /> {loginError}</p>
+                        <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '12px', textAlign: 'center' }}>
+                            <p style={{ color: '#f87171', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', margin: 0 }}><AlertTriangle size={12} /> {loginError}</p>
                         </div>
                     )}
-                    <div className="mt-6 pt-5 border-t border-neutral-800 text-center">
-                        <p className="text-[9px] text-neutral-600 uppercase font-black">OOEDN Holdings LLC • Creator Portal</p>
+                    <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
+                        <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.15)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>OOEDN Holdings LLC • Creator Portal</p>
                     </div>
                 </div>
+
+                <style>{`
+                    @keyframes creatorOrb1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,-40px) scale(1.15); } }
+                    @keyframes creatorOrb2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-40px,30px) scale(1.1); } }
+                    @keyframes creatorOrb3 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(20px,20px) scale(1.2); } }
+                    @keyframes creatorSlideUp { to { opacity: 1; transform: translateY(0); } }
+                `}</style>
             </div>
         );
     }
 
     if (isLoading && !creatorRecord) {
         return (
-            <div className="min-h-screen bg-black flex items-center justify-center">
-                <Loader2 size={48} className="animate-spin text-purple-500" />
+            <div style={{ minHeight: '100vh', background: '#07070a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', animation: 'creatorSlideUp 0.6s ease forwards', opacity: 0, transform: 'translateY(10px)' }}>
+                    <Loader2 size={32} style={{ color: '#a78bfa', animation: 'spin 1s linear infinite' }} />
+                    <p style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Loading your portal...</p>
+                </div>
+                <style>{`@keyframes creatorSlideUp { to { opacity: 1; transform: translateY(0); } }`}</style>
             </div>
         );
     }
@@ -616,16 +653,18 @@ function CreatorApp() {
 
     if (!creatorRecord) {
         return (
-            <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
-                <div className="w-full max-w-md bg-neutral-900/50 border border-neutral-800 p-8 rounded-3xl backdrop-blur-xl text-center">
-                    <div className="text-5xl mb-4">🎉</div>
-                    <h2 className="text-xl font-black text-white mb-2">Welcome, {currentAccount?.displayName}!</h2>
-                    <p className="text-neutral-400 text-sm mb-6">Your account has been created. The OOEDN team will link your profile shortly. Check back soon!</p>
-                    <p className="text-[10px] text-neutral-600 mb-4">Signed in as {currentAccount?.email}</p>
-                    <button onClick={handleLogout} className="text-xs text-neutral-500 hover:text-white transition-colors flex items-center gap-2 mx-auto">
+            <div style={{ minHeight: '100vh', background: '#07070a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', position: 'relative', overflow: 'hidden', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif' }}>
+                <div style={{ position: 'absolute', top: '20%', left: '30%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(139,92,246,0.12), transparent 70%)', borderRadius: '50%', filter: 'blur(60px)', animation: 'creatorOrb1 8s ease-in-out infinite' }} />
+                <div style={{ width: '100%', maxWidth: '400px', background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(40px) saturate(1.8)', WebkitBackdropFilter: 'blur(40px) saturate(1.8)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '28px', padding: '40px 32px', textAlign: 'center', animation: 'creatorSlideUp 0.8s cubic-bezier(0.22,1,0.36,1) forwards', opacity: 0, transform: 'translateY(20px)', position: 'relative', zIndex: 10 }}>
+                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
+                    <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'white', margin: '0 0 8px', letterSpacing: '-0.02em' }}>Welcome, {currentAccount?.displayName}!</h2>
+                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '24px', lineHeight: 1.5 }}>Your account has been created. The OOEDN team will link your profile shortly. Check back soon!</p>
+                    <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.15)', marginBottom: '16px' }}>Signed in as {currentAccount?.email}</p>
+                    <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', margin: '0 auto', padding: 0 }}>
                         <LogOut size={12} /> Sign out
                     </button>
                 </div>
+                <style>{`@keyframes creatorOrb1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,-40px) scale(1.15); } } @keyframes creatorSlideUp { to { opacity: 1; transform: translateY(0); } }`}</style>
             </div>
         );
     }
@@ -646,7 +685,10 @@ function CreatorApp() {
     const newCampaignCount = myCampaigns.filter(c => !c.acceptedByCreatorIds?.includes(creatorRecord.id)).length;
 
     return (
-        <div className={`flex h-screen bg-black text-white overflow-hidden font-sans selection:bg-purple-500/30 ${!isDarkMode ? 'light-mode' : ''}`}>
+        <div style={{ display: 'flex', height: '100vh', background: '#0a0a0f', color: 'white', overflow: 'hidden', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif', position: 'relative' }} className={!isDarkMode ? 'light-mode' : ''}>
+            {/* Subtle ambient glow — Apple style */}
+            <div style={{ position: 'absolute', top: '-10%', right: '-5%', width: '600px', height: '600px', background: 'radial-gradient(circle, rgba(167,139,250,0.06), transparent 70%)', borderRadius: '50%', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0 }} />
+            <div style={{ position: 'absolute', bottom: '-10%', left: '-5%', width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(236,72,153,0.04), transparent 70%)', borderRadius: '50%', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0 }} />
             {/* ONBOARDING WALKTHROUGH OVERLAY */}
             {showOnboarding && currentAccount && creatorRecord && (
                 <CreatorOnboarding
@@ -674,45 +716,60 @@ function CreatorApp() {
                     }}
                 />
             )}
-            {/* SIDEBAR */}
-            <aside className={`${isSidebarOpen ? 'w-56' : 'w-20'} bg-neutral-950 border-r border-neutral-800 flex flex-col transition-all duration-300 z-50 flex-shrink-0`}>
-                <div className="h-16 flex items-center justify-center border-b border-neutral-800">
+            {/* SIDEBAR — refined Apple style */}
+            <aside style={{
+                width: isSidebarOpen ? '200px' : '68px', flexShrink: 0, display: 'flex', flexDirection: 'column',
+                background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(40px) saturate(1.5)',
+                WebkitBackdropFilter: 'blur(40px) saturate(1.5)',
+                borderRight: '1px solid rgba(255,255,255,0.06)',
+                transition: 'width 0.3s cubic-bezier(0.22,1,0.36,1)', zIndex: 50,
+            }}>
+                <div style={{ height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                     {isSidebarOpen
-                        ? settings.logoUrl ? <img src={settings.logoUrl} alt="OOEDN" className="h-7 object-contain" /> : <h1 className="font-black text-lg tracking-tighter text-purple-400">OOEDN</h1>
-                        : <Flame className="text-purple-500" size={20} />}
+                        ? settings.logoUrl ? <img src={settings.logoUrl} alt="OOEDN" style={{ height: '24px', objectFit: 'contain' }} /> : <h1 style={{ fontWeight: 800, fontSize: '16px', letterSpacing: '-0.03em', color: '#a78bfa', margin: 0 }}>ooedn</h1>
+                        : <Flame style={{ color: '#a78bfa' }} size={18} />}
                 </div>
-                <nav className="flex-1 overflow-y-auto py-4 space-y-1 px-2">
-                    {navItems.map(item => (
-                        <button key={item.id} onClick={() => setView(item.id)}
-                            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all group relative
-                ${view === item.id ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/20' : 'text-neutral-500 hover:bg-neutral-900 hover:text-white'}`}
-                            title={!isSidebarOpen ? item.label : ''}>
-                            <item.icon size={18} className={view === item.id ? 'text-white' : 'text-neutral-500 group-hover:text-white'} />
-                            {isSidebarOpen && (
-                                <span className="text-xs font-bold uppercase tracking-wider flex-1">{item.label}</span>
-                            )}
-                            {isSidebarOpen && item.id === 'campaigns' && newCampaignCount > 0 && (
-                                <span className="bg-yellow-500 text-black text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
-                                    {newCampaignCount}
-                                </span>
-                            )}
-                            {!isSidebarOpen && item.id === 'campaigns' && newCampaignCount > 0 && (
-                                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-yellow-500 rounded-full animate-pulse" />
-                            )}
-                        </button>
-                    ))}
+                <nav style={{ flex: 1, overflowY: 'auto', padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    {navItems.map(item => {
+                        const isActive = view === item.id;
+                        return (
+                            <button key={item.id} onClick={() => setView(item.id)}
+                                title={!isSidebarOpen ? item.label : ''}
+                                style={{
+                                    width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: isSidebarOpen ? '10px 12px' : '10px',
+                                    borderRadius: '12px', border: 'none', cursor: 'pointer', position: 'relative',
+                                    justifyContent: isSidebarOpen ? 'flex-start' : 'center',
+                                    background: isActive ? 'rgba(167,139,250,0.12)' : 'transparent',
+                                    transition: 'all 0.2s ease',
+                                }}
+                                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
+                                {isActive && <div style={{ position: 'absolute', left: isSidebarOpen ? '0' : '-8px', top: '50%', transform: 'translateY(-50%)', width: '3px', height: '18px', borderRadius: '2px', background: 'linear-gradient(180deg, #a78bfa, #ec4899)' }} />}
+                                <item.icon size={isSidebarOpen ? 16 : 18} style={{ color: isActive ? '#a78bfa' : 'rgba(255,255,255,0.3)', flexShrink: 0, transition: 'color 0.2s' }} />
+                                {isSidebarOpen && (
+                                    <span style={{ fontSize: '12px', fontWeight: isActive ? 700 : 600, color: isActive ? 'white' : 'rgba(255,255,255,0.4)', textAlign: 'left', whiteSpace: 'nowrap' }}>{item.label}</span>
+                                )}
+                                {item.id === 'campaigns' && newCampaignCount > 0 && (
+                                    isSidebarOpen
+                                        ? <span style={{ marginLeft: 'auto', width: '18px', height: '18px', borderRadius: '50%', background: '#a78bfa', color: 'white', fontSize: '9px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{newCampaignCount}</span>
+                                        : <span style={{ position: 'absolute', top: '6px', right: '6px', width: '6px', height: '6px', background: '#a78bfa', borderRadius: '50%' }} />
+                                )}
+                            </button>
+                        );
+                    })}
                 </nav>
-                <div className="p-3 border-t border-neutral-800 space-y-2">
-                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="w-full flex items-center justify-center p-2.5 text-neutral-600 hover:text-white transition-colors bg-neutral-900 rounded-xl">
-                        {isSidebarOpen ? <X size={16} /> : <Menu size={16} />}
+                <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px', color: 'rgba(255,255,255,0.25)', background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', cursor: 'pointer', transition: 'all 0.2s' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+                        {isSidebarOpen ? <X size={14} /> : <Menu size={14} />}
                     </button>
                     {isSidebarOpen && (
                         <>
-                            <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-full flex items-center justify-center gap-2 p-2 text-neutral-500 hover:text-white text-[10px] font-bold uppercase bg-neutral-900 rounded-lg">
+                            <button onClick={() => setIsDarkMode(!isDarkMode)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px', color: 'rgba(255,255,255,0.25)', background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>
                                 {isDarkMode ? <Sun size={12} /> : <Moon size={12} />} {isDarkMode ? 'Light' : 'Dark'}
                             </button>
-                            <div className="px-2 py-1"><p className="text-[9px] text-neutral-600 truncate">{currentAccount?.email}</p></div>
-                            <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 p-2 text-red-400/60 hover:text-red-400 text-[10px] font-bold uppercase bg-neutral-900 rounded-lg">
+                            <button onClick={handleLogout} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px', color: 'rgba(239,68,68,0.4)', background: 'transparent', border: '1px solid rgba(239,68,68,0.08)', borderRadius: '10px', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>
                                 <LogOut size={12} /> Sign Out
                             </button>
                         </>
@@ -721,62 +778,70 @@ function CreatorApp() {
             </aside>
 
             {/* MAIN CONTENT */}
-            <main className="flex-1 flex flex-col relative overflow-hidden bg-black">
-                {/* TOP BAR */}
-                <header className="h-16 border-b border-neutral-800 bg-neutral-950/80 backdrop-blur-md flex items-center justify-between px-6 z-40">
-                    <h2 className="text-lg font-black uppercase tracking-tighter text-white flex items-center gap-2">
+            <main style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', zIndex: 10 }}>
+
+                {/* TOP BAR — refined frosted glass */}
+                <header style={{
+                    height: '60px', borderBottom: '1px solid rgba(255,255,255,0.06)',
+                    background: 'rgba(10,10,15,0.7)', backdropFilter: 'blur(40px) saturate(1.5)',
+                    WebkitBackdropFilter: 'blur(40px) saturate(1.5)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '0 24px', zIndex: 40, position: 'relative',
+                }}>
+                    <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                         <span>{navItems.find(n => n.id === view)?.emoji}</span>
                         {navItems.find(n => n.id === view)?.label || 'Home'}
                     </h2>
-                    <div className="flex items-center gap-3">
-                        {/* Notification Bell */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {/* Bell */}
                         <button
                             onClick={() => setShowNotifPanel(!showNotifPanel)}
-                            className="relative p-2 text-neutral-500 hover:text-white transition-colors"
-                            title="Notifications"
-                        >
-                            {unreadNotifs > 0 ? <BellDot size={18} className="text-purple-400" /> : <Bell size={18} />}
+                            style={{ position: 'relative', padding: '8px', background: 'none', border: 'none', color: unreadNotifs > 0 ? '#a78bfa' : 'rgba(255,255,255,0.3)', cursor: 'pointer', transition: 'color 0.2s' }}
+                            title="Notifications">
+                            {unreadNotifs > 0 ? <BellDot size={17} /> : <Bell size={17} />}
                             {unreadNotifs > 0 && (
-                                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-purple-500 text-[8px] font-black text-white rounded-full flex items-center justify-center animate-pulse">
-                                    {unreadNotifs}
-                                </span>
+                                <span style={{ position: 'absolute', top: '4px', right: '4px', width: '14px', height: '14px', background: '#8b5cf6', borderRadius: '50%', fontSize: '8px', fontWeight: 900, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unreadNotifs}</span>
                             )}
                         </button>
-
-                        <div className="flex items-center gap-2 bg-neutral-900 pr-4 pl-1 py-1 rounded-full border border-neutral-800">
-                            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-black text-xs">
+                        {/* Avatar pill */}
+                        <div style={{
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                            padding: '4px 14px 4px 4px', borderRadius: '100px',
+                        }}>
+                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #a78bfa, #ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: '11px' }}>
                                 {creatorRecord.name?.[0]?.toUpperCase() || 'C'}
                             </div>
-                            <span className="text-[10px] font-bold text-neutral-400 truncate max-w-[120px]">{creatorRecord.name}</span>
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>{creatorRecord.name?.split(' ')[0] || 'Creator'}</span>
                         </div>
                     </div>
                 </header>
 
-                {/* NOTIFICATION PANEL */}
+                {/* NOTIFICATION PANEL — frosted glass */}
                 {showNotifPanel && (
-                    <div className="absolute top-16 right-4 w-80 bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl z-50 overflow-hidden">
-                        <div className="flex items-center justify-between p-3 border-b border-neutral-800">
-                            <span className="text-xs font-black text-white uppercase">Notifications</span>
+                    <div style={{ position: 'absolute', top: '68px', right: '16px', width: '320px', background: 'rgba(20,20,25,0.9)', backdropFilter: 'blur(40px) saturate(1.5)', WebkitBackdropFilter: 'blur(40px) saturate(1.5)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '20px', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', zIndex: 50, overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 800, color: 'white', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Notifications</span>
                             {unreadNotifs > 0 && (
-                                <button onClick={markAllRead} className="text-[10px] text-purple-400 font-bold hover:text-purple-300">
+                                <button onClick={markAllRead} style={{ fontSize: '10px', color: '#a78bfa', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer' }}>
                                     Mark all read
                                 </button>
                             )}
                         </div>
-                        <div className="max-h-64 overflow-y-auto">
+                        <div style={{ maxHeight: '260px', overflowY: 'auto' }}>
                             {notifications.length === 0 ? (
-                                <div className="p-6 text-center">
-                                    <div className="text-2xl mb-2">🔔</div>
-                                    <p className="text-[10px] text-neutral-500">No notifications yet</p>
+                                <div style={{ padding: '32px', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>🔔</div>
+                                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)' }}>No notifications yet</p>
                                 </div>
                             ) : (
                                 notifications.slice(0, 10).map(n => (
-                                    <div key={n.id} className={`p-3 border-b border-neutral-800/50 ${n.read ? '' : 'bg-purple-500/5'}`}>
-                                        <div className="flex items-center justify-between mb-0.5">
-                                            <span className="text-[10px] font-bold text-white">{n.title}</span>
-                                            <span className="text-[8px] text-neutral-600">{new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                    <div key={n.id} style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', background: n.read ? 'transparent' : 'rgba(139,92,246,0.04)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
+                                            <span style={{ fontSize: '11px', fontWeight: 700, color: 'white' }}>{n.title}</span>
+                                            <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.15)' }}>{new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                         </div>
-                                        <p className="text-[10px] text-neutral-400">{n.body}</p>
+                                        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', margin: 0 }}>{n.body}</p>
                                     </div>
                                 ))
                             )}
@@ -786,10 +851,10 @@ function CreatorApp() {
 
                 {/* Close notification panel when clicking elsewhere */}
                 {showNotifPanel && (
-                    <div className="fixed inset-0 z-40" onClick={() => setShowNotifPanel(false)} />
+                    <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowNotifPanel(false)} />
                 )}
 
-                <div className="flex-1 overflow-auto p-6 custom-scrollbar">
+                <div style={{ flex: 1, overflowY: 'auto', padding: '24px', position: 'relative', zIndex: 1 }}>
                     {view === 'dashboard' && (
                         <CreatorDashboard
                             creator={creatorRecord}

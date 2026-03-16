@@ -195,20 +195,38 @@ const ShipmentManager: React.FC<ShipmentManagerProps> = ({ shipments, onAdd, onU
                         </select>
                         <input
                             value={form.trackingNumber}
-                            onChange={e => setForm({ ...form, trackingNumber: e.target.value })}
-                            placeholder="Tracking Number"
+                            onChange={e => {
+                                const val = e.target.value;
+                                const updates: Partial<Shipment> = { trackingNumber: val };
+                                // Auto-detect: if tracking number is entered and status is still Preparing/Issue, auto-set to Shipped
+                                if (val.trim().length > 3 && (form.status === ShipmentStatus.Preparing || form.status === ShipmentStatus.Issue)) {
+                                    updates.status = ShipmentStatus.Shipped;
+                                    updates.dateShipped = new Date().toISOString();
+                                }
+                                // If tracking is cleared, revert back to Preparing
+                                if (!val.trim() && form.status === ShipmentStatus.Shipped) {
+                                    updates.status = ShipmentStatus.Preparing;
+                                }
+                                setForm(prev => ({ ...prev, ...updates }));
+                            }}
+                            placeholder="Tracking Number — auto-sets to In Transit"
                             className="bg-black border border-neutral-700 rounded-lg p-2 text-xs text-white focus:border-emerald-500 outline-none"
                         />
                     </div>
                     <select
                         value={form.status}
                         onChange={e => setForm({ ...form, status: e.target.value as ShipmentStatus })}
-                        className="w-full bg-black border border-neutral-700 rounded-lg p-2 text-xs text-white focus:border-emerald-500 outline-none"
+                        className={`w-full bg-black border rounded-lg p-2 text-xs text-white focus:border-emerald-500 outline-none ${form.status === ShipmentStatus.Shipped ? 'border-emerald-500/50' : 'border-neutral-700'}`}
                     >
                         {Object.values(ShipmentStatus).map(s => (
                             <option key={s} value={s}>{s}</option>
                         ))}
                     </select>
+                    {form.trackingNumber && form.trackingNumber.trim().length > 3 && form.status === ShipmentStatus.Shipped && (
+                        <p className="text-[10px] text-emerald-400 flex items-center gap-1 -mt-1 ml-1">
+                            <CheckCircle size={10} /> Status auto-set to In Transit (tracking detected)
+                        </p>
+                    )}
                     <textarea
                         value={form.notes}
                         onChange={e => setForm({ ...form, notes: e.target.value })}

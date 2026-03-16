@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, X, Loader2, Sparkles, Database, MessageSquare, Mic, MicOff, Brain } from 'lucide-react';
+import { Send, X, Loader2, Sparkles, Database, MessageSquare, Mic, MicOff, Brain, Paperclip, Image as ImageIcon } from 'lucide-react';
 import { Creator, Campaign, ContentItem, TeamMessage, TeamTask, BetaTest, BetaRelease } from '../types';
 import { auraChat, getAuraGreeting } from '../services/aura/auraCore';
 import { restoreSessionFromSTM, getSessionConversation, clearSessionConversation, addToSessionConversation } from '../services/aura/auraMemory';
@@ -30,6 +30,7 @@ interface Message {
     id: string;
     role: 'user' | 'model';
     text: string;
+    imagePreview?: string; // data URL for display
 }
 
 const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], onSendTeamMessage, currentUser = 'Anonymous', brandInfo }) => {
@@ -40,10 +41,12 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
     const [isLoading, setIsLoading] = useState(false);
     const [isListening, setIsListening] = useState(false);
     const [initialized, setInitialized] = useState(false);
+    const [attachedImage, setAttachedImage] = useState<{ dataUrl: string; base64: string; mimeType: string } | null>(null);
     const recognitionRef = useRef<any>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const teamEndRef = useRef<HTMLDivElement>(null);
     const panelRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Close on Escape key
     useEffect(() => {
@@ -65,6 +68,35 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
         const timer = setTimeout(() => document.addEventListener('mousedown', handleClickOutside), 100);
         return () => { clearTimeout(timer); document.removeEventListener('mousedown', handleClickOutside); };
     }, [isOpen]);
+
+    // Listen for 'coco-open' events from other components (e.g., CampaignBoard "Ask Coco" button)
+    useEffect(() => {
+        const handleCocoOpen = (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            setIsOpen(true);
+            setMode('ai');
+            if (detail?.context) {
+                // Add context as a user message and trigger a response
+                const ctxMsg: Message = { id: crypto.randomUUID(), role: 'user', text: detail.context };
+                setMessages(prev => [...prev, ctxMsg]);
+                // Auto-send to Coco
+                (async () => {
+                    setIsLoading(true);
+                    try {
+                        const responseText = await auraChat(detail.context, appState, brandInfo, currentUser);
+                        const aiMsg: Message = { id: crypto.randomUUID(), role: 'model', text: responseText || "I'm ready to help with this campaign!" };
+                        setMessages(prev => [...prev, aiMsg]);
+                    } catch {
+                        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', text: "Something went wrong. Try again in a sec." }]);
+                    } finally {
+                        setIsLoading(false);
+                    }
+                })();
+            }
+        };
+        window.addEventListener('coco-open', handleCocoOpen);
+        return () => window.removeEventListener('coco-open', handleCocoOpen);
+    }, [appState, brandInfo, currentUser]);
 
     // Initialize Coco with greeting and restore memory
     useEffect(() => {
@@ -139,13 +171,15 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
 
         if (isLoading) return;
 
-        const userMsg: Message = { id: crypto.randomUUID(), role: 'user', text: inputText };
+        const userMsg: Message = { id: crypto.randomUUID(), role: 'user', text: inputText, imagePreview: attachedImage?.dataUrl };
+        const mediaParts = attachedImage ? [{ mimeType: attachedImage.mimeType, data: attachedImage.base64 }] : undefined;
         setMessages(prev => [...prev, userMsg]);
         setInputText('');
+        setAttachedImage(null);
         setIsLoading(true);
 
         try {
-            const responseText = await auraChat(userMsg.text, appState, brandInfo, currentUser);
+            const responseText = await auraChat(userMsg.text || 'What do you see in this image?', appState, brandInfo, currentUser, mediaParts);
             const aiMsg: Message = { id: crypto.randomUUID(), role: 'model', text: responseText || "I couldn't process that." };
             setMessages(prev => [...prev, aiMsg]);
         } catch (e) {
@@ -157,8 +191,24 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
 
     const handleClearChat = () => {
         clearSessionConversation();
+        setAttachedImage(null);
         const greeting = getAuraGreeting(currentUser);
         setMessages([{ id: 'fresh', role: 'model', text: greeting }]);
+    };
+
+    const handleImageAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) return;
+        if (file.size > 10 * 1024 * 1024) { alert('Image must be under 10MB'); return; }
+        const reader = new FileReader();
+        reader.onload = () => {
+            const dataUrl = reader.result as string;
+            const base64 = dataUrl.split(',')[1]; // Strip data:image/...;base64, prefix
+            setAttachedImage({ dataUrl, base64, mimeType: file.type });
+        };
+        reader.readAsDataURL(file);
+        e.target.value = ''; // Reset so same file can be re-selected
     };
 
     return (
@@ -222,6 +272,9 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
                                             ? 'bg-emerald-600 text-white rounded-tr-sm'
                                             : 'bg-neutral-800 text-neutral-200 rounded-tl-sm border border-neutral-700'
                                             }`}>
+                                            {msg.imagePreview && (
+                                                <img src={msg.imagePreview} alt="Attached" className="max-w-full max-h-40 rounded-lg mb-2 border border-white/20" />
+                                            )}
                                             {msg.text}
                                         </div>
                                     </div>
@@ -259,6 +312,14 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
 
                     {/* Input */}
                     <div className="p-3 bg-neutral-900 border-t border-neutral-800">
+                        {/* Image preview */}
+                        {attachedImage && mode === 'ai' && (
+                            <div className="mb-2 flex items-center gap-2 bg-neutral-800 rounded-lg p-2 border border-emerald-500/30">
+                                <img src={attachedImage.dataUrl} alt="Attached" className="w-12 h-12 object-cover rounded-md" />
+                                <span className="text-xs text-neutral-400 flex-1 truncate">Image attached</span>
+                                <button onClick={() => setAttachedImage(null)} className="text-neutral-500 hover:text-red-400 p-1"><X size={14} /></button>
+                            </div>
+                        )}
                         <form
                             onSubmit={(e) => { e.preventDefault(); handleSend(); }}
                             className="flex items-center gap-2 bg-black border border-neutral-700 rounded-full p-1 pl-4 focus-within:border-emerald-500 transition-colors"
@@ -267,9 +328,22 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
                                 type="text"
                                 value={inputText}
                                 onChange={(e) => setInputText(e.target.value)}
-                                placeholder={mode === 'ai' ? "Ask Coco anything..." : "Message team..."}
+                                placeholder={mode === 'ai' ? (attachedImage ? 'Ask about this image...' : 'Ask Coco anything...') : 'Message team...'}
                                 className="flex-1 bg-transparent text-sm text-white focus:outline-none py-2"
                             />
+                            {mode === 'ai' && (
+                                <>
+                                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageAttach} className="hidden" />
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className={`p-2 rounded-full transition-all ${attachedImage ? 'text-emerald-400' : 'text-neutral-500 hover:text-white'}`}
+                                        title="Attach image"
+                                    >
+                                        <Paperclip size={16} />
+                                    </button>
+                                </>
+                            )}
                             <button
                                 type="button"
                                 onClick={toggleVoice}
@@ -280,7 +354,7 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
                             </button>
                             <button
                                 type="submit"
-                                disabled={!inputText.trim() || (mode === 'ai' && isLoading)}
+                                disabled={(!inputText.trim() && !attachedImage) || (mode === 'ai' && isLoading)}
                                 className={`p-2 rounded-full text-black transition-colors ${mode === 'ai' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400' : 'bg-blue-500 hover:bg-blue-400'} disabled:opacity-50`}
                             >
                                 <Send size={16} />

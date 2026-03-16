@@ -110,7 +110,7 @@ const DailyDigestWidget: React.FC<DailyDigestWidgetProps> = ({
                 label: `${pendingShipments.length} shipment${pendingShipments.length !== 1 ? 's' : ''} need attention`,
                 color: 'text-blue-400',
                 bgColor: 'bg-blue-500/10 border-blue-500/20',
-                action: () => onNavigate('active')
+                action: () => onNavigate('active:shipments')
             },
             {
                 show: pendingPayments.length > 0,

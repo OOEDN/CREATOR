@@ -86,7 +86,7 @@ const ShipmentTrackerWidget: React.FC<ShipmentTrackerWidgetProps> = ({ creators,
     const displayShipments = [...pendingShipments, ...trackableShipments].slice(0, 10);
 
     return (
-        <div className="bg-ooedn-gray border border-neutral-800 rounded-3xl p-6 flex flex-col h-[400px] shadow-2xl relative overflow-hidden">
+        <div className="bg-ooedn-gray border border-neutral-800 rounded-3xl p-6 flex flex-col h-[280px] shadow-2xl relative overflow-hidden">
             <div className="flex justify-between items-center mb-4 border-b border-neutral-800 pb-4">
                 <h3 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2">
                     <Truck size={16} className="text-emerald-500" /> Shipments
@@ -97,8 +97,8 @@ const ShipmentTrackerWidget: React.FC<ShipmentTrackerWidgetProps> = ({ creators,
                             onClick={syncAllShipments}
                             disabled={syncingAll}
                             className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 ${syncingAll
-                                    ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400 cursor-wait'
-                                    : 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:text-emerald-400 hover:border-emerald-500/30'
+                                ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400 cursor-wait'
+                                : 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:text-emerald-400 hover:border-emerald-500/30'
                                 }`}
                             title="Use AI to check live tracking status"
                         >

@@ -200,7 +200,7 @@ const CreatorCommsWidget: React.FC<CreatorCommsWidgetProps> = ({
 
     // --- INBOX VIEW ---
     return (
-        <div className="bg-ooedn-gray border border-neutral-800 rounded-3xl p-5 shadow-2xl">
+        <div className="bg-ooedn-gray border border-neutral-800 rounded-3xl p-5 shadow-2xl flex flex-col h-[280px] overflow-hidden">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2">
                     <MessageCircle size={16} className="text-teal-400" /> Creator Comms
@@ -219,7 +219,7 @@ const CreatorCommsWidget: React.FC<CreatorCommsWidgetProps> = ({
                     <p className="text-neutral-700 text-[10px] mt-1">When creators send messages, they'll appear here</p>
                 </div>
             ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 flex-1 overflow-y-auto custom-scrollbar">
                     {creatorIds.map(creatorId => {
                         const lastMsg = getLastMessage(creatorId);
                         const unread = getUnreadCount(creatorId);

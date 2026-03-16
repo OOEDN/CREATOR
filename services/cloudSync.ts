@@ -271,8 +271,11 @@ export const syncStateToCloud = async (
         // Merge content: keep cloud items that admin doesn't have (creator uploads)
         if (existing?.contentItems) {
             const adminContentIds = new Set(cleanContent.map(c => c.id));
+            const adminContentUrls = new Set(cleanContent.filter(c => c.fileUrl).map(c => c.fileUrl));
             const creatorOnlyContent = existing.contentItems.filter(c =>
-                !adminContentIds.has(c.id) && (c.submittedByCreator || c.storageType === 'cloud')
+                !adminContentIds.has(c.id) &&
+                !(c.fileUrl && adminContentUrls.has(c.fileUrl)) &&
+                (c.submittedByCreator || c.storageType === 'cloud')
             );
             if (creatorOnlyContent.length > 0) {
                 console.log(`[CloudSync] 🔄 Merging ${creatorOnlyContent.length} creator-uploaded items from cloud`);

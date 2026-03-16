@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Campaign, CampaignStatus, ContentItem, Creator, AppSettings, CreatorStatus, ContentType, CampaignTask, CampaignComment, MoodboardItem } from '../types';
-import { Plus, X, Layout, FileText, CheckCircle2, MoreHorizontal, Save, Users, ImageIcon, Sparkles, Loader2, BrainCircuit, Film, HardDrive, Printer, CheckSquare, MessageSquare, Trash2, ListTodo, Send, GripHorizontal, Eye, Edit3, PenTool, Mail, Palette, LinkIcon, ExternalLink } from 'lucide-react';
+import { Campaign, CampaignStatus, ContentItem, Creator, AppSettings, CreatorStatus, ContentType, CampaignTask, CampaignComment, MoodboardItem, CampaignAvatar, UGCInspoItem } from '../types';
+import { Plus, X, Layout, FileText, CheckCircle2, MoreHorizontal, Save, Users, ImageIcon, Sparkles, Loader2, BrainCircuit, Film, HardDrive, Printer, CheckSquare, MessageSquare, Trash2, ListTodo, Send, GripHorizontal, Eye, Edit3, PenTool, Mail, Palette, LinkIcon, ExternalLink, UserCircle2, Play, Video, Bot, Hash, Tag } from 'lucide-react';
 import ContentLibrary from './ContentLibrary';
 import { generateCampaignBrief, generateCampaignTasks, generateViralScript } from '../services/geminiService';
 import { createDriveFolder, uploadToGoogleDrive } from '../services/googleDriveService';
@@ -18,11 +18,25 @@ interface CampaignBoardProps {
     appSettings: AppSettings;
     onEmailBrief?: (to: string, subject: string, body: string) => void;
     onNotifyCreator?: (creatorId: string, campaignTitle: string) => void;
+    onAskCoco?: (context: string) => void;
+    onSendAvatarEmail?: (creatorEmails: string[], subject: string, body: string) => void;
 }
+
+type SidebarTab = 'execution' | 'roster' | 'avatars' | 'ugc' | 'moodboard';
+
+const AVATAR_COLORS = [
+    'from-emerald-500 to-teal-600',
+    'from-purple-500 to-violet-600',
+    'from-amber-500 to-orange-600',
+    'from-rose-500 to-pink-600',
+    'from-blue-500 to-cyan-600',
+    'from-red-500 to-rose-600',
+];
 
 const CampaignBoard: React.FC<CampaignBoardProps> = ({
     campaigns, creators, content, onSaveCampaign, onDeleteCampaign,
-    onContentUpload, onContentUpdate, onContentDelete, appSettings, onEmailBrief, onNotifyCreator
+    onContentUpload, onContentUpdate, onContentDelete, appSettings, onEmailBrief, onNotifyCreator,
+    onAskCoco, onSendAvatarEmail
 }) => {
     const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
     const [showAIPrompt, setShowAIPrompt] = useState(false);
@@ -32,7 +46,47 @@ const CampaignBoard: React.FC<CampaignBoardProps> = ({
     const [draggedCampaignId, setDraggedCampaignId] = useState<string | null>(null);
     const [commentText, setCommentText] = useState('');
     const [newTaskText, setNewTaskText] = useState('');
-    const [editorMode, setEditorMode] = useState<'write' | 'preview'>('write'); // New Tab State
+    const [editorMode, setEditorMode] = useState<'write' | 'preview'>('write');
+    // New state for enhanced features
+    const [sidebarTab, setSidebarTab] = useState<SidebarTab>('execution');
+    const [newAvatarName, setNewAvatarName] = useState('');
+    const [newAvatarDesc, setNewAvatarDesc] = useState('');
+    const [newAvatarTraits, setNewAvatarTraits] = useState('');
+    const [showAvatarForm, setShowAvatarForm] = useState(false);
+    const [newUgcUrl, setNewUgcUrl] = useState('');
+    const [newUgcTitle, setNewUgcTitle] = useState('');
+    const [newUgcNotes, setNewUgcNotes] = useState('');
+    const [showUgcForm, setShowUgcForm] = useState(false);
+    const [avatarEmailTarget, setAvatarEmailTarget] = useState<string | null>(null);
+    // Lark-inspired: board view mode & filters
+    const [boardView, setBoardView] = useState<'kanban' | 'gallery'>('kanban');
+    const [channelFilter, setChannelFilter] = useState<string | null>(null);
+
+    const CHANNEL_OPTIONS = ['Social', 'Video', 'Display', 'Linear TV', 'Email', 'Influencer', 'UGC', 'Audio'];
+    const GOAL_OPTIONS = ['Traffic', 'Engagement', 'Branding', 'Conversion', 'Awareness', 'Retention'];
+    const CHANNEL_COLORS: Record<string, string> = {
+        'Social': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+        'Video': 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+        'Display': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+        'Linear TV': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+        'Email': 'bg-teal-500/20 text-teal-400 border-teal-500/30',
+        'Influencer': 'bg-pink-500/20 text-pink-400 border-pink-500/30',
+        'UGC': 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+        'Audio': 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+    };
+    const GOAL_COLORS: Record<string, string> = {
+        'Traffic': 'bg-emerald-500/20 text-emerald-400',
+        'Engagement': 'bg-violet-500/20 text-violet-400',
+        'Branding': 'bg-amber-500/20 text-amber-400',
+        'Conversion': 'bg-rose-500/20 text-rose-400',
+        'Awareness': 'bg-sky-500/20 text-sky-400',
+        'Retention': 'bg-teal-500/20 text-teal-400',
+    };
+
+    // Filter campaigns by channel
+    const filteredCampaigns = channelFilter
+        ? campaigns.filter(c => c.channels?.includes(channelFilter))
+        : campaigns;
 
     const columns = [
         { id: CampaignStatus.Idea, label: 'Fresh Ideas', icon: Layout, color: 'text-yellow-400 border-yellow-500/30 bg-yellow-500/5' },
@@ -278,76 +332,260 @@ Use "Negative Assumption": Stop doing X if you want Y.
         });
     };
 
+    // --- Avatar Handlers ---
+    const handleAddAvatar = () => {
+        if (!editingCampaign || !newAvatarName.trim()) return;
+        const newAvatar: CampaignAvatar = {
+            id: crypto.randomUUID(),
+            name: newAvatarName,
+            description: newAvatarDesc,
+            traits: newAvatarTraits.split(',').map(t => t.trim()).filter(Boolean),
+            color: AVATAR_COLORS[(editingCampaign.avatars?.length || 0) % AVATAR_COLORS.length],
+            matchedCreatorIds: [],
+        };
+        const updated = { ...editingCampaign, avatars: [...(editingCampaign.avatars || []), newAvatar] };
+        setEditingCampaign(updated);
+        onSaveCampaign(updated);
+        setNewAvatarName(''); setNewAvatarDesc(''); setNewAvatarTraits(''); setShowAvatarForm(false);
+    };
+
+    const handleDeleteAvatar = (avatarId: string) => {
+        if (!editingCampaign) return;
+        const updated = { ...editingCampaign, avatars: (editingCampaign.avatars || []).filter(a => a.id !== avatarId) };
+        setEditingCampaign(updated);
+        onSaveCampaign(updated);
+    };
+
+    const handleSendAvatarEmail = (avatar: CampaignAvatar) => {
+        if (!editingCampaign) return;
+        const eligibleCreators = creators.filter(c => c.email && editingCampaign.assignedCreatorIds.includes(c.id));
+        if (eligibleCreators.length === 0) return alert('No creators with emails assigned to this campaign. Assign creators first.');
+        const emails = eligibleCreators.map(c => c.email!);
+        const subject = `OOEDN — Do you vibe with "${avatar.name}"?`;
+        const body = `Hey {name},\n\nWe're building something special for our next campaign: "${editingCampaign.title}"\n\nWe've created a character called "${avatar.name}" — ${avatar.description}\n\nTraits: ${avatar.traits.join(', ')}\n\nDo you identify with this character? If this feels like you, reply and let us know — we'll send you a campaign brief that matches your energy.\n\nNo pressure. We just want to make sure the content feels authentic to who you are.\n\n— OOEDN Team`;
+        if (onSendAvatarEmail) {
+            onSendAvatarEmail(emails, subject, body);
+            const updated = { ...editingCampaign, avatarOutreachSent: true };
+            setEditingCampaign(updated);
+            onSaveCampaign(updated);
+            alert(`Avatar outreach sent to ${emails.length} creator(s)!`);
+        } else if (onEmailBrief) {
+            onEmailBrief(emails.join(', '), subject, body);
+        } else {
+            navigator.clipboard.writeText(body).then(() => alert('Email body copied to clipboard!'));
+        }
+    };
+
+    // --- UGC Handlers ---
+    const handleAddUgc = () => {
+        if (!editingCampaign || !newUgcUrl.trim() || !newUgcTitle.trim()) return;
+        const platform = newUgcUrl.includes('youtube') || newUgcUrl.includes('youtu.be') ? 'YouTube'
+            : newUgcUrl.includes('tiktok') ? 'TikTok'
+                : newUgcUrl.includes('instagram') ? 'Instagram'
+                    : newUgcUrl.includes('vimeo') ? 'Vimeo' : 'Other';
+        const item: UGCInspoItem = {
+            id: crypto.randomUUID(), url: newUgcUrl, title: newUgcTitle,
+            platform, notes: newUgcNotes || undefined, addedBy: 'Team', addedAt: new Date().toISOString(),
+        };
+        const updated = { ...editingCampaign, ugcInspo: [...(editingCampaign.ugcInspo || []), item] };
+        setEditingCampaign(updated);
+        onSaveCampaign(updated);
+        setNewUgcUrl(''); setNewUgcTitle(''); setNewUgcNotes(''); setShowUgcForm(false);
+    };
+
+    const handleDeleteUgc = (ugcId: string) => {
+        if (!editingCampaign) return;
+        const updated = { ...editingCampaign, ugcInspo: (editingCampaign.ugcInspo || []).filter(u => u.id !== ugcId) };
+        setEditingCampaign(updated);
+        onSaveCampaign(updated);
+    };
+
+    const getYouTubeEmbedUrl = (url: string): string | null => {
+        const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+        return match ? `https://www.youtube.com/embed/${match[1]}` : null;
+    };
+
+    // --- Coco Context ---
+    const handleAskCoco = () => {
+        if (!editingCampaign || !onAskCoco) return;
+        const avatarSummary = (editingCampaign.avatars || []).map(a => `"${a.name}" (${a.traits.join(', ')}) — ${a.matchedCreatorIds.length} matched`).join('; ');
+        const creatorNames = editingCampaign.assignedCreatorIds.map(id => creators.find(c => c.id === id)?.name).filter(Boolean).join(', ');
+        const ctx = `I'm working on campaign "${editingCampaign.title}" (Status: ${editingCampaign.status}). Brief: ${editingCampaign.description.slice(0, 500)}. Assigned creators: ${creatorNames || 'None'}. Avatars: ${avatarSummary || 'None'}. UGC Inspo: ${editingCampaign.ugcInspo?.length || 0} videos.`;
+        onAskCoco(ctx);
+    };
+
+    // Sidebar tab config
+    const sidebarTabs: { id: SidebarTab; label: string; icon: any; color: string }[] = [
+        { id: 'execution', label: 'Tasks', icon: ListTodo, color: 'text-blue-400 border-blue-500' },
+        { id: 'roster', label: 'Roster', icon: Users, color: 'text-emerald-400 border-emerald-500' },
+        { id: 'avatars', label: 'Avatars', icon: UserCircle2, color: 'text-purple-400 border-purple-500' },
+        { id: 'ugc', label: 'UGC', icon: Video, color: 'text-rose-400 border-rose-500' },
+        { id: 'moodboard', label: 'Mood', icon: Palette, color: 'text-amber-400 border-amber-500' },
+    ];
+
     return (
         <div className="h-full flex flex-col relative bg-ooedn-black">
             {/* BOARD VIEW */}
             {!editingCampaign && (
                 <div className="flex-1 overflow-x-auto p-6">
-                    <div className="flex items-center justify-between mb-8">
+                    {/* Toolbar: AI Button + View Toggle + Channel Filter */}
+                    <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-4">
                             <button onClick={() => setShowAIPrompt(true)} className="bg-emerald-500 hover:bg-emerald-400 text-black px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all shadow-xl active:scale-95">
                                 <Sparkles size={18} /> AI Creative Brainstorm
                             </button>
-                            <p className="text-neutral-500 text-[10px] font-black uppercase tracking-widest">Powered by OOEDN Brand Bible & Deep Research</p>
+                            <div className="flex bg-neutral-900 border border-neutral-800 rounded-lg p-1 gap-0.5">
+                                <button onClick={() => setBoardView('kanban')} className={`px-3 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all ${boardView === 'kanban' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white'}`} title="Kanban Board">
+                                    <Layout size={12} /> Board
+                                </button>
+                                <button onClick={() => setBoardView('gallery')} className={`px-3 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all ${boardView === 'gallery' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white'}`} title="Gallery View">
+                                    <ImageIcon size={12} /> Gallery
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="flex gap-6 h-[calc(100%-100px)]">
-                        {columns.map(col => (
-                            <div
-                                key={col.id}
-                                className="flex-1 flex flex-col min-w-[260px]"
-                                onDragOver={handleDragOver}
-                                onDrop={(e) => handleDrop(e, col.id)}
-                            >
-                                <div className={`p-5 rounded-t-2xl border-b-2 flex items-center justify-between bg-neutral-900/50 ${col.color}`}>
-                                    <div className="flex items-center gap-3 font-black uppercase text-xs tracking-widest">
-                                        <col.icon size={20} />
-                                        {col.label}
-                                    </div>
-                                    <button onClick={() => handleCreate(col.id)} className="hover:bg-white/10 p-2 rounded-lg transition-colors"><Plus size={20} /></button>
-                                </div>
-                                <div className="bg-neutral-900/20 border-x border-b border-neutral-800 rounded-b-2xl flex-1 p-4 space-y-4 overflow-y-auto custom-scrollbar">
-                                    {campaigns.filter(c => c.status === col.id).map(campaign => (
-                                        <div
-                                            key={campaign.id}
-                                            draggable
-                                            onDragStart={(e) => handleDragStart(e, campaign.id)}
-                                            onClick={() => setEditingCampaign(campaign)}
-                                            className={`bg-ooedn-gray border border-neutral-800 p-5 rounded-2xl cursor-pointer hover:border-emerald-500/50 hover:shadow-2xl hover:-translate-y-1 transition-all group shadow-lg ${draggedCampaignId === campaign.id ? 'opacity-50' : ''}`}
-                                        >
-                                            <div className="flex justify-between items-start mb-3">
-                                                <h4 className="font-black text-white group-hover:text-emerald-400 uppercase tracking-tighter text-sm leading-tight">{campaign.title}</h4>
-                                                <GripHorizontal size={16} className="text-neutral-600 cursor-grab" />
-                                            </div>
-                                            <div className="flex items-center gap-4 mb-4">
-                                                <span className="text-[10px] font-bold text-neutral-500 bg-neutral-900 px-2 py-1 rounded border border-neutral-800">{campaign.tasks?.filter(t => t.isDone).length || 0}/{campaign.tasks?.length || 0} Tasks</span>
-                                                <span className="text-[10px] font-bold text-neutral-500 flex items-center gap-1"><MessageSquare size={10} /> {campaign.comments?.length || 0}</span>
-                                            </div>
-                                            <p className="text-[10px] text-neutral-500 line-clamp-2 mb-4 font-medium leading-relaxed font-mono">
-                                                {campaign.description.slice(0, 100).replace(/[#\-]/g, '') || 'No brief defined.'}
-                                            </p>
-                                            <div className="flex items-center justify-between border-t border-neutral-800 pt-4">
-                                                <div className="flex -space-x-2">
-                                                    {campaign.assignedCreatorIds.slice(0, 4).map(id => {
-                                                        const cr = creators.find(c => c.id === id);
-                                                        return cr ? (
-                                                            <div key={id} className="w-7 h-7 rounded-full border-2 border-neutral-900 bg-neutral-800 flex items-center justify-center overflow-hidden shadow-lg">
-                                                                {cr.profileImage ? <img src={cr.profileImage} className="w-full h-full object-cover" /> : <span className="text-[8px] font-black">{cr.name[0]}</span>}
-                                                            </div>
-                                                        ) : null;
-                                                    })}
-                                                </div>
-                                                <div className="flex items-center gap-1.5 text-[8px] font-black text-neutral-500 uppercase tracking-widest">
-                                                    <ImageIcon size={14} /> {content.filter(c => c.campaignId === campaign.id).length} Assets
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
+                    {/* Channel Filter Bar */}
+                    <div className="flex items-center gap-2 mb-6 flex-wrap">
+                        <span className="text-[9px] font-black text-neutral-600 uppercase tracking-widest mr-1">Channels:</span>
+                        <button onClick={() => setChannelFilter(null)} className={`px-3 py-1 rounded-full text-[9px] font-bold transition-all border ${!channelFilter ? 'bg-white text-black border-white' : 'text-neutral-500 border-neutral-800 hover:border-neutral-600'}`}>All</button>
+                        {CHANNEL_OPTIONS.map(ch => {
+                            const count = campaigns.filter(c => c.channels?.includes(ch)).length;
+                            if (count === 0 && channelFilter !== ch) return null;
+                            return (
+                                <button key={ch} onClick={() => setChannelFilter(channelFilter === ch ? null : ch)} className={`px-3 py-1 rounded-full text-[9px] font-bold transition-all border flex items-center gap-1.5 ${channelFilter === ch ? CHANNEL_COLORS[ch] + ' border-current' : 'text-neutral-500 border-neutral-800 hover:border-neutral-600'}`}>
+                                    {ch} <span className="text-[7px] opacity-60">{count}</span>
+                                </button>
+                            );
+                        })}
                     </div>
+
+                    {/* KANBAN VIEW */}
+                    {boardView === 'kanban' && (
+                        <div className="flex gap-6 h-[calc(100%-140px)]">
+                            {columns.map(col => (
+                                <div key={col.id} className="flex-1 flex flex-col min-w-[260px]" onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, col.id)}>
+                                    <div className={`p-5 rounded-t-2xl border-b-2 flex items-center justify-between bg-neutral-900/50 ${col.color}`}>
+                                        <div className="flex items-center gap-3 font-black uppercase text-xs tracking-widest">
+                                            <col.icon size={20} />
+                                            {col.label}
+                                            <span className="text-[9px] opacity-50">{filteredCampaigns.filter(c => c.status === col.id).length}</span>
+                                        </div>
+                                        <button onClick={() => handleCreate(col.id)} className="hover:bg-white/10 p-2 rounded-lg transition-colors" title="Add campaign"><Plus size={20} /></button>
+                                    </div>
+                                    <div className="bg-neutral-900/20 border-x border-b border-neutral-800 rounded-b-2xl flex-1 p-4 space-y-4 overflow-y-auto custom-scrollbar">
+                                        {filteredCampaigns.filter(c => c.status === col.id).map(campaign => (
+                                            <div
+                                                key={campaign.id} draggable onDragStart={(e) => handleDragStart(e, campaign.id)}
+                                                onClick={() => setEditingCampaign(campaign)}
+                                                className={`bg-ooedn-gray border border-neutral-800 rounded-2xl cursor-pointer hover:border-emerald-500/50 hover:shadow-2xl hover:-translate-y-1 transition-all group shadow-lg overflow-hidden ${draggedCampaignId === campaign.id ? 'opacity-50' : ''}`}
+                                            >
+                                                {/* Cover Image (if set) */}
+                                                {campaign.coverImage && (
+                                                    <div className="h-28 w-full overflow-hidden">
+                                                        <img src={campaign.coverImage} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                                    </div>
+                                                )}
+                                                <div className="p-5">
+                                                    {/* Goal Badge */}
+                                                    {campaign.goal && (
+                                                        <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md mb-2 inline-block ${GOAL_COLORS[campaign.goal] || 'bg-neutral-800 text-neutral-400'}`}>{campaign.goal}</span>
+                                                    )}
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <h4 className="font-black text-white group-hover:text-emerald-400 uppercase tracking-tighter text-sm leading-tight">{campaign.title}</h4>
+                                                        <GripHorizontal size={16} className="text-neutral-600 cursor-grab flex-shrink-0" />
+                                                    </div>
+                                                    {/* Channel Tags */}
+                                                    {campaign.channels && campaign.channels.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1 mb-3">
+                                                            {campaign.channels.map(ch => (
+                                                                <span key={ch} className={`text-[8px] font-bold px-1.5 py-0.5 rounded border ${CHANNEL_COLORS[ch] || 'bg-neutral-800 text-neutral-400 border-neutral-700'}`}>{ch}</span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    <div className="flex items-center gap-3 mb-3 flex-wrap">
+                                                        <span className="text-[10px] font-bold text-neutral-500 bg-neutral-900 px-2 py-1 rounded border border-neutral-800">{campaign.tasks?.filter(t => t.isDone).length || 0}/{campaign.tasks?.length || 0} Tasks</span>
+                                                        <span className="text-[10px] font-bold text-neutral-500 flex items-center gap-1"><MessageSquare size={10} /> {campaign.comments?.length || 0}</span>
+                                                        {(campaign.avatars?.length || 0) > 0 && <span className="text-[10px] font-bold text-purple-400 flex items-center gap-1 bg-purple-500/10 px-2 py-0.5 rounded-full"><UserCircle2 size={10} /> {campaign.avatars!.length}</span>}
+                                                        {(campaign.ugcInspo?.length || 0) > 0 && <span className="text-[10px] font-bold text-rose-400 flex items-center gap-1 bg-rose-500/10 px-2 py-0.5 rounded-full"><Play size={10} /> {campaign.ugcInspo!.length}</span>}
+                                                    </div>
+                                                    <p className="text-[10px] text-neutral-500 line-clamp-2 mb-3 font-medium leading-relaxed font-mono">
+                                                        {campaign.description.slice(0, 100).replace(/[#\-]/g, '') || 'No brief defined.'}
+                                                    </p>
+                                                    <div className="flex items-center justify-between border-t border-neutral-800 pt-3">
+                                                        <div className="flex -space-x-2">
+                                                            {campaign.assignedCreatorIds.slice(0, 4).map(id => {
+                                                                const cr = creators.find(c => c.id === id);
+                                                                return cr ? (
+                                                                    <div key={id} className="w-7 h-7 rounded-full border-2 border-neutral-900 bg-neutral-800 flex items-center justify-center overflow-hidden shadow-lg">
+                                                                        {cr.profileImage ? <img src={cr.profileImage} className="w-full h-full object-cover" alt={cr.name} /> : <span className="text-[8px] font-black">{cr.name[0]}</span>}
+                                                                    </div>
+                                                                ) : null;
+                                                            })}
+                                                        </div>
+                                                        <span className="flex items-center gap-1 text-[8px] font-black text-neutral-500 uppercase tracking-widest"><ImageIcon size={14} /> {content.filter(c => c.campaignId === campaign.id).length}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* GALLERY VIEW */}
+                    {boardView === 'gallery' && (
+                        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                            {filteredCampaigns.map(campaign => (
+                                <div key={campaign.id} onClick={() => setEditingCampaign(campaign)} className="bg-ooedn-gray border border-neutral-800 rounded-2xl overflow-hidden cursor-pointer hover:border-emerald-500/50 hover:shadow-2xl hover:-translate-y-1 transition-all group">
+                                    {/* Cover */}
+                                    <div className={`h-36 w-full overflow-hidden ${!campaign.coverImage ? 'bg-gradient-to-br from-neutral-800 to-neutral-900 flex items-center justify-center' : ''}`}>
+                                        {campaign.coverImage ? (
+                                            <img src={campaign.coverImage} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                        ) : (
+                                            <div className="text-center">
+                                                <FileText size={32} className="mx-auto text-neutral-700 mb-1" />
+                                                <p className="text-[8px] text-neutral-700 font-bold uppercase">No Cover</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="p-4">
+                                        <h4 className="font-black text-white group-hover:text-emerald-400 uppercase tracking-tighter text-xs leading-tight mb-2 line-clamp-2">{campaign.title}</h4>
+                                        {/* Goal */}
+                                        {campaign.goal && <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md mr-2 ${GOAL_COLORS[campaign.goal] || 'bg-neutral-800 text-neutral-400'}`}>{campaign.goal}</span>}
+                                        {/* Channel Tags */}
+                                        <div className="flex flex-wrap gap-1 mt-2 mb-3">
+                                            {(campaign.channels || []).map(ch => (
+                                                <span key={ch} className={`text-[7px] font-bold px-1.5 py-0.5 rounded border ${CHANNEL_COLORS[ch] || 'bg-neutral-800 text-neutral-400 border-neutral-700'}`}>{ch}</span>
+                                            ))}
+                                        </div>
+                                        {/* Description snippet */}
+                                        <p className="text-[9px] text-neutral-500 line-clamp-2 mb-3 leading-relaxed">{campaign.description.slice(0, 80).replace(/[#\-]/g, '') || 'No brief.'}</p>
+                                        {/* Footer */}
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex -space-x-1.5">
+                                                {campaign.assignedCreatorIds.slice(0, 3).map(id => {
+                                                    const cr = creators.find(c => c.id === id);
+                                                    return cr ? (
+                                                        <div key={id} className="w-6 h-6 rounded-full border-2 border-neutral-900 bg-neutral-800 flex items-center justify-center overflow-hidden">
+                                                            {cr.profileImage ? <img src={cr.profileImage} className="w-full h-full object-cover" alt={cr.name} /> : <span className="text-[7px] font-black">{cr.name[0]}</span>}
+                                                        </div>
+                                                    ) : null;
+                                                })}
+                                            </div>
+                                            <span className={`text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${campaign.status === CampaignStatus.Final ? 'text-emerald-400 bg-emerald-500/10' : campaign.status === CampaignStatus.Brainstorming ? 'text-blue-400 bg-blue-500/10' : 'text-yellow-400 bg-yellow-500/10'}`}>{campaign.status}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            {/* Add Campaign Card */}
+                            <button onClick={() => handleCreate(CampaignStatus.Idea)} className="border-2 border-dashed border-neutral-800 rounded-2xl h-36 flex flex-col items-center justify-center gap-2 text-neutral-600 hover:text-emerald-400 hover:border-emerald-500/30 transition-all" title="Add campaign">
+                                <Plus size={28} />
+                                <span className="text-[9px] font-black uppercase tracking-widest">New Campaign</span>
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -413,6 +651,11 @@ Use "Negative Assumption": Stop doing X if you want Y.
                             <button onClick={handleEmailBrief} className="bg-emerald-500/10 text-emerald-400 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-500 hover:text-black transition-all border border-emerald-500/20">
                                 <Mail size={16} /> Email Brief
                             </button>
+                            {onAskCoco && (
+                                <button onClick={handleAskCoco} className="bg-gradient-to-r from-violet-600 to-purple-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:from-violet-500 hover:to-purple-500 transition-all shadow-lg shadow-purple-500/20">
+                                    <Bot size={16} /> Ask Coco
+                                </button>
+                            )}
                             <div className="h-8 w-[1px] bg-neutral-800 mx-2"></div>
                             <button onClick={() => { if (confirm("Delete Campaign?")) { onDeleteCampaign(editingCampaign.id); setEditingCampaign(null); } }} className="bg-red-500/10 text-red-500 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">
                                 <Trash2 size={16} />
@@ -479,215 +722,350 @@ Use "Negative Assumption": Stop doing X if you want Y.
                             </div>
                         </div>
 
-                        {/* RIGHT SIDEBAR: Action Hub */}
-                        <div className="w-[350px] bg-ooedn-dark border-l border-neutral-800 flex flex-col hidden lg:flex">
-                            {/* TABS */}
-                            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
+                        {/* RIGHT SIDEBAR: Tabbed Action Hub */}
+                        <div className="w-[380px] bg-ooedn-dark border-l border-neutral-800 flex flex-col hidden lg:flex">
+                            {/* Tab Navigation */}
+                            <div className="flex border-b border-neutral-800 px-2 pt-2 gap-1 flex-shrink-0">
+                                {sidebarTabs.map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setSidebarTab(tab.id)}
+                                        className={`flex items-center gap-1.5 px-3 py-2.5 rounded-t-xl text-[9px] font-black uppercase tracking-widest transition-all ${sidebarTab === tab.id
+                                            ? `${tab.color} bg-neutral-900/50 border border-neutral-800 border-b-transparent -mb-[1px]`
+                                            : 'text-neutral-600 hover:text-neutral-400'
+                                            }`}
+                                    >
+                                        <tab.icon size={12} /> {tab.label}
+                                    </button>
+                                ))}
+                            </div>
 
-                                {/* TASKS */}
-                                <div>
-                                    <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-4 flex items-center gap-2"><ListTodo size={14} /> Execution Plan</h4>
-                                    <div className="space-y-2 mb-4">
-                                        {(editingCampaign.tasks || []).map(task => (
-                                            <div key={task.id} className="flex items-start gap-3 p-3 rounded-xl bg-neutral-900 border border-neutral-800 hover:border-neutral-600 transition-colors group">
-                                                <button onClick={() => handleToggleTask(task.id)} className={`mt-0.5 ${task.isDone ? 'text-emerald-500' : 'text-neutral-600 hover:text-white'}`}>
-                                                    {task.isDone ? <CheckCircle2 size={16} /> : <CheckSquare size={16} />}
-                                                </button>
-                                                <span className={`text-xs ${task.isDone ? 'text-neutral-600 line-through' : 'text-neutral-300'}`}>{task.text}</span>
-                                                <button onClick={() => {
-                                                    const updated = { ...editingCampaign, tasks: editingCampaign.tasks?.filter(t => t.id !== task.id) };
-                                                    setEditingCampaign(updated);
-                                                    onSaveCampaign(updated);
-                                                }} className="ml-auto text-neutral-700 hover:text-red-500 opacity-0 group-hover:opacity-100"><X size={14} /></button>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
+
+                                {/* === EXECUTION TAB === */}
+                                {sidebarTab === 'execution' && (
+                                    <>
+                                        {/* Tasks */}
+                                        <div>
+                                            <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-4 flex items-center gap-2"><ListTodo size={14} /> Execution Plan</h4>
+                                            <div className="space-y-2 mb-4">
+                                                {(editingCampaign.tasks || []).map(task => (
+                                                    <div key={task.id} className="flex items-start gap-3 p-3 rounded-xl bg-neutral-900 border border-neutral-800 hover:border-neutral-600 transition-colors group">
+                                                        <button onClick={() => handleToggleTask(task.id)} className={`mt-0.5 ${task.isDone ? 'text-emerald-500' : 'text-neutral-600 hover:text-white'}`}>
+                                                            {task.isDone ? <CheckCircle2 size={16} /> : <CheckSquare size={16} />}
+                                                        </button>
+                                                        <span className={`text-xs ${task.isDone ? 'text-neutral-600 line-through' : 'text-neutral-300'}`}>{task.text}</span>
+                                                        <button onClick={() => {
+                                                            const updated = { ...editingCampaign, tasks: editingCampaign.tasks?.filter(t => t.id !== task.id) };
+                                                            setEditingCampaign(updated);
+                                                            onSaveCampaign(updated);
+                                                        }} className="ml-auto text-neutral-700 hover:text-red-500 opacity-0 group-hover:opacity-100"><X size={14} /></button>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <input
-                                            value={newTaskText}
-                                            onChange={(e) => setNewTaskText(e.target.value)}
-                                            onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
-                                            placeholder="Add a new task..."
-                                            className="flex-1 bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-blue-500 outline-none"
-                                        />
-                                        <button onClick={handleAddTask} className="bg-blue-500 text-white p-2 rounded-lg"><Plus size={16} /></button>
-                                    </div>
-                                </div>
-
-                                {/* TEAM CHAT */}
-                                <div className="border-t border-neutral-800 pt-6">
-                                    <h4 className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-4 flex items-center gap-2"><MessageSquare size={14} /> Team & Creator Notes</h4>
-                                    <div className="space-y-3 mb-4 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-                                        {(editingCampaign.comments || []).map(comment => (
-                                            <div key={comment.id} className={`p-3 rounded-xl border ${comment.isCreatorComment
-                                                    ? 'bg-purple-500/5 border-purple-500/20'
-                                                    : 'bg-neutral-900 border-neutral-800'
-                                                }`}>
-                                                <div className="flex justify-between items-center mb-1">
-                                                    <span className={`text-[9px] font-black uppercase ${comment.isCreatorComment ? 'text-purple-400' : 'text-emerald-500'
-                                                        }`}>
-                                                        {comment.isCreatorComment ? `🎨 ${comment.user}` : comment.user}
-                                                    </span>
-                                                    <span className="text-[8px] text-neutral-600">{new Date(comment.date).toLocaleDateString()}</span>
-                                                </div>
-                                                <p className="text-xs text-neutral-300">{comment.text}</p>
+                                            <div className="flex gap-2">
+                                                <input value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTask()} placeholder="Add a new task..." className="flex-1 bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-blue-500 outline-none" />
+                                                <button onClick={handleAddTask} className="bg-blue-500 text-white p-2 rounded-lg"><Plus size={16} /></button>
                                             </div>
-                                        ))}
-                                        {(!editingCampaign.comments || editingCampaign.comments.length === 0) && <p className="text-[10px] text-neutral-600 italic">No comments yet. Start the discussion.</p>}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <input
-                                            value={commentText}
-                                            onChange={(e) => setCommentText(e.target.value)}
-                                            onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
-                                            placeholder="Discuss ideas..."
-                                            className="flex-1 bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-purple-500 outline-none"
-                                        />
-                                        <button onClick={handleAddComment} className="bg-purple-500 text-white p-2 rounded-lg"><Send size={16} /></button>
-                                    </div>
-                                </div>
+                                        </div>
 
-                                {/* ROSTER & ASSETS */}
-                                <div className="border-t border-neutral-800 pt-6">
-                                    <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-4 flex items-center gap-2"><Users size={14} /> Roster & Content</h4>
-                                    <div className="flex flex-wrap gap-2 mb-4">
-                                        {creators.filter(c => editingCampaign.assignedCreatorIds.includes(c.id)).map(c => (
-                                            <div key={c.id} className="flex items-center gap-2 bg-neutral-900 border border-neutral-800 rounded-full pr-3 p-1">
-                                                <div className="w-6 h-6 rounded-full bg-neutral-800 overflow-hidden">{c.profileImage ? <img src={c.profileImage} alt={c.name} className="w-full h-full object-cover" /> : null}</div>
-                                                <span className="text-[9px] font-bold text-white">{c.name}</span>
-                                                <button
-                                                    onClick={() => {
-                                                        const updated = { ...editingCampaign, assignedCreatorIds: editingCampaign.assignedCreatorIds.filter(id => id !== c.id) };
-                                                        setEditingCampaign(updated);
-                                                        onSaveCampaign(updated);
-                                                    }}
-                                                    className="text-neutral-600 hover:text-red-400 ml-1"
-                                                ><X size={10} /></button>
+                                        {/* Comments */}
+                                        <div className="border-t border-neutral-800 pt-5">
+                                            <h4 className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-4 flex items-center gap-2"><MessageSquare size={14} /> Team & Creator Notes</h4>
+                                            <div className="space-y-3 mb-4 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                                                {(editingCampaign.comments || []).map(comment => (
+                                                    <div key={comment.id} className={`p-3 rounded-xl border ${comment.isCreatorComment ? 'bg-purple-500/5 border-purple-500/20' : 'bg-neutral-900 border-neutral-800'}`}>
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <span className={`text-[9px] font-black uppercase ${comment.isCreatorComment ? 'text-purple-400' : 'text-emerald-500'}`}>
+                                                                {comment.isCreatorComment ? `🎨 ${comment.user}` : comment.user}
+                                                            </span>
+                                                            <span className="text-[8px] text-neutral-600">{new Date(comment.date).toLocaleDateString()}</span>
+                                                        </div>
+                                                        <p className="text-xs text-neutral-300">{comment.text}</p>
+                                                    </div>
+                                                ))}
+                                                {(!editingCampaign.comments || editingCampaign.comments.length === 0) && <p className="text-[10px] text-neutral-600 italic">No comments yet.</p>}
                                             </div>
-                                        ))}
-                                    </div>
+                                            <div className="flex gap-2">
+                                                <input value={commentText} onChange={(e) => setCommentText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddComment()} placeholder="Discuss ideas..." className="flex-1 bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-purple-500 outline-none" />
+                                                <button onClick={handleAddComment} className="bg-purple-500 text-white p-2 rounded-lg"><Send size={16} /></button>
+                                            </div>
+                                        </div>
 
-                                    {/* SEND TO CREATOR */}
-                                    <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-4 mb-4">
-                                        <h5 className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                            <Send size={12} /> Assign to Creator Portal
-                                        </h5>
-                                        <select
-                                            onChange={(e) => {
-                                                const creatorId = e.target.value;
-                                                if (!creatorId || editingCampaign.assignedCreatorIds.includes(creatorId)) return;
-                                                const updated = {
-                                                    ...editingCampaign,
-                                                    assignedCreatorIds: [...editingCampaign.assignedCreatorIds, creatorId],
-                                                    creatorNotified: true,
-                                                };
-                                                setEditingCampaign(updated);
-                                                onSaveCampaign(updated);
-                                                // Send notification to creator
-                                                if (onNotifyCreator) {
-                                                    onNotifyCreator(creatorId, editingCampaign.title);
-                                                }
-                                                e.target.value = '';
-                                            }}
-                                            className="w-full bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-purple-500 outline-none mb-2"
-                                            defaultValue=""
-                                            title="Select a creator"
-                                        >
-                                            <option value="" disabled>Select a creator...</option>
-                                            {creators
-                                                .filter(c => !editingCampaign.assignedCreatorIds.includes(c.id))
-                                                .map(c => <option key={c.id} value={c.id}>{c.name} ({c.handle})</option>)}
-                                        </select>
-                                        <p className="text-[9px] text-neutral-500">Selected creators will see this campaign in their portal</p>
-                                    </div>
-
-                                    {/* DEADLINE */}
-                                    <div className="mb-4">
-                                        <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest block mb-1" htmlFor="campaign-deadline">Deadline</label>
-                                        <input
-                                            id="campaign-deadline"
-                                            type="date"
-                                            value={editingCampaign.deadline?.split('T')[0] || ''}
-                                            onChange={(e) => {
+                                        {/* Deadline */}
+                                        <div className="border-t border-neutral-800 pt-5">
+                                            <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest block mb-1" htmlFor="campaign-deadline">Deadline</label>
+                                            <input id="campaign-deadline" type="date" value={editingCampaign.deadline?.split('T')[0] || ''} onChange={(e) => {
                                                 const updated = { ...editingCampaign, deadline: e.target.value ? new Date(e.target.value).toISOString() : undefined };
                                                 setEditingCampaign(updated);
                                                 onSaveCampaign(updated);
-                                            }}
-                                            className="w-full bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none"
-                                        />
-                                    </div>
-
-                                    {/* MOODBOARD & VISUAL DIRECTION */}
-                                    <div className="border-t border-neutral-800 pt-6 mt-4">
-                                        <h4 className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Palette size={14} /> Moodboard & Visual Direction</h4>
-
-                                        {/* Style Notes */}
-                                        <div className="mb-4">
-                                            <label className="text-[9px] font-black text-neutral-500 uppercase tracking-widest block mb-1" htmlFor="style-notes">Style Notes & Tone</label>
-                                            <textarea
-                                                id="style-notes"
-                                                value={editingCampaign.styleNotes || ''}
-                                                onChange={(e) => {
-                                                    const updated = { ...editingCampaign, styleNotes: e.target.value };
-                                                    setEditingCampaign(updated);
-                                                }}
-                                                onBlur={() => onSaveCampaign(editingCampaign)}
-                                                placeholder="Describe the mood, tone, colors, aesthetic, energy... e.g. 'Warm earth tones, cozy lifestyle vibes, natural lighting, soft transitions'"
-                                                className="w-full bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-purple-500 outline-none h-20 resize-none leading-relaxed"
-                                            />
+                                            }} className="w-full bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none" />
                                         </div>
 
+                                        {/* Channels */}
+                                        <div className="border-t border-neutral-800 pt-5">
+                                            <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest block mb-2">Channels</label>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {CHANNEL_OPTIONS.map(ch => {
+                                                    const isActive = editingCampaign.channels?.includes(ch);
+                                                    return (
+                                                        <button key={ch} title={`Toggle ${ch} channel`} onClick={() => {
+                                                            const current = editingCampaign.channels || [];
+                                                            const updated = { ...editingCampaign, channels: isActive ? current.filter(c => c !== ch) : [...current, ch] };
+                                                            setEditingCampaign(updated);
+                                                            onSaveCampaign(updated);
+                                                        }} className={`px-2.5 py-1 rounded-lg text-[9px] font-bold border transition-all ${isActive ? CHANNEL_COLORS[ch] + ' border-current' : 'text-neutral-600 border-neutral-800 hover:border-neutral-600'}`}>
+                                                            {ch}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {/* Goal */}
+                                        <div className="border-t border-neutral-800 pt-5">
+                                            <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest block mb-2">Campaign Goal</label>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {GOAL_OPTIONS.map(g => {
+                                                    const isActive = editingCampaign.goal === g;
+                                                    return (
+                                                        <button key={g} title={`Set goal to ${g}`} onClick={() => {
+                                                            const updated = { ...editingCampaign, goal: isActive ? undefined : g };
+                                                            setEditingCampaign(updated);
+                                                            onSaveCampaign(updated);
+                                                        }} className={`px-2.5 py-1 rounded-lg text-[9px] font-bold transition-all ${isActive ? GOAL_COLORS[g] + ' ring-1 ring-current' : 'text-neutral-600 bg-neutral-900 hover:text-neutral-400'}`}>
+                                                            {g}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {/* Cover Image */}
+                                        <div className="border-t border-neutral-800 pt-5">
+                                            <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest block mb-1" htmlFor="campaign-cover">Cover Image URL</label>
+                                            <input id="campaign-cover" type="url" value={editingCampaign.coverImage || ''} onChange={(e) => {
+                                                setEditingCampaign({ ...editingCampaign, coverImage: e.target.value || undefined });
+                                            }} onBlur={() => onSaveCampaign(editingCampaign)} placeholder="https://..." className="w-full bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none placeholder-neutral-700" />
+                                            {editingCampaign.coverImage && (
+                                                <div className="mt-2 rounded-lg overflow-hidden border border-neutral-800">
+                                                    <img src={editingCampaign.coverImage} alt="Cover preview" className="w-full h-24 object-cover" />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* === ROSTER TAB === */}
+                                {sidebarTab === 'roster' && (
+                                    <>
+                                        <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-4 flex items-center gap-2"><Users size={14} /> Assigned Creators</h4>
+                                        <div className="space-y-2 mb-4">
+                                            {creators.filter(c => editingCampaign.assignedCreatorIds.includes(c.id)).map(c => (
+                                                <div key={c.id} className="flex items-center gap-3 bg-neutral-900 border border-neutral-800 rounded-xl p-3 group hover:border-emerald-500/30 transition-all">
+                                                    <div className="w-8 h-8 rounded-full bg-neutral-800 overflow-hidden flex-shrink-0">{c.profileImage ? <img src={c.profileImage} alt={c.name} className="w-full h-full object-cover" /> : <span className="w-full h-full flex items-center justify-center text-[10px] font-black">{c.name[0]}</span>}</div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-xs font-bold text-white truncate">{c.name}</p>
+                                                        <p className="text-[9px] text-neutral-500">{c.handle} · {c.email || 'No email'}</p>
+                                                    </div>
+                                                    <button onClick={() => {
+                                                        const updated = { ...editingCampaign, assignedCreatorIds: editingCampaign.assignedCreatorIds.filter(id => id !== c.id) };
+                                                        setEditingCampaign(updated);
+                                                        onSaveCampaign(updated);
+                                                    }} className="text-neutral-600 hover:text-red-400 opacity-0 group-hover:opacity-100"><X size={14} /></button>
+                                                </div>
+                                            ))}
+                                            {editingCampaign.assignedCreatorIds.length === 0 && <p className="text-[10px] text-neutral-600 italic py-4 text-center">No creators assigned yet.</p>}
+                                        </div>
+                                        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4">
+                                            <h5 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Send size={12} /> Assign Creator</h5>
+                                            <select onChange={(e) => {
+                                                const creatorId = e.target.value;
+                                                if (!creatorId || editingCampaign.assignedCreatorIds.includes(creatorId)) return;
+                                                const updated = { ...editingCampaign, assignedCreatorIds: [...editingCampaign.assignedCreatorIds, creatorId], creatorNotified: true };
+                                                setEditingCampaign(updated);
+                                                onSaveCampaign(updated);
+                                                if (onNotifyCreator) onNotifyCreator(creatorId, editingCampaign.title);
+                                                e.target.value = '';
+                                            }} className="w-full bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none" defaultValue="" title="Select a creator">
+                                                <option value="" disabled>Select a creator...</option>
+                                                {creators.filter(c => !editingCampaign.assignedCreatorIds.includes(c.id)).map(c => <option key={c.id} value={c.id}>{c.name} ({c.handle})</option>)}
+                                            </select>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* === AVATARS TAB === */}
+                                {sidebarTab === 'avatars' && (
+                                    <>
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h4 className="text-[10px] font-black text-purple-400 uppercase tracking-widest flex items-center gap-2"><UserCircle2 size={14} /> Character Avatars</h4>
+                                            <button onClick={() => setShowAvatarForm(!showAvatarForm)} className="bg-purple-500/10 text-purple-400 p-1.5 rounded-lg hover:bg-purple-500/20 transition-all"><Plus size={14} /></button>
+                                        </div>
+                                        <p className="text-[9px] text-neutral-500 mb-4 leading-relaxed">Create character personas. Ask creators if they identify with them — then send matching campaigns for authentic content.</p>
+
+                                        {editingCampaign.avatarOutreachSent && (
+                                            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2 mb-4 flex items-center gap-2">
+                                                <CheckCircle2 size={12} className="text-emerald-500" />
+                                                <span className="text-[9px] text-emerald-400 font-bold">Avatar outreach sent</span>
+                                            </div>
+                                        )}
+
+                                        {/* Avatar Form */}
+                                        {showAvatarForm && (
+                                            <div className="bg-neutral-900 border border-purple-500/20 rounded-2xl p-4 mb-4 space-y-3">
+                                                <input value={newAvatarName} onChange={(e) => setNewAvatarName(e.target.value)} placeholder='Character name (e.g. "The Rebel")' className="w-full bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-purple-500 outline-none" />
+                                                <textarea value={newAvatarDesc} onChange={(e) => setNewAvatarDesc(e.target.value)} placeholder="Personality description..." className="w-full bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-purple-500 outline-none h-16 resize-none" />
+                                                <input value={newAvatarTraits} onChange={(e) => setNewAvatarTraits(e.target.value)} placeholder="Traits (comma separated): bold, streetwear, minimal" className="w-full bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-purple-500 outline-none" />
+                                                <div className="flex gap-2">
+                                                    <button onClick={handleAddAvatar} disabled={!newAvatarName.trim()} className="flex-1 bg-purple-500 text-white py-2 rounded-lg text-xs font-black uppercase tracking-widest disabled:opacity-50 hover:bg-purple-400 transition-all">Create Avatar</button>
+                                                    <button onClick={() => setShowAvatarForm(false)} className="px-3 py-2 text-neutral-500 hover:text-white text-xs"><X size={14} /></button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Avatar Cards */}
+                                        <div className="space-y-3">
+                                            {(editingCampaign.avatars || []).map(avatar => (
+                                                <div key={avatar.id} className="relative group">
+                                                    <div className={`bg-gradient-to-br ${avatar.color} p-[1px] rounded-2xl`}>
+                                                        <div className="bg-ooedn-dark rounded-2xl p-4">
+                                                            <div className="flex items-start justify-between mb-2">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${avatar.color} flex items-center justify-center text-white font-black text-sm`}>{avatar.name[0]}</div>
+                                                                    <div>
+                                                                        <h5 className="text-xs font-black text-white">{avatar.name}</h5>
+                                                                        <p className="text-[8px] text-neutral-500">{avatar.matchedCreatorIds.length} matched</p>
+                                                                    </div>
+                                                                </div>
+                                                                <button onClick={() => handleDeleteAvatar(avatar.id)} className="text-neutral-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><X size={12} /></button>
+                                                            </div>
+                                                            <p className="text-[10px] text-neutral-400 mb-3 leading-relaxed">{avatar.description || 'No description.'}</p>
+                                                            <div className="flex flex-wrap gap-1 mb-3">
+                                                                {avatar.traits.map((trait, i) => (
+                                                                    <span key={i} className="text-[8px] bg-white/5 text-neutral-300 px-2 py-0.5 rounded-full border border-neutral-700 flex items-center gap-1"><Tag size={8} />{trait}</span>
+                                                                ))}
+                                                            </div>
+                                                            <button onClick={() => handleSendAvatarEmail(avatar)} className="w-full bg-purple-500/10 text-purple-400 px-3 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-purple-500 hover:text-white transition-all border border-purple-500/20">
+                                                                <Mail size={12} /> Mail to Creators
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {(!editingCampaign.avatars || editingCampaign.avatars.length === 0) && !showAvatarForm && (
+                                                <div className="text-center py-8 border border-dashed border-neutral-800 rounded-2xl">
+                                                    <UserCircle2 size={32} className="mx-auto mb-2 text-neutral-700" />
+                                                    <p className="text-[10px] text-neutral-600">No avatars yet. Create character personas to match with creators.</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* === UGC TAB === */}
+                                {sidebarTab === 'ugc' && (
+                                    <>
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h4 className="text-[10px] font-black text-rose-400 uppercase tracking-widest flex items-center gap-2"><Video size={14} /> UGC Inspiration</h4>
+                                            <button onClick={() => setShowUgcForm(!showUgcForm)} className="bg-rose-500/10 text-rose-400 p-1.5 rounded-lg hover:bg-rose-500/20 transition-all"><Plus size={14} /></button>
+                                        </div>
+                                        <p className="text-[9px] text-neutral-500 mb-4 leading-relaxed">Add reference UGC videos for content direction. YouTube links will auto-embed.</p>
+
+                                        {/* UGC Add Form */}
+                                        {showUgcForm && (
+                                            <div className="bg-neutral-900 border border-rose-500/20 rounded-2xl p-4 mb-4 space-y-3">
+                                                <input value={newUgcUrl} onChange={(e) => setNewUgcUrl(e.target.value)} placeholder="Video URL (YouTube, TikTok, Instagram...)" className="w-full bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-rose-500 outline-none" />
+                                                <input value={newUgcTitle} onChange={(e) => setNewUgcTitle(e.target.value)} placeholder="Title / Label" className="w-full bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-rose-500 outline-none" />
+                                                <textarea value={newUgcNotes} onChange={(e) => setNewUgcNotes(e.target.value)} placeholder="Why is this inspiring? (optional)" className="w-full bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-rose-500 outline-none h-14 resize-none" />
+                                                <div className="flex gap-2">
+                                                    <button onClick={handleAddUgc} disabled={!newUgcUrl.trim() || !newUgcTitle.trim()} className="flex-1 bg-rose-500 text-white py-2 rounded-lg text-xs font-black uppercase tracking-widest disabled:opacity-50 hover:bg-rose-400 transition-all">Add Video</button>
+                                                    <button onClick={() => setShowUgcForm(false)} className="px-3 py-2 text-neutral-500 hover:text-white text-xs"><X size={14} /></button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* UGC Cards */}
+                                        <div className="space-y-3">
+                                            {(editingCampaign.ugcInspo || []).map(ugc => {
+                                                const ytEmbed = getYouTubeEmbedUrl(ugc.url);
+                                                return (
+                                                    <div key={ugc.id} className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden group hover:border-rose-500/30 transition-all">
+                                                        {ytEmbed && (
+                                                            <div className="aspect-video">
+                                                                <iframe src={ytEmbed} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title={ugc.title} />
+                                                            </div>
+                                                        )}
+                                                        <div className="p-3">
+                                                            <div className="flex items-start justify-between mb-1">
+                                                                <div className="flex-1 min-w-0">
+                                                                    <h5 className="text-xs font-bold text-white truncate">{ugc.title}</h5>
+                                                                    <div className="flex items-center gap-2 mt-1">
+                                                                        {ugc.platform && <span className="text-[8px] bg-rose-500/10 text-rose-400 px-1.5 py-0.5 rounded-full font-bold">{ugc.platform}</span>}
+                                                                        <span className="text-[8px] text-neutral-600">{new Date(ugc.addedAt).toLocaleDateString()}</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <a href={ugc.url} target="_blank" rel="noopener noreferrer" className="text-neutral-500 hover:text-rose-400 p-1"><ExternalLink size={12} /></a>
+                                                                    <button onClick={() => handleDeleteUgc(ugc.id)} className="text-neutral-600 hover:text-red-400 p-1"><X size={12} /></button>
+                                                                </div>
+                                                            </div>
+                                                            {ugc.notes && <p className="text-[9px] text-neutral-500 mt-2 leading-relaxed">{ugc.notes}</p>}
+                                                            {!ytEmbed && (
+                                                                <a href={ugc.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 mt-2 bg-rose-500/10 text-rose-400 px-3 py-2 rounded-lg text-[9px] font-bold hover:bg-rose-500/20 transition-all">
+                                                                    <Play size={12} /> Watch Video
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                            {(!editingCampaign.ugcInspo || editingCampaign.ugcInspo.length === 0) && !showUgcForm && (
+                                                <div className="text-center py-8 border border-dashed border-neutral-800 rounded-2xl">
+                                                    <Video size={32} className="mx-auto mb-2 text-neutral-700" />
+                                                    <p className="text-[10px] text-neutral-600">No UGC reference videos yet. Add inspiration content.</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* === MOODBOARD TAB === */}
+                                {sidebarTab === 'moodboard' && (
+                                    <>
+                                        <h4 className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Palette size={14} /> Moodboard & Visual Direction</h4>
+                                        {/* Style Notes */}
+                                        <div className="mb-4">
+                                            <label className="text-[9px] font-black text-neutral-500 uppercase tracking-widest block mb-1">Style Notes & Tone</label>
+                                            <textarea value={editingCampaign.styleNotes || ''} onChange={(e) => setEditingCampaign({ ...editingCampaign, styleNotes: e.target.value })} onBlur={() => onSaveCampaign(editingCampaign)} placeholder="Describe the mood, tone, colors, aesthetic, energy..." className="w-full bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-500 outline-none h-20 resize-none leading-relaxed" />
+                                        </div>
                                         {/* Reference Links */}
                                         <div className="mb-4">
                                             <label className="text-[9px] font-black text-neutral-500 uppercase tracking-widest block mb-1">Reference / Inspiration Links</label>
                                             <div className="space-y-1.5 mb-2">
                                                 {(editingCampaign.referenceLinks || []).map((link, idx) => (
                                                     <div key={idx} className="flex items-center gap-2 group">
-                                                        <LinkIcon size={10} className="text-purple-400 flex-shrink-0" />
-                                                        <a href={link} target="_blank" rel="noopener noreferrer" className="text-[10px] text-purple-400 hover:text-purple-300 truncate flex-1">{link}</a>
-                                                        <button
-                                                            onClick={() => {
-                                                                const updated = { ...editingCampaign, referenceLinks: (editingCampaign.referenceLinks || []).filter((_, i) => i !== idx) };
-                                                                setEditingCampaign(updated);
-                                                                onSaveCampaign(updated);
-                                                            }}
-                                                            className="text-neutral-600 hover:text-red-400 opacity-0 group-hover:opacity-100"
-                                                            title="Remove link"
-                                                        ><X size={10} /></button>
+                                                        <LinkIcon size={10} className="text-amber-400 flex-shrink-0" />
+                                                        <a href={link} target="_blank" rel="noopener noreferrer" className="text-[10px] text-amber-400 hover:text-amber-300 truncate flex-1">{link}</a>
+                                                        <button onClick={() => {
+                                                            const updated = { ...editingCampaign, referenceLinks: (editingCampaign.referenceLinks || []).filter((_, i) => i !== idx) };
+                                                            setEditingCampaign(updated);
+                                                            onSaveCampaign(updated);
+                                                        }} className="text-neutral-600 hover:text-red-400 opacity-0 group-hover:opacity-100"><X size={10} /></button>
                                                     </div>
                                                 ))}
                                             </div>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    placeholder="Paste a reference URL..."
-                                                    className="flex-1 bg-black border border-neutral-800 rounded-lg px-3 py-1.5 text-[10px] text-white focus:border-purple-500 outline-none"
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter' && (e.target as HTMLInputElement).value.trim()) {
-                                                            const url = (e.target as HTMLInputElement).value.trim();
-                                                            const updated = { ...editingCampaign, referenceLinks: [...(editingCampaign.referenceLinks || []), url] };
-                                                            setEditingCampaign(updated);
-                                                            onSaveCampaign(updated);
-                                                            (e.target as HTMLInputElement).value = '';
-                                                        }
-                                                    }}
-                                                />
-                                                <button
-                                                    onClick={() => {
-                                                        const inputEl = document.querySelector('#ref-link-input') as HTMLInputElement;
-                                                        if (inputEl?.value.trim()) {
-                                                            const updated = { ...editingCampaign, referenceLinks: [...(editingCampaign.referenceLinks || []), inputEl.value.trim()] };
-                                                            setEditingCampaign(updated);
-                                                            onSaveCampaign(updated);
-                                                            inputEl.value = '';
-                                                        }
-                                                    }}
-                                                    className="bg-purple-500/10 text-purple-400 px-2 py-1.5 rounded-lg hover:bg-purple-500/20 text-[10px] font-bold"
-                                                    title="Add link"
-                                                ><Plus size={12} /></button>
-                                            </div>
+                                            <input placeholder="Paste a reference URL and press Enter..." className="w-full bg-black border border-neutral-800 rounded-lg px-3 py-1.5 text-[10px] text-white focus:border-amber-500 outline-none" onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && (e.target as HTMLInputElement).value.trim()) {
+                                                    const url = (e.target as HTMLInputElement).value.trim();
+                                                    const updated = { ...editingCampaign, referenceLinks: [...(editingCampaign.referenceLinks || []), url] };
+                                                    setEditingCampaign(updated);
+                                                    onSaveCampaign(updated);
+                                                    (e.target as HTMLInputElement).value = '';
+                                                }
+                                            }} />
                                         </div>
-
-                                        {/* Moodboard Assets */}
+                                        {/* Content Library */}
                                         <label className="text-[9px] font-black text-neutral-500 uppercase tracking-widest block mb-2">Moodboard Images & Assets</label>
                                         <div className="bg-neutral-900/50 rounded-xl border border-neutral-800">
                                             <ContentLibrary
@@ -698,9 +1076,8 @@ Use "Negative Assumption": Stop doing X if you want Y.
                                                 appSettings={appSettings}
                                             />
                                         </div>
-                                    </div>
-                                </div>
-
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>

@@ -83,6 +83,7 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set());
   const [reviewNote, setReviewNote] = useState('');
+  const [analysisToast, setAnalysisToast] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filteredItems = useMemo(() => {
@@ -108,41 +109,84 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({
     });
   }, [items, searchTerm, typeFilter, currentView]);
 
-  // Effect to handle authenticated preview loading
+  // Effect to handle preview loading — tries server proxy, then direct GCS with OAuth
   useEffect(() => {
     let active = true;
     const loadPreview = async () => {
-      if (!previewItem || !appSettings?.googleCloudToken) return;
+      if (!previewItem?.fileUrl) return;
 
       setIsPreviewLoading(true);
+      setPreviewBlobUrl(null);
+
+      // Strategy 1: Server-side media proxy (works in production with service account)
       try {
-        const response = await fetch(previewItem.fileUrl, {
-          headers: { 'Authorization': `Bearer ${appSettings.googleCloudToken}` }
-        });
-
-        if (!response.ok) throw new Error('Preview fetch failed');
-
-        const blob = await response.blob();
-        if (active) {
-          const url = URL.createObjectURL(blob);
-          setPreviewBlobUrl(url);
+        const proxyUrl = `/api/media-proxy?url=${encodeURIComponent(previewItem.fileUrl)}`;
+        const response = await fetch(proxyUrl);
+        if (response.ok) {
+          const blob = await response.blob();
+          if (active) {
+            setPreviewBlobUrl(URL.createObjectURL(blob));
+            setIsPreviewLoading(false);
+          }
+          return;
         }
       } catch (e) {
-        console.error("Preview load error", e);
-        setIsPreviewLoading(false);
+        console.warn('[MediaPreview] Proxy unavailable, trying direct GCS...');
       }
+
+      // Strategy 2: Direct GCS fetch with user's OAuth token
+      if (appSettings?.googleCloudToken) {
+        try {
+          const response = await fetch(previewItem.fileUrl, {
+            headers: { 'Authorization': `Bearer ${appSettings.googleCloudToken}` }
+          });
+          if (response.ok) {
+            const blob = await response.blob();
+            if (active) {
+              setPreviewBlobUrl(URL.createObjectURL(blob));
+              setIsPreviewLoading(false);
+            }
+            return;
+          }
+        } catch (e) {
+          console.warn('[MediaPreview] Direct GCS fetch failed, falling back to thumbnail');
+        }
+      }
+
+      // Strategy 3: Try the URL directly (public files)
+      if (active && previewItem.fileUrl) {
+        try {
+          const response = await fetch(previewItem.fileUrl);
+          if (response.ok) {
+            const blob = await response.blob();
+            if (active) {
+              setPreviewBlobUrl(URL.createObjectURL(blob));
+              setIsPreviewLoading(false);
+            }
+            return;
+          }
+        } catch (e) {
+          console.warn('[MediaPreview] Direct URL fetch failed');
+        }
+      }
+
+      // Fallback: use stored thumbnail
+      if (active && previewItem.thumbnail) {
+        setPreviewBlobUrl(previewItem.thumbnail);
+      }
+      if (active) setIsPreviewLoading(false);
     };
 
     loadPreview();
 
     return () => {
       active = false;
-      if (previewBlobUrl) {
+      if (previewBlobUrl && !previewBlobUrl.startsWith('data:')) {
         URL.revokeObjectURL(previewBlobUrl);
-        setPreviewBlobUrl(null);
       }
+      setPreviewBlobUrl(null);
     };
-  }, [previewItem, appSettings?.googleCloudToken]);
+  }, [previewItem]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -226,15 +270,48 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({
 
   const handleDownload = async (item: ContentItem) => {
     try {
-      const response = await fetch(item.fileUrl, { headers: { 'Authorization': `Bearer ${appSettings?.googleCloudToken}` } });
-      const blob = await response.blob();
+      let blob: Blob | null = null;
+
+      // Strategy 1: Server-side media proxy
+      try {
+        const proxyUrl = `/api/media-proxy?url=${encodeURIComponent(item.fileUrl)}`;
+        const response = await fetch(proxyUrl);
+        if (response.ok) blob = await response.blob();
+      } catch (e) {
+        console.warn('[Download] Proxy unavailable, trying direct GCS...');
+      }
+
+      // Strategy 2: Direct GCS with OAuth token
+      if (!blob && appSettings?.googleCloudToken) {
+        try {
+          const response = await fetch(item.fileUrl, {
+            headers: { 'Authorization': `Bearer ${appSettings.googleCloudToken}` }
+          });
+          if (response.ok) blob = await response.blob();
+        } catch (e) {
+          console.warn('[Download] Direct GCS fetch failed');
+        }
+      }
+
+      // Strategy 3: Direct URL (public files)
+      if (!blob) {
+        const response = await fetch(item.fileUrl);
+        if (response.ok) blob = await response.blob();
+      }
+
+      if (!blob) throw new Error('All download methods failed');
+
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = item.title;
       link.click();
       window.URL.revokeObjectURL(url);
-    } catch (e) { alert("Download failed. CORS block?"); }
+    } catch (e) {
+      console.error("Download failed:", e);
+      setAnalysisToast('Download failed. Please try again or re-login.');
+      setTimeout(() => setAnalysisToast(null), 6000);
+    }
   };
 
   const handleAutoTag = async (item: ContentItem, e: React.MouseEvent) => {
@@ -242,6 +319,7 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({
     if (!appSettings?.googleCloudToken || analyzingIds.has(item.id)) return;
 
     setAnalyzingIds(prev => new Set(prev).add(item.id));
+    setAnalysisToast(null);
 
     try {
       let result;
@@ -251,16 +329,38 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({
         result = await analyzeImageWithVision(item.fileUrl, appSettings.googleCloudToken, appSettings.googleProjectId);
       }
       onUpdate(item.id, { tags: result.tags, aiData: result.raw });
-      alert(`AI identified ${result.tags.length} tags: ${result.tags.slice(0, 3).join(', ')}...`);
+      setAnalysisToast(`✅ AI identified ${result.tags.length} tags: ${result.tags.slice(0, 3).join(', ')}...`);
+      setTimeout(() => setAnalysisToast(null), 5000);
     } catch (error: any) {
-      alert(`AI Analysis Error: ${error.message}. Ensure APIs are enabled.`);
+      const isAuthError = error.message?.includes('authentication') || error.message?.includes('credential') || error.message?.includes('OAuth');
+      setAnalysisToast(
+        isAuthError
+          ? '⚠️ AI Analysis requires a fresh login. Your session may have expired — try re-logging in from the sidebar.'
+          : `⚠️ AI Analysis Error: ${error.message}`
+      );
+      setTimeout(() => setAnalysisToast(null), 8000);
     } finally {
       setAnalyzingIds(prev => { const next = new Set(prev); next.delete(item.id); return next; });
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative">
+      {/* Inline Toast for AI Analysis / Download feedback */}
+      {analysisToast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[200] max-w-lg animate-in slide-in-from-top-2 fade-in duration-300">
+          <div className={`px-5 py-3 rounded-xl border shadow-2xl backdrop-blur-xl text-xs font-bold flex items-center gap-3
+            ${analysisToast.startsWith('✅')
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+              : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+            }`}>
+            <span className="flex-1">{analysisToast}</span>
+            <button onClick={() => setAnalysisToast(null)} className="text-neutral-500 hover:text-white transition-colors flex-shrink-0" title="Dismiss">
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
       {previewItem && (
         <div className="fixed inset-0 z-[100] bg-black/98 flex items-center justify-center p-4 backdrop-blur-2xl animate-in fade-in duration-200">
           <div className="absolute top-6 right-6 flex items-center gap-4 z-50">

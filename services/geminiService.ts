@@ -1,11 +1,9 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
 import { Platform, PaymentMethod, Creator, Campaign, ContentItem, ShipmentStatus, CampaignStatus, ReachPlatform } from "../types";
+import { aiGenerate } from "./aiProxy";
 
-// Helper to reliably get API key in Vite environment
-const getApiKey = () => {
-    return window.env?.API_KEY || process.env.API_KEY || '';
-};
+// ── Structured generation helper ──
+// All calls go through the server-side proxy — no API key in the browser
 
 const getBrandContext = (brandInfo?: string) => {
     return brandInfo
@@ -15,43 +13,39 @@ const getBrandContext = (brandInfo?: string) => {
 
 // ... Existing parsing functions ...
 export const parseCreatorInfo = async (rawText: string) => {
-    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const systemInstruction = `Extract creator info. Detect ALL payment methods mentioned (e.g. Venmo, PayPal, Zelle). Extract physical addresses if present. Detect sourcing platform if mentioned (Brillo, Social Cat, Join Bands). Default platform to Instagram if not found.`;
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: `Extract info from: "${rawText}"`,
-            config: {
-                systemInstruction,
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        name: { type: Type.STRING },
-                        handle: { type: Type.STRING },
-                        platform: { type: Type.STRING, enum: Object.values(Platform) },
-                        reachPlatform: { type: Type.STRING },
-                        email: { type: Type.STRING },
-                        address: { type: Type.STRING },
-                        paymentOptions: {
-                            type: Type.ARRAY,
-                            items: {
-                                type: Type.OBJECT,
-                                properties: {
-                                    method: { type: Type.STRING, enum: Object.values(PaymentMethod) },
-                                    details: { type: Type.STRING }
-                                },
-                                required: ["method", "details"]
-                            }
-                        },
-                        rate: { type: Type.NUMBER },
-                        notes: { type: Type.STRING },
+        const text = await aiGenerate({
+            prompt: `Extract info from: "${rawText}"`,
+            systemInstruction,
+            model: 'gemini-3-flash',
+            responseSchema: {
+                type: 'OBJECT',
+                properties: {
+                    name: { type: 'STRING' },
+                    handle: { type: 'STRING' },
+                    platform: { type: 'STRING', enum: Object.values(Platform) },
+                    reachPlatform: { type: 'STRING' },
+                    email: { type: 'STRING' },
+                    address: { type: 'STRING' },
+                    paymentOptions: {
+                        type: 'ARRAY',
+                        items: {
+                            type: 'OBJECT',
+                            properties: {
+                                method: { type: 'STRING', enum: Object.values(PaymentMethod) },
+                                details: { type: 'STRING' }
+                            },
+                            required: ["method", "details"]
+                        }
                     },
-                    required: ["name", "handle", "platform"],
+                    rate: { type: 'NUMBER' },
+                    notes: { type: 'STRING' },
                 },
+                required: ["name", "handle", "platform"],
             },
         });
-        return JSON.parse(response.text || '{}');
+        return JSON.parse(text || '{}');
     } catch (error) {
         console.error("Gemini Extraction Error:", error);
         throw error;
@@ -59,35 +53,31 @@ export const parseCreatorInfo = async (rawText: string) => {
 };
 
 export const parseBulkCreators = async (rawText: string) => {
-    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const systemInstruction = `You are a data entry specialist for OOEDN. Parse a list of creators from unstructured text. 
     Return an array of objects. Infer platform from handle if possible. 
     Default platform to Instagram. Return JSON array.`;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: `Parse this list of creators:\n\n${rawText}`,
-            config: {
-                systemInstruction,
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.ARRAY,
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            name: { type: Type.STRING },
-                            handle: { type: Type.STRING },
-                            platform: { type: Type.STRING, enum: Object.values(Platform) },
-                            email: { type: Type.STRING },
-                            rate: { type: Type.NUMBER }
-                        },
-                        required: ["name"]
-                    }
+        const text = await aiGenerate({
+            prompt: `Parse this list of creators:\n\n${rawText}`,
+            systemInstruction,
+            model: 'gemini-3-flash',
+            responseSchema: {
+                type: 'ARRAY',
+                items: {
+                    type: 'OBJECT',
+                    properties: {
+                        name: { type: 'STRING' },
+                        handle: { type: 'STRING' },
+                        platform: { type: 'STRING', enum: Object.values(Platform) },
+                        email: { type: 'STRING' },
+                        rate: { type: 'NUMBER' }
+                    },
+                    required: ["name"]
                 }
             }
         });
-        return JSON.parse(response.text || '[]');
+        return JSON.parse(text || '[]');
     } catch (error) {
         console.error("Bulk Parse Error:", error);
         throw error;
@@ -95,9 +85,6 @@ export const parseBulkCreators = async (rawText: string) => {
 };
 
 export const generateCampaignBrief = async (prompt: string, creators: Creator[], existingCampaigns: Campaign[], brandInfo?: string) => {
-    const ai = new GoogleGenAI({ apiKey: getApiKey() });
-
-    // Context filtering
     const creatorsContext = creators
         .filter(c => c.status !== 'Blackburn')
         .map(c => ({ id: c.id, name: c.name, handle: c.handle, notes: c.notes, rating: c.rating }))
@@ -129,27 +116,24 @@ export const generateCampaignBrief = async (prompt: string, creators: Creator[],
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-3-pro-preview",
-            contents: `User Idea: ${prompt}\n\nCreator Pool: ${JSON.stringify(creatorsContext)}`,
-            config: {
-                systemInstruction,
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        title: { type: Type.STRING },
-                        description: { type: Type.STRING, description: "Full brief in Markdown format including North Star, Hook Strategy, Script, and Compliance." },
-                        recommendedCreatorIds: {
-                            type: Type.ARRAY,
-                            items: { type: Type.STRING }
-                        }
-                    },
-                    required: ["title", "description", "recommendedCreatorIds"]
-                }
+        const text = await aiGenerate({
+            prompt: `User Idea: ${prompt}\n\nCreator Pool: ${JSON.stringify(creatorsContext)}`,
+            systemInstruction,
+            model: 'gemini-3.1-pro-preview',
+            responseSchema: {
+                type: 'OBJECT',
+                properties: {
+                    title: { type: 'STRING' },
+                    description: { type: 'STRING', description: "Full brief in Markdown format including North Star, Hook Strategy, Script, and Compliance." },
+                    recommendedCreatorIds: {
+                        type: 'ARRAY',
+                        items: { type: 'STRING' }
+                    }
+                },
+                required: ["title", "description", "recommendedCreatorIds"]
             }
         });
-        return JSON.parse(response.text || '{}');
+        return JSON.parse(text || '{}');
     } catch (error) {
         console.error("Campaign Brief Generation Error", error);
         throw error;
@@ -157,7 +141,6 @@ export const generateCampaignBrief = async (prompt: string, creators: Creator[],
 };
 
 export const generateViralScript = async (briefContext: string, brandInfo?: string) => {
-    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const systemInstruction = `You are a Viral Script Engineer for OOEDN. 
     ${getBrandContext(brandInfo)}
     
@@ -172,12 +155,12 @@ export const generateViralScript = async (briefContext: string, brandInfo?: stri
     Start with "## 🎬 GENERATED SCRIPT (AI)"`;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-3-pro-preview",
-            contents: `Context from Brief: ${briefContext}`,
-            config: { systemInstruction }
+        const text = await aiGenerate({
+            prompt: `Context from Brief: ${briefContext}`,
+            systemInstruction,
+            model: 'gemini-3.1-pro-preview',
         });
-        return response.text;
+        return text;
     } catch (e) {
         console.error("Script Gen Error", e);
         return "## Script Generation Failed\nPlease try again.";
@@ -185,23 +168,19 @@ export const generateViralScript = async (briefContext: string, brandInfo?: stri
 };
 
 export const generateCampaignTasks = async (brief: string, brandInfo?: string) => {
-    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const systemInstruction = `You are a Project Manager for OOEDN. Break down this campaign brief into actionable, short tasks for the marketing team. Return a JSON array of strings.`;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: `Brief: ${brief}`,
-            config: {
-                systemInstruction,
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.ARRAY,
-                    items: { type: Type.STRING }
-                }
+        const text = await aiGenerate({
+            prompt: `Brief: ${brief}`,
+            systemInstruction,
+            model: 'gemini-3-flash',
+            responseSchema: {
+                type: 'ARRAY',
+                items: { type: 'STRING' }
             }
         });
-        return JSON.parse(response.text || '[]');
+        return JSON.parse(text || '[]');
     } catch (e) {
         console.error("Task Gen Error", e);
         return ["Review Brief", "Select Creators", "Send Contracts"];
@@ -209,29 +188,25 @@ export const generateCampaignTasks = async (brief: string, brandInfo?: string) =
 };
 
 export const syncTrackingWithAI = async (trackingNumber: string, carrier?: string) => {
-    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const prompt = `Search the live status of package ${trackingNumber} ${carrier ? `via ${carrier}` : ''}. Use Google Search. Output current status (Not Shipped, Preparing, In Transit, Delivered, Shipping Issue), last location, and actual carrier.`;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-3-pro-preview",
-            contents: prompt,
-            config: {
-                tools: [{ googleSearch: {} }],
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        status: { type: Type.STRING, enum: Object.values(ShipmentStatus) },
-                        detailedStatus: { type: Type.STRING },
-                        carrierFound: { type: Type.STRING },
-                        lastLocation: { type: Type.STRING }
-                    },
-                    required: ["status", "detailedStatus"]
-                }
+        const text = await aiGenerate({
+            prompt,
+            model: 'gemini-3.1-pro-preview',
+            tools: [{ googleSearch: {} }],
+            responseSchema: {
+                type: 'OBJECT',
+                properties: {
+                    status: { type: 'STRING', enum: Object.values(ShipmentStatus) },
+                    detailedStatus: { type: 'STRING' },
+                    carrierFound: { type: 'STRING' },
+                    lastLocation: { type: 'STRING' }
+                },
+                required: ["status", "detailedStatus"]
             }
         });
-        return JSON.parse(response.text || '{}');
+        return JSON.parse(text || '{}');
     } catch (error) {
         console.error("AI Tracking Error", error);
         return null;
@@ -239,16 +214,21 @@ export const syncTrackingWithAI = async (trackingNumber: string, carrier?: strin
 };
 
 export const chatWithAppData = async (userQuery: string, appState: { creators: Creator[], campaigns: Campaign[], content: ContentItem[] }, chatHistory: { role: string, parts: { text: string }[] }[] = [], brandInfo?: string) => {
-    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const contextData = JSON.stringify({
         creators: appState.creators.map(c => ({ name: c.name, handle: c.handle, status: c.status, tracking: c.trackingNumber, rating: c.rating })),
         campaigns: appState.campaigns
     });
     const systemInstruction = `You are the OOEDN Assistant. ${getBrandContext(brandInfo)} Provide insights, tracking summaries, and roster analysis. Access this data: ${contextData}`;
     try {
-        const chat = ai.chats.create({ model: "gemini-3-flash-preview", config: { systemInstruction }, history: chatHistory });
-        const result = await chat.sendMessage({ message: userQuery });
-        return result.text;
+        // For chat with history, use the chat endpoint
+        const { aiChat } = await import('./aiProxy');
+        const text = await aiChat({
+            message: userQuery,
+            systemInstruction,
+            model: 'gemini-3-flash',
+            history: chatHistory,
+        });
+        return text;
     } catch (error) {
         console.error("Gemini Chat Error", error);
         return "I'm having trouble connecting to your database right now.";
@@ -256,7 +236,6 @@ export const chatWithAppData = async (userQuery: string, appState: { creators: C
 };
 
 export const draftCreatorOutreach = async (creator: Creator, type: 'recruit' | 'followup' | 'payment', campaign?: string, brandInfo?: string) => {
-    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const systemInstruction = `You are the OOEDN Outreach Manager. ${getBrandContext(brandInfo)} 
     Draft a professional but street-style outreach message for a creator. 
     Creator: ${creator.name} (@${creator.handle}). 
@@ -264,12 +243,12 @@ export const draftCreatorOutreach = async (creator: Creator, type: 'recruit' | '
     Campaign: ${campaign || 'General Collaboration'}.`;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: `Draft a ${type} message for ${creator.name}.`,
-            config: { systemInstruction }
+        const text = await aiGenerate({
+            prompt: `Draft a ${type} message for ${creator.name}.`,
+            systemInstruction,
+            model: 'gemini-3-flash',
         });
-        return response.text;
+        return text;
     } catch (error) {
         console.error("Outreach Draft Error", error);
         return "Failed to generate draft.";
@@ -277,7 +256,6 @@ export const draftCreatorOutreach = async (creator: Creator, type: 'recruit' | '
 };
 
 export const generateCaptionAI = async (title: string, creatorName: string, previousCaptions: string[], brandInfo?: string) => {
-    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const systemInstruction = `You are the OOEDN Social Media Manager. ${getBrandContext(brandInfo)} 
     Draft a viral, high-engagement caption for a piece of content. 
     Creator: ${creatorName}. 
@@ -285,12 +263,12 @@ export const generateCaptionAI = async (title: string, creatorName: string, prev
     Style Context (Recent Captions): ${previousCaptions.join(' | ')}`;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: `Generate a caption for content titled "${title}" by ${creatorName}.`,
-            config: { systemInstruction }
+        const text = await aiGenerate({
+            prompt: `Generate a caption for content titled "${title}" by ${creatorName}.`,
+            systemInstruction,
+            model: 'gemini-3-flash',
         });
-        return response.text;
+        return text;
     } catch (error) {
         console.error("Caption Generation Error", error);
         return "Failed to generate caption.";
@@ -300,7 +278,6 @@ export const generateCaptionAI = async (title: string, creatorName: string, prev
 // ── AI Email Editor — Polish & Spell Check ──
 
 export const polishEmailDraft = async (body: string, brandInfo?: string) => {
-    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const systemInstruction = `You are a professional email editor for OOEDN. ${getBrandContext(brandInfo)}
     
     Improve the given email draft:
@@ -312,12 +289,12 @@ export const polishEmailDraft = async (body: string, brandInfo?: string) => {
     - Return ONLY the improved email text (no explanations, no headers, no quotes)`;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: `Polish this email draft:\n\n${body}`,
-            config: { systemInstruction }
+        const text = await aiGenerate({
+            prompt: `Polish this email draft:\n\n${body}`,
+            systemInstruction,
+            model: 'gemini-3-flash',
         });
-        return response.text || body;
+        return text || body;
     } catch (error) {
         console.error("Polish Email Error", error);
         return null;
@@ -325,34 +302,30 @@ export const polishEmailDraft = async (body: string, brandInfo?: string) => {
 };
 
 export const checkSpellingGrammar = async (body: string) => {
-    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const systemInstruction = `You are a spelling and grammar checker. Analyze the text and return a JSON array of corrections.
     Each correction should have: "original" (the wrong text), "corrected" (the fix), and "reason" (brief explanation).
     If the text is perfect, return an empty array [].
     Only flag actual errors — do not suggest style changes.`;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: `Check spelling and grammar:\n\n${body}`,
-            config: {
-                systemInstruction,
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.ARRAY,
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            original: { type: Type.STRING },
-                            corrected: { type: Type.STRING },
-                            reason: { type: Type.STRING },
-                        },
-                        required: ["original", "corrected", "reason"]
-                    }
+        const text = await aiGenerate({
+            prompt: `Check spelling and grammar:\n\n${body}`,
+            systemInstruction,
+            model: 'gemini-3-flash',
+            responseSchema: {
+                type: 'ARRAY',
+                items: {
+                    type: 'OBJECT',
+                    properties: {
+                        original: { type: 'STRING' },
+                        corrected: { type: 'STRING' },
+                        reason: { type: 'STRING' },
+                    },
+                    required: ["original", "corrected", "reason"]
                 }
             }
         });
-        return JSON.parse(response.text || '[]');
+        return JSON.parse(text || '[]');
     } catch (error) {
         console.error("Spell Check Error", error);
         return [];

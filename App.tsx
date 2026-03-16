@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     LayoutDashboard, Users, Flame, Settings, Plus, Search, Menu, X, CreditCard, CalendarDays, Loader2, Briefcase, RefreshCw, Sparkles, Link, Database, Truck, Package, Library, Inbox, FolderLock, MapPin, Layers, Cloud, LogOut, AlertTriangle, ShieldCheck, Globe, Info, Terminal, UserPlus, CloudCog, Archive, Copy, KeyRound, ExternalLink, ArrowRight, Wrench, Trash2, Sun, Moon, Mail, Crown, Eye, FlaskConical
 } from 'lucide-react';
-import { Creator, CreatorStatus, PaymentStatus, Platform, ContentItem, AppSettings, ShipmentStatus, Campaign, ContentStatus, PaymentOption, Shipment, TeamMessage, TeamTask, BetaTest, BetaRelease, CreatorAccount } from './types';
+import { Creator, CreatorStatus, PaymentStatus, Platform, ContentItem, AppSettings, ShipmentStatus, Campaign, ContentStatus, PaymentOption, Shipment, TeamMessage, TeamTask, BetaTest, BetaRelease, CreatorAccount, ReachoutStatus } from './types';
 import { syncTrackingWithAI } from './services/geminiService';
-import { syncStateToCloud, loadRemoteState, MasterDB, onSyncStatusChange, SyncStatus, getSyncStatus } from './services/cloudSync';
+import { syncStateToCloud, loadRemoteState, MasterDB, onSyncStatusChange, SyncStatus, getSyncStatus, performDailyBackup } from './services/cloudSync';
+import { connectRealtime, onRealtimeChange, disconnectRealtime } from './services/realtimeService';
 import CreatorCard from './components/CreatorCard';
 import StatsOverview from './components/StatsOverview';
 import CreatorEditModal from './components/CreatorEditModal';
@@ -26,7 +27,9 @@ import ContentPipelineWidget from './components/ContentPipelineWidget';
 import QuickNotesWidget from './components/QuickNotesWidget';
 import CreatorInbox from './components/CreatorInbox';
 import LongTermCreators from './components/LongTermCreators';
+import CreatorReachout from './components/CreatorReachout';
 import PendingReview from './components/PendingReview';
+import AdminTrainingCourse from './components/AdminTrainingCourse';
 import { subscribeToPush, sendPushNotification, getPermissionStatus, isSupported as isPushSupported } from './services/pushService';
 import { syncContentToDrive, ensureOOEDNMasterFolder } from './services/googleDriveService';
 import { getInboxSummary, EmailThread } from './services/gmailService';
@@ -99,13 +102,14 @@ function App() {
     const [betaTests, setBetaTests] = useState<BetaTest[]>([]);
     const [betaReleases, setBetaReleases] = useState<BetaRelease[]>([]);
     const [creatorAccounts, setCreatorAccounts] = useState<CreatorAccount[]>([]);
-    const [view, setView] = useState<'dashboard' | 'active' | 'inactive' | 'blackburn' | 'payments' | 'calendar' | 'campaigns' | 'pending-review' | 'asset-pool' | 'team-assets' | 'master-library' | 'team' | 'inbox' | 'partners' | 'betaLab'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'active' | 'inactive' | 'blackburn' | 'payments' | 'calendar' | 'campaigns' | 'pending-review' | 'asset-pool' | 'team-assets' | 'master-library' | 'team' | 'inbox' | 'partners' | 'reachout' | 'betaLab'>('dashboard');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedCreator, setSelectedCreator] = useState<Creator | null>(null);
     const [selectedShipmentId, setSelectedShipmentId] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [showPendingShipmentsOnly, setShowPendingShipmentsOnly] = useState(false);
     const [isConnected, setIsConnected] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [lastSyncedTime, setLastSyncedTime] = useState<string>('Never');
@@ -120,6 +124,9 @@ function App() {
     const [showPushBanner, setShowPushBanner] = useState(false);
     const pushSubscribedRef = useRef(false);
     const initialLoadCompleteRef = useRef(false);
+
+    // Admin training course state — per-user (keyed by email)
+    const [showAdminTraining, setShowAdminTraining] = useState(false);
 
     // Theme state
     const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -205,6 +212,27 @@ function App() {
         }
     }, []);
 
+    // Admin Training Course gating — check if team member has completed training
+    useEffect(() => {
+        if (!isConnected || !userEmail) return;
+        // Owner/admin auto-skipped
+        const ownerEmails = ['danielvillano', 'daniel'];
+        const emailPrefix = userEmail.split('@')[0].toLowerCase();
+        if (ownerEmails.some(e => emailPrefix.includes(e))) {
+            setShowAdminTraining(false);
+            return;
+        }
+        try {
+            const key = `ooedn_training_done_${userEmail.toLowerCase()}`;
+            const done = localStorage.getItem(key);
+            if (!done) {
+                setShowAdminTraining(true);
+            }
+        } catch (e) {
+            console.warn('[Training] Storage check error:', e);
+        }
+    }, [isConnected, userEmail]);
+
     // Auth Error Listener - Global
     useEffect(() => {
         const handleAuthError = (e: any) => {
@@ -250,7 +278,7 @@ function App() {
         const envClientId = window.env?.CLIENT_ID;
         const clientId = (envClientId && envClientId.length > 10)
             ? envClientId
-            : '850668507460-3qtvn7krlf5vv0artsraukruq7lqheug.apps.googleusercontent.com';
+            : '964463045186-ck53fm3viba6jsq7ctg0jd8vj9oom4ag.apps.googleusercontent.com';
 
         try {
             const client = window.google.accounts.oauth2.initTokenClient({
@@ -369,7 +397,23 @@ function App() {
                         setCreators(migratedCreators.reverse());
                     }
                     if (data.campaigns) setCampaigns(data.campaigns);
-                    if (data.contentItems) setContentItems(data.contentItems);
+                    if (data.contentItems) {
+                        // Dedup: if same fileUrl exists multiple times, keep only the newest entry
+                        const urlMap = new Map<string, typeof data.contentItems[0]>();
+                        const noUrlItems: typeof data.contentItems = [];
+                        for (const item of data.contentItems) {
+                            if (!item.fileUrl) { noUrlItems.push(item); continue; }
+                            const existing = urlMap.get(item.fileUrl);
+                            if (!existing || new Date(item.uploadDate || 0) > new Date(existing.uploadDate || 0)) {
+                                urlMap.set(item.fileUrl, item);
+                            }
+                        }
+                        const deduped = [...urlMap.values(), ...noUrlItems];
+                        if (deduped.length < data.contentItems.length) {
+                            console.log(`[CloudSync] 🧹 Deduped content: ${data.contentItems.length} → ${deduped.length} items`);
+                        }
+                        setContentItems(deduped);
+                    }
                     if (data.teamMessages) setTeamMessages(data.teamMessages);
                     if (data.teamTasks) setTeamTasks(data.teamTasks);
                     if (data.betaTests) setBetaTests(data.betaTests);
@@ -402,6 +446,18 @@ function App() {
             // Guard 3+4: cloudSync.ts has isSuspiciouslyEmpty check + save queue
             syncStateToCloud(settings, creators, campaigns, contentItems, settings.brandInfo, teamMessages, teamTasks, undefined, betaTests, betaReleases, creatorAccounts);
             setLastSyncedTime(new Date().toLocaleTimeString());
+
+            // === AUTO-BACKUP: Run daily backup if 24h+ since last backup ===
+            const lastBackup = localStorage.getItem('ooedn_last_backup_date');
+            const now = new Date();
+            const hoursSinceBackup = lastBackup ? (now.getTime() - new Date(lastBackup).getTime()) / (1000 * 60 * 60) : 999;
+            if (hoursSinceBackup >= 24) {
+                console.log(`[AutoBackup] ⏰ ${Math.round(hoursSinceBackup)}h since last backup — triggering daily backup...`);
+                performDailyBackup(settings, creators, campaigns, contentItems).then(() => {
+                    localStorage.setItem('ooedn_last_backup_date', now.toISOString());
+                    console.log('[AutoBackup] ✅ Daily backup completed');
+                }).catch(e => console.error('[AutoBackup] ❌ Backup failed:', e));
+            }
         }, 3000); // 3s debounce (was 5s — faster persistence)
         return () => clearTimeout(timer);
     }, [creators, campaigns, contentItems, settings, isConnected, teamMessages, teamTasks, betaTests, betaReleases, creatorAccounts]);
@@ -414,6 +470,63 @@ function App() {
         });
         return unsub;
     }, []);
+
+    // ── Real-Time Firestore Listeners (SSE) ──
+    useEffect(() => {
+        if (!isConnected || !initialLoadCompleteRef.current) return;
+
+        const cleanup = connectRealtime();
+
+        const unsubMessages = onRealtimeChange('teamMessages', (event) => {
+            if (event.type === 'added') {
+                setTeamMessages(prev => {
+                    if (prev.some(m => m.id === event.doc.id)) return prev;
+                    console.log(`[Realtime] 📩 New message: ${event.doc.sender || 'unknown'}`);
+                    return [...prev, event.doc as TeamMessage];
+                });
+            } else if (event.type === 'modified') {
+                setTeamMessages(prev => prev.map(m => m.id === event.doc.id ? { ...m, ...event.doc } as TeamMessage : m));
+            } else if (event.type === 'removed') {
+                setTeamMessages(prev => prev.filter(m => m.id !== event.doc.id));
+            }
+        });
+
+        const unsubContent = onRealtimeChange('contentItems', (event) => {
+            if (event.type === 'added') {
+                setContentItems(prev => {
+                    if (prev.some(c => c.id === event.doc.id)) return prev;
+                    if (deletedContentIdsRef.current.has(event.doc.id)) return prev;
+                    console.log(`[Realtime] 🎬 New content: ${event.doc.title || event.doc.id}`);
+                    return [...prev, event.doc as ContentItem];
+                });
+            } else if (event.type === 'modified') {
+                setContentItems(prev => prev.map(c => c.id === event.doc.id ? { ...c, ...event.doc } as ContentItem : c));
+            } else if (event.type === 'removed') {
+                setContentItems(prev => prev.filter(c => c.id !== event.doc.id));
+            }
+        });
+
+        const unsubTasks = onRealtimeChange('teamTasks', (event) => {
+            if (event.type === 'added') {
+                setTeamTasks(prev => {
+                    if (prev.some(t => t.id === event.doc.id)) return prev;
+                    console.log(`[Realtime] 📋 New task: ${event.doc.title || event.doc.id}`);
+                    return [...prev, event.doc as TeamTask];
+                });
+            } else if (event.type === 'modified') {
+                setTeamTasks(prev => prev.map(t => t.id === event.doc.id ? { ...t, ...event.doc } as TeamTask : t));
+            } else if (event.type === 'removed') {
+                setTeamTasks(prev => prev.filter(t => t.id !== event.doc.id));
+            }
+        });
+
+        return () => {
+            unsubMessages();
+            unsubContent();
+            unsubTasks();
+            cleanup();
+        };
+    }, [isConnected]);
 
     // Poll for creator activity (messages, uploads) every 30s
     useEffect(() => {
@@ -439,9 +552,11 @@ function App() {
                 if (data.contentItems) {
                     setContentItems(prev => {
                         const existingIds = new Set(prev.map(c => c.id));
-                        // Filter out items that were deliberately deleted this session
+                        const existingUrls = new Set(prev.filter(c => c.fileUrl).map(c => c.fileUrl));
+                        // Filter out items that were deliberately deleted this session OR already exist by ID or fileUrl
                         const newContent = data.contentItems!.filter(c =>
-                            !existingIds.has(c.id) && !deletedContentIdsRef.current.has(c.id)
+                            !existingIds.has(c.id) && !deletedContentIdsRef.current.has(c.id) &&
+                            !(c.fileUrl && existingUrls.has(c.fileUrl))
                         );
                         if (newContent.length > 0) {
                             console.log(`[Poll] 🎬 ${newContent.length} new content uploads from creators`);
@@ -453,7 +568,7 @@ function App() {
                 // Update creator accounts
                 if (data.creatorAccounts) setCreatorAccounts(data.creatorAccounts);
             } catch (e) { /* silent polling failure */ }
-        }, 30000);
+        }, 120000); // 2-minute fallback (real-time SSE handles most updates)
         return () => clearInterval(interval);
     }, [isConnected, settings.googleCloudToken]);
 
@@ -526,7 +641,14 @@ function App() {
     };
 
     const handleContentUpload = async (item: ContentItem) => {
-        setContentItems(prev => [...prev, item]);
+        setContentItems(prev => {
+            // Dedup: prevent adding if an item with the same fileUrl already exists
+            if (item.fileUrl && prev.some(c => c.fileUrl === item.fileUrl)) {
+                console.warn(`[ContentUpload] Skipping duplicate fileUrl: ${item.fileUrl}`);
+                return prev;
+            }
+            return [...prev, item];
+        });
 
         // Auto-backup to Google Drive (non-blocking)
         if (settings?.googleCloudToken && item.fileUrl && !item.driveBackedUp) {
@@ -718,6 +840,20 @@ function App() {
     return (
         <div className={`flex h-screen bg-black text-white overflow-hidden font-sans selection:bg-emerald-500/30 ${!isDarkMode ? 'light-mode' : ''}`}>
 
+            {/* Admin Training Course Gate */}
+            {showAdminTraining && (
+                <AdminTrainingCourse
+                    userName={userEmail?.split('@')[0] || 'Team Member'}
+                    onComplete={() => {
+                        setShowAdminTraining(false);
+                        try {
+                            const key = `ooedn_training_done_${(userEmail || 'unknown').toLowerCase()}`;
+                            localStorage.setItem(key, 'true');
+                        } catch (e) { console.warn('[Training] Storage error:', e); }
+                    }}
+                />
+            )}
+
             {/* SIDEBAR */}
             <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-ooedn-dark border-r border-neutral-800 flex flex-col transition-all duration-300 z-50 flex-shrink-0 mobile-sidebar`}>
                 <div className="h-20 flex items-center justify-center border-b border-neutral-800">
@@ -742,6 +878,7 @@ function App() {
                         { id: 'master-library', icon: Database, label: 'Master Library' },
                         { id: 'inbox', icon: Mail, label: 'Creator Inbox' },
                         { id: 'partners', icon: Crown, label: 'Long-Term Partners' },
+                        { id: 'reachout', icon: UserPlus, label: 'Creator Reachout' },
                         { id: 'team', icon: ShieldCheck, label: 'Team Access' },
                         { id: 'inactive', icon: Archive, label: 'Archive' },
                         { id: 'blackburn', icon: Flame, label: 'Blackburn', color: 'text-red-500' },
@@ -811,6 +948,25 @@ function App() {
                             >
                                 ⚡ Force Save Now
                             </button>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        await performDailyBackup(settings, creators, campaigns, contentItems);
+                                        localStorage.setItem('ooedn_last_backup_date', new Date().toISOString());
+                                        alert('✅ Backup saved successfully to cloud!');
+                                    } catch (e) {
+                                        alert('❌ Backup failed: ' + (e as Error).message);
+                                    }
+                                }}
+                                className="w-full text-[9px] bg-blue-500/10 text-blue-400 px-2 py-1.5 rounded-lg border border-blue-500/20 font-bold hover:text-white hover:border-blue-400 transition-all"
+                            >
+                                💾 Backup Now
+                            </button>
+                            {localStorage.getItem('ooedn_last_backup_date') && (
+                                <p className="text-[8px] text-neutral-600 text-center">
+                                    Last backup: {new Date(localStorage.getItem('ooedn_last_backup_date')!).toLocaleDateString()} {new Date(localStorage.getItem('ooedn_last_backup_date')!).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                                </p>
+                            )}
                         </div>
                     )}
                 </div>
@@ -828,14 +984,14 @@ function App() {
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <div className="hidden md:flex items-center gap-2 bg-black border border-neutral-800 rounded-xl px-4 py-2">
+                        <div className="flex items-center gap-2 bg-black border border-neutral-800 rounded-xl px-3 md:px-4 py-2">
                             <Search size={14} className="text-neutral-500" />
                             <input
                                 type="text"
-                                placeholder="Search system..."
+                                placeholder={showPendingShipmentsOnly ? '🚚 Pending Shipments (clear to reset)' : 'Search system...'}
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-transparent border-none focus:outline-none text-xs text-white w-48 placeholder-neutral-700 font-medium"
+                                onChange={(e) => { setSearchTerm(e.target.value); if (showPendingShipmentsOnly) setShowPendingShipmentsOnly(false); }}
+                                className="bg-transparent border-none focus:outline-none text-xs text-white w-28 md:w-48 placeholder-neutral-700 font-medium"
                             />
                         </div>
                         {/* Push notification status indicator (green dot = active) */}
@@ -900,7 +1056,7 @@ function App() {
                         </div>
                     </div>
                 )}
-                <div className="flex-1 overflow-auto p-8 custom-scrollbar">
+                <div className="flex-1 overflow-auto p-8 custom-scrollbar mobile-main">
 
                     {/* GLOBAL STATS (Only on Dashboard) */}
                     {view === 'dashboard' && (
@@ -912,7 +1068,15 @@ function App() {
                                 teamMessages={teamMessages}
                                 contentItems={contentItems}
                                 currentUser={userEmail || ''}
-                                onNavigate={(v) => setView(v as any)}
+                                onNavigate={(v) => {
+                                    if (v === 'active:shipments') {
+                                        setSearchTerm('');
+                                        setShowPendingShipmentsOnly(true);
+                                        setView('active');
+                                    } else {
+                                        setView(v as any);
+                                    }
+                                }}
                             />
 
                             <StatsOverview
@@ -920,7 +1084,7 @@ function App() {
                                 content={contentItems}
                                 onPendingClick={() => setView('payments')}
                                 onUnusedClick={() => setView('asset-pool')}
-                                onInTransitClick={() => { setSearchTerm('Shipped'); setView('active'); }}
+                                onInTransitClick={() => { setSearchTerm(''); setShowPendingShipmentsOnly(true); setView('active'); }}
                                 onNoPostClick={() => { setSearchTerm('Delivered'); setView('active'); }}
                                 onInactiveClick={() => setView('inactive')}
                             />
@@ -969,7 +1133,12 @@ function App() {
                                 {/* SHIPMENT TRACKER WIDGET */}
                                 <ShipmentTrackerWidget
                                     creators={creators}
-                                    onViewAll={() => { setSearchTerm('Shipped'); setView('active'); }}
+                                    onViewAll={() => {
+                                        // Use a special filter tag that the creator list filter understands
+                                        setSearchTerm('');
+                                        setShowPendingShipmentsOnly(true);
+                                        setView('active');
+                                    }}
                                     onSelectCreator={(creator, shipmentId) => {
                                         setSelectedCreator(creator);
                                         if (shipmentId) setSelectedShipmentId(shipmentId);
@@ -1061,6 +1230,20 @@ function App() {
                     {/* CREATOR LIST VIEWS */}
                     {(view === 'active' || view === 'inactive' || view === 'blackburn') && (
                         <>
+                            {/* PENDING SHIPMENTS FILTER BANNER */}
+                            {showPendingShipmentsOnly && view === 'active' && (
+                                <div className="mb-4 bg-blue-500/10 border border-blue-500/30 rounded-xl p-3 flex items-center justify-between">
+                                    <span className="text-sm text-blue-400 font-bold flex items-center gap-2">
+                                        🚚 Showing only creators with pending shipments (Preparing / Issue)
+                                    </span>
+                                    <button
+                                        onClick={() => setShowPendingShipmentsOnly(false)}
+                                        className="text-xs bg-blue-500/20 text-blue-300 px-3 py-1.5 rounded-lg font-bold hover:bg-blue-500/30 transition-all"
+                                    >
+                                        Clear Filter
+                                    </button>
+                                </div>
+                            )}
                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="text-2xl font-black uppercase tracking-tighter text-white">{view} Roster</h2>
                                 {view === 'active' && (
@@ -1074,13 +1257,22 @@ function App() {
                                     .filter(c => {
                                         if (view === 'blackburn') return c.status === CreatorStatus.Blackburn;
                                         if (view === 'inactive') return c.status === CreatorStatus.Inactive;
+                                        // Hide creators tagged for reachout (Queued/Contacted) from active roster
+                                        if (c.reachoutStatus && c.reachoutStatus !== ReachoutStatus.None && c.reachoutStatus !== ReachoutStatus.Reactivated) return false;
                                         return c.status !== CreatorStatus.Blackburn && c.status !== CreatorStatus.Inactive;
                                     })
-                                    .filter(c =>
-                                        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        c.handle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        c.shipmentStatus?.toLowerCase().includes(searchTerm.toLowerCase())
-                                    )
+                                    .filter(c => {
+                                        // Special filter: only show creators with pending/active shipments
+                                        if (showPendingShipmentsOnly) {
+                                            return (c.shipments || []).some(s =>
+                                                s.status === ShipmentStatus.Preparing || s.status === ShipmentStatus.Issue
+                                            );
+                                        }
+                                        if (!searchTerm) return true;
+                                        return c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            c.handle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            c.shipmentStatus?.toLowerCase().includes(searchTerm.toLowerCase());
+                                    })
                                     .map(creator => (
                                         <CreatorCard
                                             key={creator.id}
@@ -1124,6 +1316,15 @@ function App() {
                                         isCreatorMessage: false,
                                     };
                                     setTeamMessages(prev => [...prev, msg]);
+                                }}
+                                onAskCoco={(context) => {
+                                    // Dispatch custom event for GlobalChat to pick up
+                                    window.dispatchEvent(new CustomEvent('coco-open', { detail: { context } }));
+                                }}
+                                onSendAvatarEmail={(emails, subject, body) => {
+                                    // Navigate to inbox with the avatar email pre-filled
+                                    setView('inbox');
+                                    sessionStorage.setItem('compose_prefill', JSON.stringify({ to: emails.join(', '), subject, body }));
                                 }}
                             />
                         </>
@@ -1276,6 +1477,18 @@ function App() {
                             onUpdateCreator={(id, updates) => {
                                 setCreators(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
                             }}
+                        />
+                    )}
+
+                    {/* CREATOR REACHOUT */}
+                    {view === 'reachout' && (
+                        <CreatorReachout
+                            creators={creators}
+                            appSettings={settings}
+                            onUpdateCreator={(id, updates) => {
+                                setCreators(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+                            }}
+                            onNavigate={(v) => { setSearchTerm(''); setView(v as any); }}
                         />
                     )}
                 </div>
@@ -1498,9 +1711,11 @@ function App() {
                 <style>{`@media(max-width:768px){.mobile-bottom-nav{display:flex!important}}`}</style>
                 {[
                     { id: 'dashboard', icon: LayoutDashboard, label: 'Home' },
-                    { id: 'active', icon: Users, label: 'Creators' },
-                    { id: 'calendar', icon: CalendarDays, label: 'Calendar' },
-                    { id: 'payments', icon: CreditCard, label: 'Payments' },
+                    { id: 'active', icon: Users, label: 'Roster' },
+                    { id: 'campaigns', icon: Briefcase, label: 'Campaigns' },
+                    { id: 'payments', icon: CreditCard, label: 'Pay' },
+                    { id: 'reachout', icon: UserPlus, label: 'Reach' },
+                    { id: 'calendar', icon: CalendarDays, label: 'Cal' },
                     { id: 'team', icon: ShieldCheck, label: 'Team' },
                 ].map(item => (
                     <button
