@@ -130,8 +130,110 @@ router.post('/chat', async (req, res) => {
   }
 });
 
+// ── Gemini Embedding 2 ──
+
+router.post('/embed', async (req, res) => {
+  try {
+    const { text, texts, taskType, dimensions } = req.body;
+    if (!text && !texts) return res.status(400).json({ error: 'text or texts required' });
+
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) return res.status(500).json({ error: 'API_KEY not configured' });
+
+    const { GoogleGenAI } = await import('@google/genai');
+    const ai = new GoogleGenAI({ apiKey });
+
+    const model = 'gemini-embedding-2-preview'; // Gemini Embedding 2
+    const config = {};
+    if (taskType) config.taskType = taskType; // RETRIEVAL_QUERY, RETRIEVAL_DOCUMENT, SEMANTIC_SIMILARITY, etc.
+    if (dimensions) config.outputDimensionality = dimensions; // 768, 1536, or 3072
+
+    if (texts && Array.isArray(texts)) {
+      // Batch embed
+      const result = await ai.models.embedContent({ model, contents: texts, config });
+      return res.json({ embeddings: result.embeddings.map(e => e.values) });
+    }
+
+    // Single embed
+    const result = await ai.models.embedContent({ model, contents: text, config });
+    res.json({ embedding: result.embeddings[0].values });
+  } catch (e) {
+    console.error('[Embedding] Error:', e.message);
+    res.status(500).json({ error: e.message || 'Embedding failed' });
+  }
+});
+
+// ── Cosine Similarity ──
+function cosineSimilarity(a, b) {
+  if (!a || !b || a.length !== b.length) return 0;
+  let dot = 0, magA = 0, magB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    magA += a[i] * a[i];
+    magB += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(magA) * Math.sqrt(magB));
+}
+
 // Coco Memory — Firestore-backed
 export default function createAiRoutes(firestoreDAL) {
+
+  // ── Semantic Memory (Embedding-powered) ──
+
+  // Store a memory with its embedding vector
+  router.post('/memory/semantic-save', async (req, res) => {
+    try {
+      const { userId, text, category, embedding } = req.body;
+      if (!userId || !text || !embedding) {
+        return res.status(400).json({ error: 'userId, text, and embedding required' });
+      }
+
+      const docId = `sem_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const doc = {
+        text,
+        category: category || 'conversation',
+        embedding, // float[] vector
+        createdAt: new Date().toISOString(),
+        userId,
+      };
+      await firestoreDAL.setDocument(`coco_semantic_memory/${userId}/vectors`, docId, doc);
+      res.json({ ok: true, id: docId });
+    } catch (e) {
+      console.error('[Coco Semantic] Save error:', e.message);
+      res.status(500).json({ error: 'Failed to save semantic memory' });
+    }
+  });
+
+  // Search memories by semantic similarity
+  router.post('/memory/semantic-search', async (req, res) => {
+    try {
+      const { userId, queryEmbedding, topK, minScore } = req.body;
+      if (!userId || !queryEmbedding) {
+        return res.status(400).json({ error: 'userId and queryEmbedding required' });
+      }
+
+      const memories = await firestoreDAL.getCollection(`coco_semantic_memory/${userId}/vectors`);
+      if (!memories || memories.length === 0) return res.json({ results: [] });
+
+      // Compute similarity scores
+      const scored = memories
+        .filter(m => m.embedding && m.embedding.length > 0)
+        .map(m => ({
+          text: m.text,
+          category: m.category,
+          createdAt: m.createdAt,
+          score: cosineSimilarity(queryEmbedding, m.embedding),
+        }))
+        .filter(m => m.score >= (minScore || 0.5))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, topK || 3);
+
+      res.json({ results: scored });
+    } catch (e) {
+      console.error('[Coco Semantic] Search error:', e.message);
+      res.json({ results: [] });
+    }
+  });
   router.post('/memory/save', async (req, res) => {
     try {
       const { userId, key, value, category, ttlDays } = req.body;

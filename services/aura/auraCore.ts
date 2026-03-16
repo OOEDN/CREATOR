@@ -9,7 +9,7 @@
  */
 
 import { Creator, Campaign, ContentItem, TeamTask, TeamMessage, BetaTest, BetaRelease } from "../../types";
-import { aiGenerate, aiChat, saveMemory, recallMemories } from "../aiProxy";
+import { aiGenerate, aiChat, saveMemory, recallMemories, aiEmbed, semanticSave, semanticSearch } from "../aiProxy";
 
 // ── Soul & Knowledge (loaded once, cached) ──
 import COCO_SOUL_RAW from "./COCO_SOUL.md?raw";
@@ -151,6 +151,39 @@ async function buildMemoryContext(userId?: string): Promise<string> {
     }
 }
 
+// ── Semantic Memory Helpers (Gemini Embedding 2) ──
+
+async function recallSemanticContext(userId: string, query: string): Promise<string> {
+    try {
+        // Embed the user's query
+        const queryEmbedding = await aiEmbed(query, { taskType: 'RETRIEVAL_QUERY', dimensions: 768 });
+        if (!queryEmbedding || queryEmbedding.length === 0) return '';
+
+        // Search past memories
+        const results = await semanticSearch(userId, queryEmbedding, 3);
+        if (!results || results.length === 0) return '';
+
+        const recalled = results.map(r => `- (relevance ${Math.round(r.score * 100)}%) ${r.text}`).join('\n');
+        return `\n## Recalled Past Conversations (Semantic Memory)\n${recalled}`;
+    } catch (e) {
+        console.warn('[Coco Semantic] Recall failed:', e);
+        return '';
+    }
+}
+
+async function saveSemanticMemory(userId: string, userMsg: string, cocoResponse: string): Promise<void> {
+    try {
+        const summary = `User asked: ${userMsg.slice(0, 150)}. Coco replied: ${cocoResponse.slice(0, 200)}`;
+        const embedding = await aiEmbed(summary, { taskType: 'RETRIEVAL_DOCUMENT', dimensions: 768 });
+        if (embedding && embedding.length > 0) {
+            await semanticSave(userId, summary, embedding, 'conversation');
+        }
+    } catch (e) {
+        // Non-blocking — don't let memory failures break chat
+        console.warn('[Coco Semantic] Save failed:', e);
+    }
+}
+
 function buildSystemPrompt(mode: AuraMode, ctx: AuraContext, memoryContext: string): string {
     const soul = COCO_SOUL_RAW || '';
     const knowledge = COCO_KNOWLEDGE_RAW || '';
@@ -221,7 +254,11 @@ export async function askAura(
 
     // Build memory context from Firestore
     const memoryContext = useMemory ? await buildMemoryContext(userId) : '(Memory disabled)';
-    const systemInstruction = buildSystemPrompt(mode, context, memoryContext);
+
+    // Semantic recall: find relevant past conversations
+    const semanticContext = (useMemory && mode === 'chat') ? await recallSemanticContext(userId, input) : '';
+
+    const systemInstruction = buildSystemPrompt(mode, context, memoryContext + semanticContext);
 
     // Build history for chat mode
     const history = options?.history || (mode === 'chat' ? sessionConversation : []);
@@ -255,6 +292,9 @@ export async function askAura(
 
             // Persist notable interactions to Firestore (async, non-blocking)
             saveMemory(userId, `conv_${Date.now()}`, `User: ${input.slice(0, 100)} → Coco: ${responseText.slice(0, 100)}`, 'conversation', 7).catch(() => {});
+
+            // Embed & save to semantic memory (async, non-blocking)
+            saveSemanticMemory(userId, input, responseText).catch(() => {});
         }
 
         // Parse email mode response
