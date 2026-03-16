@@ -33,3 +33,7 @@ backups/
 
 # OS files
 Thumbs.db
+
+# Secrets (never commit)
+service-account-key.json
+INFRASTRUCTURE.md
