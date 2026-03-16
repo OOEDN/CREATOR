@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, X, Loader2, Sparkles, Database, MessageSquare, Mic, MicOff, Brain, Paperclip, Image as ImageIcon } from 'lucide-react';
+import { Send, X, Loader2, Sparkles, Database, MessageSquare, Mic, MicOff, Brain, Paperclip, Image as ImageIcon, Film } from 'lucide-react';
 import { Creator, Campaign, ContentItem, TeamMessage, TeamTask, BetaTest, BetaRelease } from '../types';
 import { auraChat, getAuraGreeting } from '../services/aura/auraCore';
 import { restoreSessionFromSTM, getSessionConversation, clearSessionConversation, addToSessionConversation } from '../services/aura/auraMemory';
@@ -30,7 +30,8 @@ interface Message {
     id: string;
     role: 'user' | 'model';
     text: string;
-    imagePreview?: string; // data URL for display
+    mediaPreview?: string; // data URL for display
+    mediaType?: 'image' | 'video';
 }
 
 const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], onSendTeamMessage, currentUser = 'Anonymous', brandInfo }) => {
@@ -41,7 +42,7 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
     const [isLoading, setIsLoading] = useState(false);
     const [isListening, setIsListening] = useState(false);
     const [initialized, setInitialized] = useState(false);
-    const [attachedImage, setAttachedImage] = useState<{ dataUrl: string; base64: string; mimeType: string } | null>(null);
+    const [attachedMedia, setAttachedMedia] = useState<{ dataUrl: string; base64: string; mimeType: string; type: 'image' | 'video' } | null>(null);
     const recognitionRef = useRef<any>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const teamEndRef = useRef<HTMLDivElement>(null);
@@ -171,15 +172,15 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
 
         if (isLoading) return;
 
-        const userMsg: Message = { id: crypto.randomUUID(), role: 'user', text: inputText, imagePreview: attachedImage?.dataUrl };
-        const mediaParts = attachedImage ? [{ mimeType: attachedImage.mimeType, data: attachedImage.base64 }] : undefined;
+        const userMsg: Message = { id: crypto.randomUUID(), role: 'user', text: inputText, mediaPreview: attachedMedia?.dataUrl, mediaType: attachedMedia?.type };
+        const mediaParts = attachedMedia ? [{ mimeType: attachedMedia.mimeType, data: attachedMedia.base64 }] : undefined;
         setMessages(prev => [...prev, userMsg]);
         setInputText('');
-        setAttachedImage(null);
+        setAttachedMedia(null);
         setIsLoading(true);
 
         try {
-            const responseText = await auraChat(userMsg.text || 'What do you see in this image?', appState, brandInfo, currentUser, mediaParts);
+            const responseText = await auraChat(userMsg.text || (attachedMedia?.type === 'video' ? 'What is happening in this video?' : 'What do you see in this image?'), appState, brandInfo, currentUser, mediaParts);
             const aiMsg: Message = { id: crypto.randomUUID(), role: 'model', text: responseText || "I couldn't process that." };
             setMessages(prev => [...prev, aiMsg]);
         } catch (e) {
@@ -191,24 +192,27 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
 
     const handleClearChat = () => {
         clearSessionConversation();
-        setAttachedImage(null);
+        setAttachedMedia(null);
         const greeting = getAuraGreeting(currentUser);
         setMessages([{ id: 'fresh', role: 'model', text: greeting }]);
     };
 
-    const handleImageAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleMediaAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        if (!file.type.startsWith('image/')) return;
-        if (file.size > 10 * 1024 * 1024) { alert('Image must be under 10MB'); return; }
+        const isImage = file.type.startsWith('image/');
+        const isVideo = file.type.startsWith('video/');
+        if (!isImage && !isVideo) return;
+        const maxSize = isVideo ? 20 * 1024 * 1024 : 10 * 1024 * 1024;
+        if (file.size > maxSize) { alert(`File must be under ${isVideo ? '20' : '10'}MB`); return; }
         const reader = new FileReader();
         reader.onload = () => {
             const dataUrl = reader.result as string;
-            const base64 = dataUrl.split(',')[1]; // Strip data:image/...;base64, prefix
-            setAttachedImage({ dataUrl, base64, mimeType: file.type });
+            const base64 = dataUrl.split(',')[1];
+            setAttachedMedia({ dataUrl, base64, mimeType: file.type, type: isVideo ? 'video' : 'image' });
         };
         reader.readAsDataURL(file);
-        e.target.value = ''; // Reset so same file can be re-selected
+        e.target.value = '';
     };
 
     return (
@@ -272,8 +276,11 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
                                             ? 'bg-emerald-600 text-white rounded-tr-sm'
                                             : 'bg-neutral-800 text-neutral-200 rounded-tl-sm border border-neutral-700'
                                             }`}>
-                                            {msg.imagePreview && (
-                                                <img src={msg.imagePreview} alt="Attached" className="max-w-full max-h-40 rounded-lg mb-2 border border-white/20" />
+                                            {msg.mediaPreview && msg.mediaType === 'video' && (
+                                                <video src={msg.mediaPreview} controls className="max-w-full max-h-40 rounded-lg mb-2 border border-white/20" />
+                                            )}
+                                            {msg.mediaPreview && msg.mediaType !== 'video' && (
+                                                <img src={msg.mediaPreview} alt="Attached" className="max-w-full max-h-40 rounded-lg mb-2 border border-white/20" />
                                             )}
                                             {msg.text}
                                         </div>
@@ -312,12 +319,16 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
 
                     {/* Input */}
                     <div className="p-3 bg-neutral-900 border-t border-neutral-800">
-                        {/* Image preview */}
-                        {attachedImage && mode === 'ai' && (
+                        {/* Media preview */}
+                        {attachedMedia && mode === 'ai' && (
                             <div className="mb-2 flex items-center gap-2 bg-neutral-800 rounded-lg p-2 border border-emerald-500/30">
-                                <img src={attachedImage.dataUrl} alt="Attached" className="w-12 h-12 object-cover rounded-md" />
-                                <span className="text-xs text-neutral-400 flex-1 truncate">Image attached</span>
-                                <button onClick={() => setAttachedImage(null)} className="text-neutral-500 hover:text-red-400 p-1"><X size={14} /></button>
+                                {attachedMedia.type === 'video' ? (
+                                    <div className="w-12 h-12 rounded-md bg-neutral-700 flex items-center justify-center"><Film size={20} className="text-emerald-400" /></div>
+                                ) : (
+                                    <img src={attachedMedia.dataUrl} alt="Attached" className="w-12 h-12 object-cover rounded-md" />
+                                )}
+                                <span className="text-xs text-neutral-400 flex-1 truncate">{attachedMedia.type === 'video' ? 'Video' : 'Image'} attached</span>
+                                <button onClick={() => setAttachedMedia(null)} className="text-neutral-500 hover:text-red-400 p-1"><X size={14} /></button>
                             </div>
                         )}
                         <form
@@ -328,17 +339,17 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
                                 type="text"
                                 value={inputText}
                                 onChange={(e) => setInputText(e.target.value)}
-                                placeholder={mode === 'ai' ? (attachedImage ? 'Ask about this image...' : 'Ask Coco anything...') : 'Message team...'}
+                                placeholder={mode === 'ai' ? (attachedMedia ? `Ask about this ${attachedMedia.type}...` : 'Ask Coco anything...') : 'Message team...'}
                                 className="flex-1 bg-transparent text-sm text-white focus:outline-none py-2"
                             />
                             {mode === 'ai' && (
                                 <>
-                                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageAttach} className="hidden" />
+                                    <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleMediaAttach} className="hidden" />
                                     <button
                                         type="button"
                                         onClick={() => fileInputRef.current?.click()}
-                                        className={`p-2 rounded-full transition-all ${attachedImage ? 'text-emerald-400' : 'text-neutral-500 hover:text-white'}`}
-                                        title="Attach image"
+                                        className={`p-2 rounded-full transition-all ${attachedMedia ? 'text-emerald-400' : 'text-neutral-500 hover:text-white'}`}
+                                        title="Attach image or video"
                                     >
                                         <Paperclip size={16} />
                                     </button>
@@ -354,7 +365,7 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
                             </button>
                             <button
                                 type="submit"
-                                disabled={(!inputText.trim() && !attachedImage) || (mode === 'ai' && isLoading)}
+                                disabled={(!inputText.trim() && !attachedMedia) || (mode === 'ai' && isLoading)}
                                 className={`p-2 rounded-full text-black transition-colors ${mode === 'ai' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400' : 'bg-blue-500 hover:bg-blue-400'} disabled:opacity-50`}
                             >
                                 <Send size={16} />

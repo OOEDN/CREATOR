@@ -20,6 +20,37 @@ const MAX_RECONNECT_DELAY = 30000; // 30s max
 const listeners: Map<string, Set<RealtimeCallback>> = new Map();
 
 /**
+ * Request browser notification permission and show notifications
+ * for new messages/tasks when the tab is not focused.
+ */
+function requestNotificationPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission().then(p =>
+      console.log(`[Realtime] Notification permission: ${p}`)
+    );
+  }
+}
+
+function showNotification(title: string, body: string, tag?: string) {
+  if (
+    'Notification' in window &&
+    Notification.permission === 'granted' &&
+    document.hidden // Only notify when tab is NOT focused
+  ) {
+    const n = new Notification(title, {
+      body,
+      icon: '/ooedn-logo.png',
+      tag: tag || 'ooedn-realtime', // Prevents duplicate notifications
+      silent: false,
+    });
+    // Auto-close after 5s
+    setTimeout(() => n.close(), 5000);
+    // Focus tab on click
+    n.onclick = () => { window.focus(); n.close(); };
+  }
+}
+
+/**
  * Register a callback for changes to a specific collection.
  * Returns an unsubscribe function.
  */
@@ -50,6 +81,9 @@ export function connectRealtime(): () => void {
   console.log('[Realtime] Connecting to SSE stream...');
   eventSource = new EventSource(url);
 
+  // Request notification permission on first connect
+  requestNotificationPermission();
+
   eventSource.addEventListener('connected', (e) => {
     const data = JSON.parse((e as MessageEvent).data);
     console.log(`[Realtime] ✅ Connected (${data.clientCount} clients)`);
@@ -62,6 +96,24 @@ export function connectRealtime(): () => void {
     eventSource.addEventListener(collection, (e) => {
       try {
         const event: RealtimeEvent = JSON.parse((e as MessageEvent).data);
+
+        // Fire browser notification for new items when tab is not focused
+        if (event.type === 'added') {
+          if (collection === 'teamMessages' && event.doc?.text) {
+            showNotification(
+              `💬 ${event.doc.sender || 'Team'}`,
+              event.doc.text.substring(0, 80),
+              `msg-${event.doc.id}`
+            );
+          } else if (collection === 'teamTasks' && event.doc?.title) {
+            showNotification(
+              '📋 New Task',
+              event.doc.title.substring(0, 80),
+              `task-${event.doc.id}`
+            );
+          }
+        }
+
         const callbacks = listeners.get(collection);
         if (callbacks) {
           for (const cb of callbacks) {
