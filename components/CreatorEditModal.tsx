@@ -243,8 +243,7 @@ const CreatorEditModal: React.FC<CreatorEditModalProps> = ({
 
 <!-- Logo -->
 <tr><td align="center" style="padding:32px 0 24px;">
-  <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:42px;font-weight:900;letter-spacing:-2px;color:#ffffff;">ooedn</div>
-  <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:3px;color:#737373;text-transform:uppercase;margin-top:2px;">out of eedun</div>
+  <img src="https://i.postimg.cc/Z5xWzGv5/Logowhite.png" alt="OOEDN" width="180" style="display:block;height:auto;max-width:180px;" />
 </td></tr>
 
 <!-- Divider -->
