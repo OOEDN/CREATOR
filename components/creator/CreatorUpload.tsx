@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Creator, ContentItem, ContentType, ContentStatus, Platform, ContentNote } from '../../types';
+import { Creator, Campaign, ContentItem, ContentType, ContentStatus, Platform, ContentNote } from '../../types';
 import {
     Upload as UploadIcon, Image, Video, FileText, CheckCircle, Loader2,
     MessageSquare, Send, ChevronDown, ChevronUp, Sparkles, Eye, RotateCw
@@ -7,6 +7,7 @@ import {
 
 interface Props {
     creator: Creator;
+    campaigns?: Campaign[];
     contentItems: ContentItem[];
     onUpload: (item: ContentItem) => void;
     onReplyToNote: (contentId: string, text: string) => void;
@@ -21,13 +22,14 @@ const statusColors: Record<string, { bg: string; text: string; emoji: string }> 
     'Published': { bg: 'bg-purple-500/10', text: 'text-purple-400', emoji: '🚀' },
 };
 
-const CreatorUpload: React.FC<Props> = ({ creator, contentItems, onUpload, onReplyToNote, onUpdateContent }) => {
+const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUpload, onReplyToNote, onUpdateContent }) => {
     const [isDragging, setIsDragging] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [title, setTitle] = useState('');
     const [caption, setCaption] = useState('');
     const [contentType, setContentType] = useState<ContentType>(ContentType.Video);
     const [platform, setPlatform] = useState<Platform>(creator.platform);
+    const [selectedCampaignId, setSelectedCampaignId] = useState<string>('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [preview, setPreview] = useState<string | null>(null);
     const [expandedContentId, setExpandedContentId] = useState<string | null>(null);
@@ -35,6 +37,11 @@ const CreatorUpload: React.FC<Props> = ({ creator, contentItems, onUpload, onRep
     const [showUploadForm, setShowUploadForm] = useState(true);
     const [revisingContentId, setRevisingContentId] = useState<string | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
+
+    // Filter campaigns this creator is assigned to
+    const myCampaigns = (campaigns || []).filter(c =>
+        c.assignedCreatorIds?.includes(creator.id) || c.status === 'Final Campaign'
+    );
     const revisionFileRef = useRef<HTMLInputElement>(null);
 
     const myContent = contentItems.filter(c => c.creatorId === creator.id || c.creatorName === creator.name);
@@ -104,10 +111,12 @@ const CreatorUpload: React.FC<Props> = ({ creator, contentItems, onUpload, onRep
                 fileUrl = URL.createObjectURL(selectedFile);
             }
 
+            const selectedCampaign = myCampaigns.find(c => c.id === selectedCampaignId);
             const item: ContentItem = {
                 id: crypto.randomUUID(),
                 creatorId: creator.id,
                 creatorName: creator.name,
+                campaignId: selectedCampaignId || undefined,
                 title,
                 type: contentType,
                 status: ContentStatus.Raw,
@@ -116,13 +125,14 @@ const CreatorUpload: React.FC<Props> = ({ creator, contentItems, onUpload, onRep
                 storageType,
                 uploadDate: new Date().toISOString(),
                 caption: caption || undefined,
-                tags: [creator.name, 'creator-upload'],
+                tags: [creator.name, 'creator-upload', ...(selectedCampaign ? [selectedCampaign.title] : [])],
                 submittedByCreator: true,
             };
             onUpload(item);
             setSelectedFile(null);
             setTitle('');
             setCaption('');
+            setSelectedCampaignId('');
             setPreview(null);
         } catch (e) {
             console.error('[Upload] Submit error:', e);
@@ -273,6 +283,26 @@ const CreatorUpload: React.FC<Props> = ({ creator, contentItems, onUpload, onRep
                                     className="w-full bg-black border border-neutral-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50"
                                 />
                             </div>
+                            {/* Campaign Selector */}
+                            {myCampaigns.length > 0 && (
+                                <div>
+                                    <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest block mb-1" htmlFor="upload-campaign">🎯 Link to Campaign</label>
+                                    <select
+                                        id="upload-campaign"
+                                        value={selectedCampaignId}
+                                        onChange={e => setSelectedCampaignId(e.target.value)}
+                                        className="w-full bg-black border border-neutral-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50"
+                                    >
+                                        <option value="">No campaign (general upload)</option>
+                                        {myCampaigns.map(c => (
+                                            <option key={c.id} value={c.id}>📋 {c.title}</option>
+                                        ))}
+                                    </select>
+                                    {selectedCampaignId && (
+                                        <p className="text-[9px] text-emerald-400 mt-1 flex items-center gap-1">✅ Content will appear in the campaign's UGC tab</p>
+                                    )}
+                                </div>
+                            )}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest block mb-1" htmlFor="upload-type">Type</label>

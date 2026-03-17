@@ -2,12 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     LayoutDashboard, MessageCircle, Upload, CreditCard, User, Package, Briefcase,
     Loader2, ArrowRight, AlertTriangle, Flame, LogOut, Menu, X, Sun, Moon, UserPlus,
-    Mail, Lock, Eye, EyeOff, Bell, BellDot, FlaskConical
+    Mail, Lock, Eye, EyeOff, Bell, BellDot, FlaskConical, Users
 } from 'lucide-react';
 import {
     Creator, CreatorStatus, PaymentStatus, Platform, ContentItem, AppSettings,
     ShipmentStatus, Campaign, ContentStatus, TeamMessage, TeamTask, Shipment,
-    CreatorAccount, ContentNote, BetaTest, BetaRelease
+    CreatorAccount, ContentNote, BetaTest, BetaRelease, PeerMessage
 } from './types';
 import CreatorDashboard from './components/creator/CreatorDashboard';
 import CreatorChat from './components/creator/CreatorChat';
@@ -18,8 +18,10 @@ import CreatorShipments from './components/creator/CreatorShipments';
 import CreatorCampaigns from './components/creator/CreatorCampaigns';
 import CreatorOnboarding from './components/creator/CreatorOnboarding';
 import CreatorBetaLab from './components/creator/CreatorBetaLab';
+import CreatorAIChat from './components/creator/CreatorAIChat';
+import CreatorPeerChat from './components/creator/CreatorPeerChat';
 
-type CreatorView = 'dashboard' | 'chat' | 'upload' | 'payments' | 'profile' | 'shipments' | 'campaigns' | 'betaLab';
+type CreatorView = 'dashboard' | 'chat' | 'upload' | 'payments' | 'profile' | 'shipments' | 'campaigns' | 'betaLab' | 'community';
 
 // GCS settings (shared with team side)
 const GCS_SETTINGS: AppSettings = {
@@ -69,6 +71,7 @@ function CreatorApp() {
     const [betaReleases, setBetaReleases] = useState<BetaRelease[]>([]);
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [showWelcomeIntro, setShowWelcomeIntro] = useState(false);
+    const [peerMessages, setPeerMessages] = useState<PeerMessage[]>([]);
 
     // JWT Token
     const [jwtToken, setJwtToken] = useState<string | null>(() => {
@@ -678,6 +681,7 @@ function CreatorApp() {
         { id: 'profile', icon: User, label: 'Profile', emoji: '👤' },
         { id: 'shipments', icon: Package, label: 'Shipments', emoji: '📦' },
         { id: 'campaigns', icon: Briefcase, label: 'Campaigns', emoji: '🎯' },
+        { id: 'community', icon: Users, label: 'Community', emoji: '🤝' },
         { id: 'betaLab', icon: FlaskConical, label: 'Beta Lab', emoji: '🧪' },
     ];
 
@@ -875,6 +879,7 @@ function CreatorApp() {
                     {view === 'upload' && (
                         <CreatorUpload
                             creator={creatorRecord}
+                            campaigns={campaigns}
                             contentItems={contentItems}
                             onUpload={handleContentUpload}
                             onReplyToNote={handleReplyToNote}
@@ -937,6 +942,48 @@ function CreatorApp() {
                                 setTeamMessages(prev => [...prev, msg]);
                                 saveMasterDB(undefined, undefined, undefined, [...teamMessages, msg]);
                             }}
+                            onSelectAngle={(campaignId, avatarId, angleId) => {
+                                const updatedCampaigns = campaigns.map(c => {
+                                    if (c.id !== campaignId) return c;
+                                    const updatedAvatars = (c.avatars || []).map(avatar => {
+                                        if (avatar.id !== avatarId) return avatar;
+                                        const updatedAngles = (avatar.angles || []).map(angle => {
+                                            if (angle.id !== angleId) return angle;
+                                            const ids = angle.selectedByCreatorIds || [];
+                                            if (!ids.includes(creatorRecord.id)) {
+                                                return { ...angle, selectedByCreatorIds: [...ids, creatorRecord.id] };
+                                            }
+                                            return angle;
+                                        });
+                                        // Also add creator to avatar's matchedCreatorIds for slot tracking
+                                        const matchedIds = avatar.matchedCreatorIds || [];
+                                        const updatedMatched = matchedIds.includes(creatorRecord.id) ? matchedIds : [...matchedIds, creatorRecord.id];
+                                        return { ...avatar, angles: updatedAngles, matchedCreatorIds: updatedMatched };
+                                    });
+                                    return { ...c, avatars: updatedAvatars };
+                                });
+                                setCampaigns(updatedCampaigns);
+                                saveMasterDB(undefined, updatedCampaigns);
+                            }}
+                        />
+                    )}
+                    {view === 'community' && (
+                        <CreatorPeerChat
+                            creator={creatorRecord}
+                            campaigns={campaigns}
+                            creators={creators}
+                            peerMessages={peerMessages}
+                            onSendPeerMessage={(toCreatorId, text) => {
+                                const msg: PeerMessage = {
+                                    id: crypto.randomUUID(),
+                                    fromCreatorId: creatorRecord.id,
+                                    toCreatorId,
+                                    text,
+                                    timestamp: new Date().toISOString(),
+                                };
+                                setPeerMessages(prev => [...prev, msg]);
+                                saveMasterDB();
+                            }}
                         />
                     )}
                     {view === 'betaLab' && currentAccount && (
@@ -954,6 +1001,13 @@ function CreatorApp() {
                         />
                     )}
                 </div>
+
+                {/* Coco AI Chat — floating overlay */}
+                <CreatorAIChat
+                    creator={creatorRecord}
+                    campaigns={campaigns}
+                    contentItems={contentItems}
+                />
             </main>
         </div>
     );
