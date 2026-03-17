@@ -27,6 +27,12 @@ jobs:
       - name: TypeScript Build
         run: npm run build
 
+      - name: Smoke Tests
+        run: node tests/smoke.test.js
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+          DB_SOURCE: firestore
+
   deploy-admin:
     name: Deploy to Cloud Run
     needs: build-check
