@@ -7,6 +7,7 @@ import {
     UserCircle2, Unlock, Check, Star, Zap, ChevronLeft, Lock, Shield, Target, Download, Bell, Pause
 } from 'lucide-react';
 import CampaignProgressBar from './CampaignProgressBar';
+import CaptionGenerator from './CaptionGenerator';
 
 interface Props {
     creator: Creator;
@@ -232,6 +233,13 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                         <div className="mb-4">
                                             <CampaignProgressBar campaign={campaign} creator={creator} contentItems={contentItems} />
                                         </div>
+
+                                        {/* Caption & Hashtag Generator (for accepted campaigns) */}
+                                        {isAccepted && (
+                                            <div className="mb-4">
+                                                <CaptionGenerator campaign={campaign} />
+                                            </div>
+                                        )}
 
                                         {/* === GAMIFIED BRIEF HUB — progressive unlock === */}
                                         {(campaign.avatars?.length || 0) > 0 && (() => {

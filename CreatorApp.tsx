@@ -82,6 +82,8 @@ function CreatorApp() {
     // Notifications
     const [notifications, setNotifications] = useState<CreatorNotification[]>([]);
     const [showNotifPanel, setShowNotifPanel] = useState(false);
+    const [showConfetti, setShowConfetti] = useState(false);
+    const prevPaymentStatusRef = useRef<string | null>(null);
 
     const initialLoadRef = useRef(false);
 
@@ -103,6 +105,18 @@ function CreatorApp() {
             return () => clearTimeout(timer);
         }
     }, [showWelcomeIntro]);
+
+    // Payment confetti detection
+    useEffect(() => {
+        if (!creatorRecord) return;
+        const currentStatus = creatorRecord.paymentStatus;
+        if (prevPaymentStatusRef.current && prevPaymentStatusRef.current !== 'Paid' && currentStatus === 'Paid') {
+            setShowConfetti(true);
+            addNotification('payment', '🎉 You Got Paid!', `$${creatorRecord.totalEarned || creatorRecord.rate || 0} has been sent to you!`);
+            setTimeout(() => setShowConfetti(false), 4000);
+        }
+        prevPaymentStatusRef.current = currentStatus;
+    }, [creatorRecord?.paymentStatus]);
 
     const [settings] = useState<AppSettings>(() => {
         const saved = localStorage.getItem('ooedn_settings');
@@ -779,6 +793,31 @@ function CreatorApp() {
             {/* Subtle ambient glow — Apple style */}
             <div style={{ position: 'absolute', top: '-10%', right: '-5%', width: '600px', height: '600px', background: 'radial-gradient(circle, rgba(167,139,250,0.06), transparent 70%)', borderRadius: '50%', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0 }} />
             <div style={{ position: 'absolute', bottom: '-10%', left: '-5%', width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(236,72,153,0.04), transparent 70%)', borderRadius: '50%', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0 }} />
+
+            {/* CONFETTI OVERLAY */}
+            {showConfetti && (
+                <>
+                    <style>{`
+                        @keyframes confettiFall {
+                            0% { transform: translateY(-100px) rotate(0deg) scale(1); opacity: 1; }
+                            100% { transform: translateY(100vh) rotate(720deg) scale(0.3); opacity: 0; }
+                        }
+                    `}</style>
+                    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', zIndex: 9999, overflow: 'hidden' }}>
+                        {Array.from({ length: 20 }).map((_, i) => (
+                            <div key={i} style={{
+                                position: 'absolute',
+                                top: '-40px',
+                                left: `${Math.random() * 100}%`,
+                                fontSize: `${16 + Math.random() * 20}px`,
+                                animation: `confettiFall ${2 + Math.random() * 2}s ease-in ${Math.random() * 0.8}s forwards`,
+                            }}>
+                                {['🎉', '💰', '🎊', '💵', '✨', '🥳', '💸', '🤑'][i % 8]}
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
             {/* ONBOARDING WALKTHROUGH OVERLAY */}
             {showOnboarding && currentAccount && creatorRecord && (
                 <CreatorOnboarding
