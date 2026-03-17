@@ -3,6 +3,23 @@ name: Deploy Admin (team.ooedn.com)
 on:
   push:
     branches: [main]
+    paths:
+      # Team app files
+      - 'App.tsx'
+      - 'index.tsx'
+      - 'index.html'
+      - 'components/**'
+      - '!components/creator/**'  # Exclude creator-only components
+      # Shared infrastructure (triggers both deploys)
+      - 'server.js'
+      - 'routes/**'
+      - 'services/**'
+      - 'types.ts'
+      - 'package.json'
+      - 'Dockerfile'
+      - 'vite.config.ts'
+      - 'tests/**'
+      - '.github/workflows/deploy-admin.yml'
   workflow_dispatch: # Allow manual trigger from GitHub UI
 
 env:
