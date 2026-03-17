@@ -233,14 +233,99 @@ const CreatorEditModal: React.FC<CreatorEditModalProps> = ({
 
             // Email credentials via Gmail (using admin's OAuth token)
             const portalUrl = 'https://creator.ooedn.com';
-            const emailBody = `Hey ${creator.name}!\n\nYou've been invited to the OOEDN Creator Portal!\n\nHere are your login credentials:\n\nEmail: ${creatorEmail}\nPassword: ${password}\n\nPortal Link: ${portalUrl}\n\nLog in to view your campaigns, upload content, request payments, and chat with the team.\n\nWelcome aboard!\n\n-- The OOEDN Creative Team`;
+            const emailHtml = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#0a0a0a;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0a0a;">
+<tr><td align="center" style="padding:40px 20px;">
+<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
+
+<!-- Logo -->
+<tr><td align="center" style="padding:32px 0 24px;">
+  <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:42px;font-weight:900;letter-spacing:-2px;color:#ffffff;">ooedn</div>
+  <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:3px;color:#737373;text-transform:uppercase;margin-top:2px;">out of eedun</div>
+</td></tr>
+
+<!-- Divider -->
+<tr><td style="padding:0 40px;"><div style="height:1px;background:linear-gradient(to right,transparent,#333,transparent);"></div></td></tr>
+
+<!-- Welcome -->
+<tr><td style="padding:32px 40px 16px;text-align:center;">
+  <h1 style="margin:0;font-size:26px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">Welcome to the Creator Portal</h1>
+  <p style="margin:12px 0 0;font-size:15px;color:#a3a3a3;line-height:1.6;">Hey <strong style="color:#ffffff;">${creator.name}</strong> — you've been invited to join the OOEDN creative team. Your portal is ready.</p>
+</td></tr>
+
+<!-- Credentials Card -->
+<tr><td style="padding:8px 40px 24px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#171717;border:1px solid #262626;border-radius:16px;overflow:hidden;">
+    <tr><td style="padding:20px 24px 12px;">
+      <div style="font-size:9px;font-weight:800;letter-spacing:2px;color:#10b981;text-transform:uppercase;">Your Login Credentials</div>
+    </td></tr>
+    <tr><td style="padding:0 24px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="padding:8px 0;font-size:11px;font-weight:700;color:#737373;text-transform:uppercase;letter-spacing:1px;width:80px;">Email</td>
+          <td style="padding:8px 0;font-size:15px;color:#ffffff;font-family:'Courier New',monospace;font-weight:600;">${creatorEmail}</td>
+        </tr>
+        <tr><td colspan="2" style="padding:0;"><div style="height:1px;background-color:#262626;"></div></td></tr>
+        <tr>
+          <td style="padding:8px 0;font-size:11px;font-weight:700;color:#737373;text-transform:uppercase;letter-spacing:1px;width:80px;">Password</td>
+          <td style="padding:8px 0;font-size:15px;color:#ffffff;font-family:'Courier New',monospace;font-weight:600;">${password}</td>
+        </tr>
+      </table>
+    </td></tr>
+    <tr><td style="padding:12px 24px 16px;">
+      <div style="font-size:10px;color:#525252;">Save these credentials — you'll need them to sign in.</div>
+    </td></tr>
+  </table>
+</td></tr>
+
+<!-- CTA Button -->
+<tr><td align="center" style="padding:8px 40px 32px;">
+  <a href="${portalUrl}" target="_blank" style="display:inline-block;background:linear-gradient(135deg,#10b981,#059669);color:#000000;text-decoration:none;font-size:13px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:16px 48px;border-radius:12px;">Open Your Portal &rarr;</a>
+</td></tr>
+
+<!-- What You Can Do -->
+<tr><td style="padding:0 40px 32px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#171717;border:1px solid #262626;border-radius:16px;">
+    <tr><td style="padding:20px 24px;">
+      <div style="font-size:9px;font-weight:800;letter-spacing:2px;color:#a78bfa;text-transform:uppercase;margin-bottom:12px;">What You Can Do</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding:6px 0;font-size:14px;color:#d4d4d4;">📋 &nbsp;View your campaign briefs &amp; assignments</td></tr>
+        <tr><td style="padding:6px 0;font-size:14px;color:#d4d4d4;">📸 &nbsp;Upload content directly to the team</td></tr>
+        <tr><td style="padding:6px 0;font-size:14px;color:#d4d4d4;">💬 &nbsp;Chat with the OOEDN creative team</td></tr>
+        <tr><td style="padding:6px 0;font-size:14px;color:#d4d4d4;">💰 &nbsp;Request payments &amp; track shipments</td></tr>
+      </table>
+    </td></tr>
+  </table>
+</td></tr>
+
+<!-- Footer -->
+<tr><td style="padding:0 40px;"><div style="height:1px;background:linear-gradient(to right,transparent,#333,transparent);"></div></td></tr>
+<tr><td style="padding:24px 40px;text-align:center;">
+  <div style="font-size:11px;color:#525252;line-height:1.6;">
+    OOEDN Holdings LLC &bull; Creator Operations<br>
+    <a href="${portalUrl}" style="color:#10b981;text-decoration:none;">${portalUrl}</a>
+  </div>
+</td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
 
             try {
                 await sendEmail(
                     appSettings.googleCloudToken!,
                     creatorEmail,
-                    'Welcome to the OOEDN Creator Portal!',
-                    emailBody
+                    '🎬 Welcome to the OOEDN Creator Portal!',
+                    emailHtml,
+                    undefined,
+                    undefined,
+                    undefined,
+                    true
                 );
             } catch (emailErr: any) {
                 console.warn('[Invite] Email send failed, but account was created:', emailErr);

@@ -94,18 +94,20 @@ export const sendEmail = async (
     body: string,
     threadId?: string,
     inReplyTo?: string,
-    fromEmail: string = TEAM_EMAIL
+    fromEmail: string = TEAM_EMAIL,
+    isHtml: boolean = false
 ): Promise<{ id: string; threadId: string }> => {
     const hasNonAscii = /[^\x00-\x7F]/.test(subject);
     const encodedSubject = hasNonAscii
         ? `=?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`
         : subject;
 
+    const contentType = isHtml ? 'text/html; charset=utf-8' : 'text/plain; charset=utf-8';
     const headers = [
         `From: OOEDN Creative Team <${fromEmail}>`,
         `To: ${to}`,
         `Subject: ${encodedSubject}`,
-        `Content-Type: text/plain; charset=utf-8`,
+        `Content-Type: ${contentType}`,
         `MIME-Version: 1.0`,
     ];
     if (inReplyTo) {
