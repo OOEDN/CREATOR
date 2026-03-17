@@ -4,7 +4,7 @@ import {
     Briefcase, CheckSquare, Square, Calendar, Clock, Sparkles,
     Trophy, Upload, ArrowRight, Timer, Palette, LinkIcon, ExternalLink,
     FileText, Image, ListTodo, MessageSquare, ChevronDown, ChevronRight, Eye, Send,
-    UserCircle2, Unlock, Check, Star, Zap, ChevronLeft, Lock, Shield, Target, Download
+    UserCircle2, Unlock, Check, Star, Zap, ChevronLeft, Lock, Shield, Target, Download, Bell, Pause
 } from 'lucide-react';
 
 interface Props {
@@ -17,6 +17,7 @@ interface Props {
     onNavigate: (view: string) => void;
     onAddComment?: (campaignId: string, text: string) => void;
     onSelectAngle?: (campaignId: string, avatarId: string, angleId: string) => void;
+    onJoinWaitlist?: (campaignId: string) => void;
 }
 
 type CampaignTab = 'moodboard' | 'tasks' | 'uploads' | 'notes';
@@ -51,7 +52,7 @@ const CampaignConfetti: React.FC<{ active: boolean }> = ({ active }) => {
     );
 };
 
-const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, onMarkTaskDone, onAcceptCampaign, onDeclineCampaign, onNavigate, onAddComment, onSelectAngle }) => {
+const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, onMarkTaskDone, onAcceptCampaign, onDeclineCampaign, onNavigate, onAddComment, onSelectAngle, onJoinWaitlist }) => {
     const myCampaigns = campaigns.filter(c => c.assignedCreatorIds?.includes(creator.id) || c.status === 'Final Campaign');
     const [completedCampaignId, setCompletedCampaignId] = useState<string | null>(null);
     const [recentlyCompleted, setRecentlyCompleted] = useState<Set<string>>(new Set());
@@ -255,6 +256,8 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                             const maxPerAvatar = campaign.maxCreatorsPerAvatar;
                                             const campaignFull = maxPerAvatar ? campaign.avatars!.every(a => (a.matchedCreatorIds?.length || 0) >= maxPerAvatar) : false;
                                             const creatorAlreadyChose = campaign.avatars!.some(a => a.matchedCreatorIds?.includes(creator.id));
+                                            const isPaused = campaign.status === 'Paused';
+                                            const isOnWaitlist = campaign.waitlistCreatorIds?.includes(creator.id) || false;
 
                                             return (
                                                 <>
@@ -360,12 +363,34 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                             </div>
                                                         </div>
 
+                                                        {/* Campaign Paused Banner */}
+                                                        {isPaused && (
+                                                            <div className="px-5 py-8 text-center border-b border-orange-500/20 bg-gradient-to-br from-orange-500/5 to-neutral-900/80">
+                                                                <Pause size={32} className="text-orange-400 mx-auto mb-3" />
+                                                                <h4 className="text-base font-black text-white mb-1">⏸ Campaign Paused</h4>
+                                                                <p className="text-[11px] text-neutral-400 leading-relaxed">This campaign is temporarily on hold.<br/>The team will resume it when ready — hang tight!</p>
+                                                            </div>
+                                                        )}
+
                                                         {/* Campaign Closed Overlay */}
-                                                        {campaignFull && !creatorAlreadyChose && (
+                                                        {campaignFull && !creatorAlreadyChose && !isPaused && (
                                                             <div className="px-5 py-8 text-center border-b border-neutral-800/50 bg-gradient-to-br from-red-500/5 to-neutral-900/80">
                                                                 <Lock size={32} className="text-neutral-600 mx-auto mb-3" />
-                                                                <h4 className="text-base font-black text-white mb-1">🔒 Campaign Closed</h4>
-                                                                <p className="text-[11px] text-neutral-400 leading-relaxed">All spots for this campaign have been filled.<br/>Check back for future opportunities!</p>
+                                                                <h4 className="text-base font-black text-white mb-1">🔒 Campaign Filled</h4>
+                                                                <p className="text-[11px] text-neutral-400 leading-relaxed mb-4">All spots for this campaign have been filled at the moment.</p>
+                                                                {isOnWaitlist ? (
+                                                                    <div className="flex items-center justify-center gap-2 text-emerald-400">
+                                                                        <Check size={14} />
+                                                                        <span className="text-[11px] font-bold">You're on the waitlist — we'll notify you when a spot opens!</span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => onJoinWaitlist?.(campaign.id)}
+                                                                        className="bg-amber-500/10 text-amber-400 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest border border-amber-500/20 hover:bg-amber-500 hover:text-black transition-all flex items-center gap-2 mx-auto"
+                                                                    >
+                                                                        <Bell size={14} /> Notify Me When Available
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         )}
                                                         {campaignFull && creatorAlreadyChose && (
@@ -381,7 +406,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                             {/* ══════════════════════════════════════════════
                                                                 STEP 1: CHOOSE YOUR CHARACTER
                                                                ══════════════════════════════════════════════ */}
-                                                            {currentStep === 1 && !chosenAvatar && !(campaignFull && !creatorAlreadyChose) && (
+                                                            {currentStep === 1 && !chosenAvatar && !(campaignFull && !creatorAlreadyChose) && !isPaused && (
                                                                 <div className="step-zoom-in">
                                                                     {/* Campaign Goal Teaser */}
                                                                     {(campaign.briefGoal || campaign.description) && (

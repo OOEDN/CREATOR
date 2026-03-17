@@ -373,6 +373,12 @@ function CreatorApp() {
         });
         setCampaigns(updatedCampaigns);
         saveMasterDB(undefined, updatedCampaigns);
+        // Check capacity before accepting
+        const campaign = campaigns.find(c => c.id === campaignId);
+        if (campaign?.status === 'Paused') {
+            addNotification('campaign', 'Campaign Paused', 'This campaign is currently paused. Try again later.');
+            return;
+        }
         addNotification('campaign', 'Campaign Accepted! 🎯', `You're now part of the campaign. Check the deliverables!`);
     };
 
@@ -403,6 +409,31 @@ function CreatorApp() {
         setTeamMessages(updatedMessages);
         saveMasterDB(undefined, undefined, undefined, updatedMessages);
         addNotification('campaign', 'Campaign Declined', `You've declined this campaign.`);
+    };
+
+    const handleJoinWaitlist = (campaignId: string) => {
+        if (!creatorRecord) return;
+        const updatedCampaigns = campaigns.map(c => {
+            if (c.id !== campaignId) return c;
+            const waitlist = c.waitlistCreatorIds || [];
+            if (waitlist.includes(creatorRecord.id)) return c;
+            return { ...c, waitlistCreatorIds: [...waitlist, creatorRecord.id] };
+        });
+        setCampaigns(updatedCampaigns);
+        saveMasterDB(undefined, updatedCampaigns);
+        // Notify team
+        const campaign = campaigns.find(c => c.id === campaignId);
+        const msg: TeamMessage = {
+            id: crypto.randomUUID(),
+            creatorId: creatorRecord.id,
+            sender: creatorRecord.name,
+            text: `🔔 Joined waitlist for campaign "${campaign?.title || 'Unknown'}" — wants to be notified when a spot opens`,
+            timestamp: new Date().toISOString(),
+            isCreatorMessage: true,
+        };
+        setTeamMessages(prev => [...prev, msg]);
+        saveMasterDB(undefined, undefined, undefined, [...teamMessages, msg]);
+        addNotification('campaign', 'Waitlist Joined! 🔔', 'We\'ll notify you when a spot opens up on this campaign.');
     };
 
     // --- BETA LAB HANDLERS ---
@@ -965,6 +996,7 @@ function CreatorApp() {
                                 setCampaigns(updatedCampaigns);
                                 saveMasterDB(undefined, updatedCampaigns);
                             }}
+                            onJoinWaitlist={handleJoinWaitlist}
                         />
                     )}
                     {view === 'community' && (

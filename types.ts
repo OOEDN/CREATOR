@@ -55,6 +55,7 @@ export enum CampaignStatus {
   Idea = 'Idea',
   Brainstorming = 'Brainstorming',
   Final = 'Final Campaign',
+  Paused = 'Paused',
 }
 
 export enum ReachoutStatus {
@@ -171,6 +172,30 @@ export interface CampaignAvatar {
   traits: string[];            // Key traits: ["bold", "streetwear", "minimal"]
   color: string;               // Accent color for the avatar card
   matchedCreatorIds: string[]; // Creators who identified with this avatar
+  angles?: AvatarAngle[];      // Hook/story angles for this avatar
+}
+
+// Angle within an Avatar — creators choose an angle to unlock the full brief
+export interface AvatarAngle {
+  id: string;
+  hook: string;                // The hook line (visible to creators)
+  story: string;               // The overarching story/approach (visible)
+  summary: string;             // Short brief summary (always visible on card)
+  briefContent: string;        // Full brief / story script (revealed after selection)
+  psychology?: string;         // Why this angle works psychologically
+  visualCue?: string;          // Filming tips (location, style, overlays)
+  hooks?: string[];            // Array of selectable hook options
+  selectedByCreatorIds: string[];  // Creators who chose this angle
+}
+
+// Creator-to-Creator peer messaging
+export interface PeerMessage {
+  id: string;
+  fromCreatorId: string;
+  toCreatorId: string;
+  text: string;
+  timestamp: string;
+  readAt?: string;
 }
 
 // UGC Inspiration Video reference
@@ -208,6 +233,11 @@ export interface Campaign {
   channels?: string[];             // Content channels: "Social", "Video", "Display", "Linear TV", etc.
   goal?: string;                   // Campaign goal: "Traffic", "Engagement", "Branding", "Conversion", "Awareness"
   coverImage?: string;             // Cover image URL for gallery view
+  // Brief fields
+  briefGoal?: string;              // Campaign goal/metaphor (e.g. "Reframe Scalp Milk as Daily Supplement")
+  briefMandatories?: string;       // Dos/don'ts / required shots / tagging rules
+  maxCreatorsPerAvatar?: number;   // Max creators allowed per avatar (when all full → campaign closed)
+  waitlistCreatorIds?: string[];   // Creators waiting for a slot to open up
 }
 
 export interface Shipment {

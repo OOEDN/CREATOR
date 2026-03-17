@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Campaign, CampaignStatus, ContentItem, Creator, AppSettings, CreatorStatus, ContentType, CampaignTask, CampaignComment, MoodboardItem, CampaignAvatar, UGCInspoItem, AvatarAngle } from '../types';
-import { Plus, X, Layout, FileText, CheckCircle2, MoreHorizontal, Save, Users, ImageIcon, Sparkles, Loader2, BrainCircuit, Film, HardDrive, Printer, CheckSquare, MessageSquare, Trash2, ListTodo, Send, GripHorizontal, Eye, Edit3, PenTool, Mail, Palette, LinkIcon, ExternalLink, UserCircle2, Play, Video, Bot, Hash, Tag } from 'lucide-react';
+import { Plus, X, Layout, FileText, CheckCircle2, MoreHorizontal, Save, Users, ImageIcon, Sparkles, Loader2, BrainCircuit, Film, HardDrive, Printer, CheckSquare, MessageSquare, Trash2, ListTodo, Send, GripHorizontal, Eye, Edit3, PenTool, Mail, Palette, LinkIcon, ExternalLink, UserCircle2, Play, Video, Bot, Hash, Tag, Pause, Clock, Bell } from 'lucide-react';
 import ContentLibrary from './ContentLibrary';
 import { generateCampaignBrief, generateCampaignTasks, generateViralScript } from '../services/geminiService';
 import { createDriveFolder, uploadToGoogleDrive } from '../services/googleDriveService';
@@ -100,6 +100,7 @@ const CampaignBoard: React.FC<CampaignBoardProps> = ({
         { id: CampaignStatus.Idea, label: 'Fresh Ideas', icon: Layout, color: 'text-yellow-400 border-yellow-500/30 bg-yellow-500/5' },
         { id: CampaignStatus.Brainstorming, label: 'Brainstorming Hub', icon: BrainCircuit, color: 'text-blue-400 border-blue-500/30 bg-blue-500/5' },
         { id: CampaignStatus.Final, label: 'Final Campaigns', icon: CheckCircle2, color: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/5' },
+        { id: CampaignStatus.Paused, label: 'Paused', icon: Pause, color: 'text-orange-400 border-orange-500/30 bg-orange-500/5' },
     ];
 
     const handleCreate = (status: CampaignStatus) => {
@@ -532,6 +533,16 @@ Use "Negative Assumption": Stop doing X if you want Y.
                                                             })}
                                                         </div>
                                                         <span className="flex items-center gap-1 text-[8px] font-black text-neutral-500 uppercase tracking-widest"><ImageIcon size={14} /> {content.filter(c => c.campaignId === campaign.id).length}</span>
+                                                        {(campaign.waitlistCreatorIds?.length || 0) > 0 && (
+                                                            <span className="text-[8px] font-bold text-amber-400 flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                                                                <Clock size={9} /> {campaign.waitlistCreatorIds!.length} waitlisted
+                                                            </span>
+                                                        )}
+                                                        {campaign.status === CampaignStatus.Paused && (
+                                                            <span className="text-[8px] font-bold text-orange-400 flex items-center gap-1 bg-orange-500/10 px-2 py-0.5 rounded-full border border-orange-500/20">
+                                                                <Pause size={9} /> Paused
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -693,6 +704,34 @@ Use "Negative Assumption": Stop doing X if you want Y.
                             >
                                 🚀 Finalize
                             </button>
+                            {editingCampaign.status === CampaignStatus.Final && (
+                                <button
+                                    onClick={() => {
+                                        const paused = { ...editingCampaign, status: CampaignStatus.Paused };
+                                        setEditingCampaign(paused);
+                                        onSaveCampaign(paused);
+                                        alert('⏸ Campaign "' + paused.title + '" is now PAUSED.\n\nCreators will see a "Campaign Paused" message and cannot interact with it until you resume.');
+                                    }}
+                                    className="bg-orange-500/10 text-orange-400 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 border border-orange-500/20 hover:bg-orange-500 hover:text-black transition-all"
+                                    title="Pause this campaign — creators won't be able to interact"
+                                >
+                                    <Pause size={14} /> Pause
+                                </button>
+                            )}
+                            {editingCampaign.status === CampaignStatus.Paused && (
+                                <button
+                                    onClick={() => {
+                                        const resumed = { ...editingCampaign, status: CampaignStatus.Final };
+                                        setEditingCampaign(resumed);
+                                        onSaveCampaign(resumed);
+                                        alert('▶️ Campaign "' + resumed.title + '" is LIVE again!\n\nCreators can now interact with it.');
+                                    }}
+                                    className="bg-emerald-500/10 text-emerald-400 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 border border-emerald-500/20 hover:bg-emerald-500 hover:text-black transition-all"
+                                    title="Resume this campaign — put it back live"
+                                >
+                                    <Play size={14} /> Resume
+                                </button>
+                            )}
                             <button onClick={() => { onSaveCampaign(editingCampaign); setEditingCampaign(null); }} className="bg-emerald-500 text-black px-8 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-400 transition-all shadow-lg">
                                 <Save size={18} /> Done
                             </button>
