@@ -212,6 +212,41 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
                 })}
             </div>
 
+            {/* PROFILE THEME */}
+            <div className="bg-neutral-900/80 backdrop-blur-sm border border-neutral-800 rounded-2xl p-5">
+                <h3 className="text-sm font-black uppercase tracking-widest text-purple-400 flex items-center gap-2 mb-4">
+                    <Sparkles size={14} /> Profile Theme
+                </h3>
+                <p className="text-[9px] text-neutral-500 font-bold uppercase tracking-widest mb-3">Accent Color</p>
+                <div className="flex flex-wrap gap-2">
+                    {[
+                        { id: '#a855f7', label: 'Purple' },
+                        { id: '#ec4899', label: 'Pink' },
+                        { id: '#06b6d4', label: 'Cyan' },
+                        { id: '#10b981', label: 'Emerald' },
+                        { id: '#f59e0b', label: 'Amber' },
+                        { id: '#ef4444', label: 'Red' },
+                        { id: '#3b82f6', label: 'Blue' },
+                        { id: '#8b5cf6', label: 'Violet' },
+                        { id: '#f97316', label: 'Orange' },
+                        { id: '#14b8a6', label: 'Teal' },
+                    ].map(color => {
+                        const isActive = (creator.profileTheme?.accent || '#a855f7') === color.id;
+                        return (
+                            <button
+                                key={color.id}
+                                title={color.label}
+                                onClick={() => onUpdate({ profileTheme: { ...(creator.profileTheme || {}), accent: color.id } })}
+                                className={`w-8 h-8 rounded-xl border-2 transition-all active:scale-90 ${
+                                    isActive ? 'border-white scale-110 shadow-lg' : 'border-transparent hover:scale-105'
+                                }`}
+                                style={{ background: color.id, boxShadow: isActive ? `0 0 16px ${color.id}50` : 'none' }}
+                            />
+                        );
+                    })}
+                </div>
+            </div>
+
             {/* PAYMENT METHODS — main feature */}
             <div className="bg-neutral-900/80 backdrop-blur-sm border border-neutral-800 rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">

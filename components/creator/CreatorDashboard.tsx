@@ -478,6 +478,102 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                     </div>
                 )}
 
+                {/* ═══ DAILY MICRO-CHALLENGE ═══ */}
+                {(() => {
+                    const dailyChallenges = [
+                        { emoji: '📸', task: 'Upload a behind-the-scenes clip', xp: 15 },
+                        { emoji: '💡', task: 'Try a new angle for your next video', xp: 20 },
+                        { emoji: '🎭', task: 'Recreate a trending sound with your style', xp: 25 },
+                        { emoji: '📝', task: 'Write a killer caption for your last upload', xp: 10 },
+                        { emoji: '🔥', task: 'Reply to a teammate in the community tab', xp: 10 },
+                        { emoji: '🎬', task: 'Film 3 different hooks for the same brief', xp: 30 },
+                        { emoji: '🤳', task: 'Upload a quick product unboxing', xp: 20 },
+                    ];
+                    const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+                    const todaysChallenge = dailyChallenges[dayOfYear % dailyChallenges.length];
+                    return (
+                        <div style={{
+                            marginTop: '28px',
+                            background: 'linear-gradient(135deg, rgba(251,191,36,0.08) 0%, rgba(245,158,11,0.04) 100%)',
+                            backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+                            border: '1px solid rgba(251,191,36,0.15)',
+                            borderRadius: '18px', padding: '18px 20px',
+                            animation: 'dashFadeUp 0.6s ease 0.65s both',
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                <span style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(251,191,36,0.7)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>⚡ Daily Challenge</span>
+                                <span style={{ fontSize: '10px', fontWeight: 800, color: '#fbbf24', background: 'rgba(251,191,36,0.12)', padding: '2px 8px', borderRadius: '8px' }}>+{todaysChallenge.xp} XP</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{ fontSize: '24px' }}>{todaysChallenge.emoji}</span>
+                                <p style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.7)', margin: 0 }}>{todaysChallenge.task}</p>
+                            </div>
+                        </div>
+                    );
+                })()}
+
+                {/* ═══ YOUR IMPACT STATS ═══ */}
+                <div style={{
+                    marginTop: '28px',
+                    background: 'rgba(255,255,255,0.02)',
+                    backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    borderRadius: '18px', padding: '18px 20px',
+                    animation: 'dashFadeUp 0.6s ease 0.7s both',
+                }}>
+                    <p style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>📊 Your Impact</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                        <div style={{ textAlign: 'center' }}>
+                            <p style={{ fontSize: '18px', fontWeight: 800, color: '#a78bfa', margin: 0 }}><AnimNum value={totalUploads} /></p>
+                            <p style={{ fontSize: '8px', color: 'rgba(255,255,255,0.3)', fontWeight: 600, textTransform: 'uppercase', margin: '2px 0 0' }}>Uploads</p>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                            <p style={{ fontSize: '18px', fontWeight: 800, color: '#67e8f9', margin: 0 }}><AnimNum value={completedCount} /></p>
+                            <p style={{ fontSize: '8px', color: 'rgba(255,255,255,0.3)', fontWeight: 600, textTransform: 'uppercase', margin: '2px 0 0' }}>Approved</p>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                            <p style={{ fontSize: '18px', fontWeight: 800, color: '#86efac', margin: 0 }}>{totalUploads > 0 ? Math.round((completedCount / totalUploads) * 100) : 0}%</p>
+                            <p style={{ fontSize: '8px', color: 'rgba(255,255,255,0.3)', fontWeight: 600, textTransform: 'uppercase', margin: '2px 0 0' }}>Approval Rate</p>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                            <p style={{ fontSize: '18px', fontWeight: 800, color: '#fbbf24', margin: 0 }}><AnimNum value={acceptedCampaigns.length} /></p>
+                            <p style={{ fontSize: '8px', color: 'rgba(255,255,255,0.3)', fontWeight: 600, textTransform: 'uppercase', margin: '2px 0 0' }}>Campaigns</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ═══ UPCOMING CAMPAIGN PREVIEWS ═══ */}
+                {(() => {
+                    const upcoming = campaigns.filter(c => c.status === 'Brainstorming' || c.status === 'Idea');
+                    if (upcoming.length === 0) return null;
+                    return (
+                        <div style={{
+                            marginTop: '28px', animation: 'dashFadeUp 0.6s ease 0.75s both',
+                        }}>
+                            <p style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>👀 Coming Soon</p>
+                            <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px' }}>
+                                {upcoming.slice(0, 3).map(c => (
+                                    <div key={c.id} style={{
+                                        minWidth: '160px', flex: '0 0 auto',
+                                        background: 'rgba(255,255,255,0.03)',
+                                        border: '1px solid rgba(255,255,255,0.06)',
+                                        borderRadius: '14px', padding: '14px',
+                                        filter: 'blur(1.5px)',
+                                        transition: 'filter 0.3s',
+                                        cursor: 'default',
+                                    }}
+                                        onMouseEnter={e => { e.currentTarget.style.filter = 'blur(0px)'; }}
+                                        onMouseLeave={e => { e.currentTarget.style.filter = 'blur(1.5px)'; }}
+                                    >
+                                        <p style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.title}</p>
+                                        <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.25)', margin: '4px 0 0', fontWeight: 600, textTransform: 'uppercase' }}>{c.status}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                })()}
+
                 {/* ═══ ENABLE NOTIFICATIONS ═══ */}
                 {onEnableNotifications && !creator.notificationsEnabled && (
                     <div
