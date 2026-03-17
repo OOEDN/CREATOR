@@ -232,7 +232,7 @@ const CreatorEditModal: React.FC<CreatorEditModalProps> = ({
             }
 
             // Email credentials via Gmail (using admin's OAuth token)
-            const portalUrl = 'https://ooedn-creators-270857128950.us-west1.run.app';
+            const portalUrl = 'https://creator.ooedn.com';
             const emailBody = `Hey ${creator.name}!\n\nYou've been invited to the OOEDN Creator Portal!\n\nHere are your login credentials:\n\nEmail: ${creatorEmail}\nPassword: ${password}\n\nPortal Link: ${portalUrl}\n\nLog in to view your campaigns, upload content, request payments, and chat with the team.\n\nWelcome aboard!\n\n-- The OOEDN Creative Team`;
 
             try {
