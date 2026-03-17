@@ -9,7 +9,19 @@ const VERTEX_LOCATION = 'us-central1';
 
 function getVertexModel(modelName) {
   const vertexAI = new VertexAI({ project: VERTEX_PROJECT, location: VERTEX_LOCATION });
-  return vertexAI.getGenerativeModel({ model: modelName || 'gemini-3-flash' });
+  return vertexAI.getGenerativeModel({ model: modelName || 'gemini-2.0-flash' });
+}
+
+// Map Vertex AI model names → Google AI SDK model names for API key fallback
+function mapModelForApiKey(vertexModel) {
+  const map = {
+    'gemini-3-flash': 'gemini-2.5-flash',
+    'gemini-3.1-pro-preview': 'gemini-2.5-pro',
+    'gemini-3.1-pro': 'gemini-2.5-pro',
+    'gemini-3-pro': 'gemini-2.5-flash',
+    'gemini-2.0-flash': 'gemini-2.5-flash',
+  };
+  return map[vertexModel] || vertexModel || 'gemini-2.5-flash';
 }
 
 // Generic generation endpoint (single-shot, optionally structured)
@@ -66,7 +78,7 @@ router.post('/generate', async (req, res) => {
         const config = {};
         if (systemInstruction) config.systemInstruction = systemInstruction;
         if (responseSchema) { config.responseMimeType = 'application/json'; config.responseSchema = responseSchema; }
-        const fallbackResult = await ai.models.generateContent({ model: model || 'gemini-3-flash', contents: prompt, config });
+        const fallbackResult = await ai.models.generateContent({ model: mapModelForApiKey(model), contents: prompt, config });
         console.log('[Vertex AI] Fallback to API key succeeded');
         return res.json({ text: fallbackResult.text || '' });
       }
@@ -118,7 +130,7 @@ router.post('/chat', async (req, res) => {
         const { GoogleGenAI } = await import('@google/genai');
         const ai = new GoogleGenAI({ apiKey });
         const { message, systemInstruction, model, history } = req.body;
-        const chatSession = ai.chats.create({ model: model || 'gemini-3.1-pro-preview', config: { systemInstruction: systemInstruction || '' }, history: history || [] });
+        const chatSession = ai.chats.create({ model: mapModelForApiKey(model), config: { systemInstruction: systemInstruction || '' }, history: history || [] });
         const fallbackResult = await chatSession.sendMessage({ message });
         console.log('[Vertex AI] Chat fallback to API key succeeded');
         return res.json({ text: fallbackResult.text || '' });

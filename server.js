@@ -1,4 +1,6 @@
 
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -256,7 +258,7 @@ function creatorAuthMiddleware(req, res, next) {
 
 function scopeDataForCreator(db, creatorRecord) {
   if (!creatorRecord) return { creator: null, campaigns: [], contentItems: [], teamMessages: db.teamMessages || [], betaTests: db.betaTests || [], betaReleases: [] };
-  const myCampaigns = (db.campaigns || []).filter(c => c.assignedCreatorIds?.includes(creatorRecord.id));
+  const myCampaigns = (db.campaigns || []).filter(c => c.assignedCreatorIds?.includes(creatorRecord.id) || c.status === 'Final Campaign');
   const myContent = (db.contentItems || []).filter(c => c.creatorId === creatorRecord.id);
   const myBetaReleases = (db.betaReleases || []).filter(r => r.creatorId === creatorRecord.id);
   return {
