@@ -319,6 +319,14 @@ export interface Creator {
   totalEarned?: number;                 // Lifetime earnings tracker
   lastActiveDate?: string;              // For streak tracking
 
+  // Engagement system
+  xp?: number;                           // Total experience points
+  level?: number;                        // Current level (1-6)
+  achievements?: string[];               // Earned achievement IDs
+  streak?: number;                       // Consecutive active days
+  longestStreak?: number;                // All-time best streak
+  profileTheme?: { accent: string; banner?: string }; // Custom profile theme
+
   // Reachout tracking
   reachoutStatus?: ReachoutStatus;      // Pipeline status for creator reactivation
   reachoutNote?: string;                // Why this creator was tagged

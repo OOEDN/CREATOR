@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { Creator, PaymentMethod, Platform } from '../../types';
 import {
     User, Save, CheckCircle, Sparkles, Camera, Shield, Star,
-    CreditCard, Plus, Trash2, Edit3, X, Award, Zap, Heart
+    CreditCard, Plus, Trash2, Edit3, X, Award, Zap, Heart, Trophy, Lock
 } from 'lucide-react';
+import { getLevel, getLevelProgress, getNextLevel, ACHIEVEMENTS } from '../../services/creatorXP';
 
 interface Props {
     creator: Creator;
@@ -77,10 +78,12 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
         setTimeout(() => setSaved(false), 2000);
     };
 
-    // Level / badge based on uploads, earnings, etc.
-    const level = (creator.totalEarned || 0) >= 5000 ? '💎 Diamond' :
-        (creator.totalEarned || 0) >= 2000 ? '🥇 Gold' :
-            (creator.totalEarned || 0) >= 500 ? '🥈 Silver' : '🥉 Bronze';
+    // Level from XP engine
+    const currentLevel = getLevel(creator.xp || 0);
+    const nextLevel = getNextLevel(creator.xp || 0);
+    const progressPercent = getLevelProgress(creator.xp || 0);
+    const earnedSet = new Set(creator.achievements || []);
+    const categories = ['content', 'campaigns', 'social', 'milestones', 'special'] as const;
 
     return (
         <div className="max-w-2xl mx-auto space-y-5">
@@ -118,7 +121,7 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
                                 </span>
                             )}
                             <span className="text-[10px] font-black text-purple-400 bg-purple-500/10 px-2.5 py-1 rounded-lg border border-purple-500/20">
-                                {level}
+                                {currentLevel.emoji} {currentLevel.name}
                             </span>
                         </div>
                     </div>
@@ -139,6 +142,74 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
                         <p className="text-[8px] text-neutral-500 font-bold uppercase tracking-widest">Pay Methods</p>
                     </div>
                 </div>
+            </div>
+
+            {/* XP PROGRESS BAR */}
+            <div className="bg-neutral-900/80 backdrop-blur-sm border border-neutral-800 rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-purple-400 flex items-center gap-2">
+                        <Zap size={14} /> Level {currentLevel.level} — {currentLevel.emoji} {currentLevel.name}
+                    </h3>
+                    <span className="text-[10px] font-bold text-neutral-500">{creator.xp || 0} XP</span>
+                </div>
+                <div className="h-3 bg-black/50 rounded-full overflow-hidden border border-neutral-800">
+                    <div
+                        className={`h-full rounded-full bg-gradient-to-r ${currentLevel.color} transition-all duration-1000`}
+                        style={{ width: `${progressPercent}%` }}
+                    />
+                </div>
+                <div className="flex justify-between mt-1.5">
+                    <span className="text-[9px] text-neutral-600 font-bold">{currentLevel.emoji} {currentLevel.name}</span>
+                    {nextLevel && <span className="text-[9px] text-neutral-600 font-bold">{nextLevel.emoji} {nextLevel.name} ({nextLevel.minXP} XP)</span>}
+                </div>
+                <div className="flex items-center gap-4 mt-3">
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-bold text-amber-400">🔥 {creator.streak || 0} day streak</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <Trophy size={10} className="text-purple-400" />
+                        <span className="text-[9px] font-bold text-purple-400">{(creator.achievements || []).length}/{ACHIEVEMENTS.length} achievements</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* ACHIEVEMENTS GALLERY */}
+            <div className="bg-neutral-900/80 backdrop-blur-sm border border-neutral-800 rounded-2xl p-5">
+                <h3 className="text-sm font-black uppercase tracking-widest text-purple-400 flex items-center gap-2 mb-4">
+                    <Trophy size={14} /> Achievements
+                </h3>
+                {categories.map(cat => {
+                    const catAchievements = ACHIEVEMENTS.filter(a => a.category === cat);
+                    return (
+                        <div key={cat} className="mb-4 last:mb-0">
+                            <p className="text-[9px] font-black text-neutral-500 uppercase tracking-widest mb-2">{cat}</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {catAchievements.map(ach => {
+                                    const unlocked = earnedSet.has(ach.id);
+                                    return (
+                                        <div
+                                            key={ach.id}
+                                            className={`rounded-xl p-3 border transition-all ${
+                                                unlocked
+                                                    ? 'bg-purple-500/10 border-purple-500/20'
+                                                    : 'bg-black/30 border-neutral-800 opacity-50'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="text-lg">{unlocked ? ach.emoji : '🔒'}</span>
+                                                <span className={`text-[10px] font-black ${unlocked ? 'text-white' : 'text-neutral-500'}`}>
+                                                    {ach.name}
+                                                </span>
+                                            </div>
+                                            <p className="text-[9px] text-neutral-500 leading-relaxed">{ach.description}</p>
+                                            <p className="text-[8px] font-bold text-purple-400 mt-1">+{ach.xpReward} XP</p>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
 
             {/* PAYMENT METHODS — main feature */}

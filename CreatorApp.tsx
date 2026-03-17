@@ -20,6 +20,7 @@ import CreatorOnboarding from './components/creator/CreatorOnboarding';
 import CreatorBetaLab from './components/creator/CreatorBetaLab';
 import CreatorAIChat from './components/creator/CreatorAIChat';
 import CreatorPeerChat from './components/creator/CreatorPeerChat';
+import { XP_REWARDS, checkAchievements, updateStreak, getLevel } from './services/creatorXP';
 
 type CreatorView = 'dashboard' | 'chat' | 'upload' | 'payments' | 'profile' | 'shipments' | 'campaigns' | 'betaLab' | 'community';
 
@@ -284,6 +285,57 @@ function CreatorApp() {
         }
     };
 
+    // --- XP ENGINE ---
+    const awardXP = (action: string) => {
+        if (!creatorRecord) return;
+        const reward = XP_REWARDS[action];
+        if (!reward) return;
+
+        const newXP = (creatorRecord.xp || 0) + reward.xp;
+        const oldLevel = getLevel(creatorRecord.xp || 0);
+        const newLevel = getLevel(newXP);
+
+        // Update streak
+        const streakResult = updateStreak(creatorRecord);
+        const totalXP = newXP + streakResult.streakXP;
+
+        // Check achievements
+        const tempCreator = { ...creatorRecord, xp: totalXP, streak: streakResult.streak };
+        const { newAchievements, totalNewXP: achievementXP } = checkAchievements(
+            tempCreator, contentItems, campaigns, teamMessages
+        );
+        const finalXP = totalXP + achievementXP;
+        const newAchievementIds = [...(creatorRecord.achievements || []), ...newAchievements.map(a => a.id)];
+
+        // Update creator
+        const updated: Partial<Creator> = {
+            xp: finalXP,
+            level: getLevel(finalXP).level,
+            streak: streakResult.streak,
+            longestStreak: streakResult.longestStreak,
+            lastActiveDate: new Date().toISOString(),
+            achievements: newAchievementIds,
+        };
+        handleUpdateMyProfile(updated);
+
+        // Notifications
+        addNotification('message', `+${reward.xp} XP`, reward.label);
+
+        // Level up!
+        if (newLevel.level > oldLevel.level) {
+            setTimeout(() => {
+                addNotification('message', `${newLevel.emoji} Level Up!`, `You're now ${newLevel.name}! Keep creating.`);
+            }, 800);
+        }
+
+        // Achievement toasts
+        newAchievements.forEach((ach, i) => {
+            setTimeout(() => {
+                addNotification('message', `${ach.emoji} Achievement Unlocked!`, `${ach.name} — ${ach.description} (+${ach.xpReward} XP)`);
+            }, 1200 + i * 600);
+        });
+    };
+
     const unreadNotifs = notifications.filter(n => !n.read).length;
 
     const markAllRead = () => {
@@ -332,6 +384,7 @@ function CreatorApp() {
         setContentItems(updatedContent);
         saveMasterDB(undefined, undefined, updatedContent);
         addNotification('message', 'Content Uploaded! 🚀', `"${item.title}" has been submitted for review.`);
+        awardXP('content_upload');
     };
 
     const handleContentUpdate = (id: string, updates: Partial<ContentItem>) => {
@@ -363,6 +416,7 @@ function CreatorApp() {
         });
         setCampaigns(updatedCampaigns);
         saveMasterDB(undefined, updatedCampaigns);
+        awardXP('task_complete');
     };
 
     const handleAcceptCampaign = (campaignId: string) => {
@@ -380,6 +434,7 @@ function CreatorApp() {
             return;
         }
         addNotification('campaign', 'Campaign Accepted! 🎯', `You're now part of the campaign. Check the deliverables!`);
+        awardXP('campaign_accept');
     };
 
     const handleDeclineCampaign = (campaignId: string) => {

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Creator, Campaign, ContentItem, ContentStatus, TeamMessage, PaymentStatus } from '../../types';
 import {
-    DollarSign, CheckCircle, Upload, MessageCircle, Flame, ArrowRight, Bell, ChevronRight, Zap
+    DollarSign, CheckCircle, Upload, MessageCircle, Flame, ArrowRight, Bell, ChevronRight, Zap, Target, Trophy
 } from 'lucide-react';
+import { getLevel, getNextLevel, getLevelProgress, ACHIEVEMENTS } from '../../services/creatorXP';
 
 interface Props {
     creator: Creator;
@@ -30,7 +31,7 @@ const AnimNum: React.FC<{ value: number; prefix?: string }> = ({ value, prefix =
     return <>{prefix}{display}</>;
 };
 
-/* ─── Stat Card (frosted glass with pastel tint) ──────── */
+/* ─── Stat Card (deep glassmorphism with 3D tilt) ──────── */
 const StatCard: React.FC<{
     label: string;
     value: string | number;
@@ -46,42 +47,53 @@ const StatCard: React.FC<{
             flex: '1 1 0',
             minWidth: '120px',
             background: `linear-gradient(135deg, rgba(${tint},0.12) 0%, rgba(${tint},0.04) 100%)`,
-            backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+            backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
             border: `1px solid rgba(${tint},0.15)`,
+            borderTop: `1px solid rgba(${tint},0.25)`,
+            borderLeft: `1px solid rgba(${tint},0.2)`,
             borderRadius: '20px',
             padding: '20px 18px',
             cursor: onClick ? 'pointer' : 'default',
-            transition: 'all 0.3s cubic-bezier(0.22,1,0.36,1)',
+            transition: 'all 0.4s cubic-bezier(0.22,1,0.36,1)',
             animation: `dashFadeUp 0.6s ease ${delay}s both`,
+            boxShadow: `0 4px 24px rgba(${tint},0.08), inset 0 1px 0 rgba(255,255,255,0.06)`,
+            position: 'relative' as const,
+            overflow: 'hidden',
         }}
         onMouseEnter={e => {
-            e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
-            e.currentTarget.style.borderColor = `rgba(${tint},0.3)`;
-            e.currentTarget.style.boxShadow = `0 12px 32px rgba(${tint},0.15)`;
+            e.currentTarget.style.transform = 'translateY(-4px) scale(1.02) rotateX(5deg) rotateY(2deg)';
+            e.currentTarget.style.borderColor = `rgba(${tint},0.35)`;
+            e.currentTarget.style.boxShadow = `0 16px 40px rgba(${tint},0.2), inset 0 1px 0 rgba(255,255,255,0.1)`;
         }}
         onMouseLeave={e => {
-            e.currentTarget.style.transform = 'translateY(0) scale(1)';
+            e.currentTarget.style.transform = 'translateY(0) scale(1) rotateX(0) rotateY(0)';
             e.currentTarget.style.borderColor = `rgba(${tint},0.15)`;
-            e.currentTarget.style.boxShadow = 'none';
+            e.currentTarget.style.boxShadow = `0 4px 24px rgba(${tint},0.08), inset 0 1px 0 rgba(255,255,255,0.06)`;
         }}
     >
-        <p style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 10px' }}>
+        {/* Inner highlight overlay */}
+        <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: '50%',
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 100%)',
+            borderRadius: '20px 20px 0 0', pointerEvents: 'none',
+        }} />
+        <p style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 10px', position: 'relative' as const }}>
             {label}
         </p>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', position: 'relative' as const }}>
             <span style={{ fontSize: '28px', fontWeight: 800, color: 'white', letterSpacing: '-0.03em', lineHeight: 1 }}>
                 {typeof value === 'number' ? <AnimNum value={value} /> : value}
             </span>
             {suffix && <span style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.35)' }}>{suffix}</span>}
         </div>
-        <div style={{ marginTop: '10px', color: `rgba(${tint},0.7)` }}>{icon}</div>
+        <div style={{ marginTop: '10px', color: `rgba(${tint},0.7)`, position: 'relative' as const }}>{icon}</div>
     </div>
 );
 
 export default function CreatorDashboard({ creator, campaigns, contentItems, teamMessages, onNavigate, onEnableNotifications }: Props) {
     const myContent = contentItems.filter(c => c.creatorId === creator.id);
     const myMessages = teamMessages.filter(m => m.creatorId === creator.id);
-    const myCampaigns = campaigns.filter(c => c.assignedCreatorIds?.includes(creator.id));
+    const myCampaigns = campaigns.filter(c => c.assignedCreatorIds?.includes(creator.id) || c.status === 'Final Campaign');
     const pendingCampaigns = myCampaigns.filter(c => !c.acceptedByCreatorIds?.includes(creator.id));
     const acceptedCampaigns = myCampaigns.filter(c => c.acceptedByCreatorIds?.includes(creator.id));
 
@@ -90,15 +102,13 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
     const unreadMessages = myMessages.filter(m => !m.isCreatorMessage).length;
     const totalEarned = creator.totalEarned || 0;
 
-    // XP system — based on actions
-    const xpTotal = completedCount * 25 + totalUploads * 10 + acceptedCampaigns.length * 50;
-    const xpLevel = Math.floor(xpTotal / 100) + 1;
-    const xpProgress = (xpTotal % 100); // 0–99
-
-    // Streak
-    const lastActive = creator.lastActiveDate ? new Date(creator.lastActiveDate) : new Date(creator.dateAdded);
-    const daysSinceActive = Math.floor((Date.now() - lastActive.getTime()) / 86400000);
-    const streak = daysSinceActive <= 7 ? Math.min(99, Math.max(1, completedCount + acceptedCampaigns.length)) : 0;
+    // XP system — use real engine
+    const xp = creator.xp || 0;
+    const currentLevel = getLevel(xp);
+    const nextLevel = getNextLevel(xp);
+    const progressPercent = getLevelProgress(xp);
+    const streak = creator.streak || 0;
+    const earnedAchievements = (creator.achievements || []).map(id => ACHIEVEMENTS.find(a => a.id === id)).filter(Boolean);
 
     // Greeting
     const hour = new Date().getHours();
@@ -122,12 +132,15 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
         })),
     ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 4);
 
+    // Current Focus — top 3 tasks from active campaign
+    const focusTasks = campaignTasks.slice(0, 3);
+
     return (
         <>
             <style>{`
                 @keyframes dashFadeUp {
-                    from { opacity: 0; transform: translateY(16px); }
-                    to { opacity: 1; transform: translateY(0); }
+                    from { opacity: 0; transform: translateY(16px) scale(0.98); }
+                    to { opacity: 1; transform: translateY(0) scale(1); }
                 }
                 @keyframes dashProgressFill {
                     from { width: 0; }
@@ -136,9 +149,25 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                     0% { background-position: -200% center; }
                     100% { background-position: 200% center; }
                 }
+                @keyframes ambientDrift {
+                    0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.5; }
+                    25% { transform: translate(30px, -20px) scale(1.08); opacity: 0.6; }
+                    50% { transform: translate(-20px, 15px) scale(1.12); opacity: 0.45; }
+                    75% { transform: translate(15px, 25px) scale(1.05); opacity: 0.55; }
+                }
             `}</style>
 
-            <div style={{ maxWidth: '640px', margin: '0 auto', paddingBottom: '40px' }}>
+            {/* ═══ AMBIENT ORB ═══ */}
+            <div style={{
+                position: 'fixed', top: '-15%', right: '-10%',
+                width: '500px', height: '500px',
+                background: 'radial-gradient(circle, rgba(167,139,250,0.1) 0%, rgba(236,72,153,0.05) 40%, transparent 70%)',
+                borderRadius: '50%', filter: 'blur(80px)',
+                pointerEvents: 'none', zIndex: 0,
+                animation: 'ambientDrift 15s ease-in-out infinite',
+            }} />
+
+            <div style={{ maxWidth: '640px', margin: '0 auto', paddingBottom: '40px', position: 'relative', zIndex: 1 }}>
 
                 {/* ═══ TOP BAR — Avatar + XP ═══ */}
                 <div style={{
@@ -162,7 +191,9 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
 
                     {/* XP Bar + Level */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>XP</span>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                            {xp} XP
+                        </span>
                         <div style={{
                             width: '100px', height: '6px', borderRadius: '3px',
                             background: 'rgba(255,255,255,0.08)',
@@ -170,19 +201,19 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                         }}>
                             <div style={{
                                 height: '100%', borderRadius: '3px',
-                                width: `${xpProgress}%`,
-                                background: 'linear-gradient(90deg, #a78bfa, #67e8f9)',
+                                width: `${progressPercent}%`,
+                                background: `linear-gradient(90deg, var(--xp-start, #a78bfa), var(--xp-end, #67e8f9))`,
                                 backgroundSize: '200% 100%',
                                 animation: 'dashProgressFill 1s ease 0.5s both, dashXpShimmer 3s ease-in-out infinite',
                             }} />
                         </div>
                         <div style={{
-                            background: 'linear-gradient(135deg, #a78bfa, #67e8f9)',
+                            background: `linear-gradient(135deg, var(--level-start, #a78bfa), var(--level-end, #67e8f9))`,
                             borderRadius: '10px', padding: '3px 10px',
                             display: 'flex', alignItems: 'center', gap: '4px',
                         }}>
-                            <Zap size={10} style={{ color: 'white' }} />
-                            <span style={{ fontSize: '11px', fontWeight: 800, color: 'white' }}>{xpLevel}</span>
+                            <span style={{ fontSize: '12px' }}>{currentLevel.emoji}</span>
+                            <span style={{ fontSize: '11px', fontWeight: 800, color: 'white' }}>{currentLevel.name}</span>
                         </div>
 
                         {/* Streak badge */}
@@ -196,16 +227,37 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                                 <Flame size={11} style={{ color: '#fb923c' }} />
                             </div>
                         )}
+
+                        {/* Achievement count */}
+                        {earnedAchievements.length > 0 && (
+                            <div style={{
+                                display: 'flex', alignItems: 'center', gap: '3px',
+                                background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.2)',
+                                borderRadius: '10px', padding: '3px 8px',
+                                cursor: 'pointer',
+                            }} onClick={() => onNavigate('profile')}>
+                                <Trophy size={10} style={{ color: '#a855f7' }} />
+                                <span style={{ fontSize: '11px', fontWeight: 800, color: '#a855f7' }}>{earnedAchievements.length}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 {/* ═══ GREETING ═══ */}
                 <div style={{ marginBottom: '28px', animation: 'dashFadeUp 0.6s ease 0.15s both' }}>
                     <h1 style={{
-                        fontSize: '32px', fontWeight: 800, color: 'white',
+                        fontSize: '36px', fontWeight: 800, color: 'white',
                         letterSpacing: '-0.03em', margin: '0 0 6px', lineHeight: 1.2,
                     }}>
-                        {greeting},<br />{firstName}
+                        {greeting},<br />
+                        <span style={{
+                            background: 'linear-gradient(135deg, #a78bfa, #ec4899)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            backgroundClip: 'text',
+                        }}>
+                            {firstName}
+                        </span>
                     </h1>
                     <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.35)', fontWeight: 500, margin: 0 }}>
                         {creator.status === 'Long Term' ? 'Long-term partner' : creator.status === 'Active' ? 'Active creator' : `Status: ${creator.status || 'Active'}`}
@@ -213,13 +265,21 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                     </p>
                 </div>
 
-                {/* ═══ STAT CARDS ROW ═══ */}
+                {/* ═══ ANALYTICS HEADING + STAT CARDS ═══ */}
                 <div style={{ marginBottom: '28px' }}>
                     <div style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px',
                         animation: 'dashFadeUp 0.5s ease 0.25s both',
                     }}>
-                        <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', margin: 0 }}>Stats</h3>
+                        <div>
+                            <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', margin: '0 0 6px' }}>Analytics</h3>
+                            {/* Glowing purple accent bar */}
+                            <div style={{
+                                width: '40px', height: '3px', borderRadius: '2px',
+                                background: 'linear-gradient(90deg, #a78bfa, #ec4899)',
+                                boxShadow: '0 0 12px rgba(167,139,250,0.4)',
+                            }} />
+                        </div>
                         {streak > 0 && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>Streak</span>
@@ -306,9 +366,77 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                     </div>
                 )}
 
+                {/* ═══ CURRENT FOCUS ═══ */}
+                {activeCampaign && focusTasks.length > 0 && (
+                    <div style={{ marginBottom: '28px', animation: 'dashFadeUp 0.6s ease 0.6s both' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                            <Target size={15} style={{ color: '#a78bfa' }} />
+                            <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', margin: 0 }}>Current Focus</h3>
+                        </div>
+                        <div style={{
+                            background: 'rgba(255,255,255,0.03)',
+                            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+                            border: '1px solid rgba(255,255,255,0.06)',
+                            borderTop: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '18px', padding: '18px 20px',
+                            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+                        }}>
+                            {/* Active campaign title + progress */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                                <span style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{activeCampaign.title}</span>
+                                <span style={{
+                                    fontSize: '11px', fontWeight: 700, color: '#a78bfa',
+                                    background: 'rgba(167,139,250,0.12)', borderRadius: '8px', padding: '2px 8px',
+                                }}>{campaignProgress}%</span>
+                            </div>
+                            {/* Mini progress bar */}
+                            <div style={{ height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: '16px' }}>
+                                <div style={{
+                                    height: '100%', borderRadius: '2px',
+                                    width: `${campaignProgress}%`,
+                                    background: 'linear-gradient(90deg, #a78bfa, #67e8f9)',
+                                    transition: 'width 1s ease',
+                                }} />
+                            </div>
+                            {/* Top 3 tasks */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                {focusTasks.map((task: any, i: number) => {
+                                    const isDone = task.done || task.completedByCreatorIds?.includes(creator.id) || task.isDone;
+                                    return (
+                                        <div key={task.id || i} style={{
+                                            display: 'flex', alignItems: 'center', gap: '10px',
+                                            padding: '8px 0',
+                                            borderBottom: i < focusTasks.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                                        }}>
+                                            {/* Checkbox indicator */}
+                                            <div style={{
+                                                width: '18px', height: '18px', borderRadius: '6px', flexShrink: 0,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                background: isDone ? 'rgba(134,239,172,0.2)' : 'transparent',
+                                                border: isDone ? '1.5px solid rgba(134,239,172,0.5)' : '1.5px solid rgba(255,255,255,0.15)',
+                                                transition: 'all 0.2s',
+                                            }}>
+                                                {isDone && <CheckCircle size={11} style={{ color: '#86efac' }} />}
+                                            </div>
+                                            <span style={{
+                                                fontSize: '13px', fontWeight: 500,
+                                                color: isDone ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.6)',
+                                                textDecoration: isDone ? 'line-through' : 'none',
+                                                flex: 1,
+                                            }}>
+                                                {task.title || task.text || task.name || `Task ${i + 1}`}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* ═══ RECENT ACTIVITY ═══ */}
                 {recentActivity.length > 0 && (
-                    <div style={{ animation: 'dashFadeUp 0.6s ease 0.6s both' }}>
+                    <div style={{ animation: 'dashFadeUp 0.6s ease 0.65s both' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                             <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', margin: 0 }}>Recent Activity</h3>
                             <button onClick={() => onNavigate('upload')}
@@ -318,15 +446,23 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                         </div>
                         <div style={{
                             background: 'rgba(255,255,255,0.03)',
+                            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
                             border: '1px solid rgba(255,255,255,0.06)',
+                            borderTop: '1px solid rgba(255,255,255,0.1)',
                             borderRadius: '18px', overflow: 'hidden',
+                            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
                         }}>
                             {recentActivity.map((item, i) => (
                                 <div key={item.id} style={{
                                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                     padding: '14px 20px',
                                     borderBottom: i < recentActivity.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                                }}>
+                                    transition: 'background 0.2s',
+                                    cursor: 'default',
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                                >
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <div style={{
                                             width: '8px', height: '8px', borderRadius: '50%',
@@ -347,14 +483,24 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                     <div
                         onClick={onEnableNotifications}
                         style={{
-                            marginTop: '28px', background: 'rgba(255,255,255,0.03)',
-                            border: '1px solid rgba(255,255,255,0.06)', borderRadius: '18px',
+                            marginTop: '28px',
+                            background: 'rgba(255,255,255,0.03)',
+                            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+                            border: '1px dashed rgba(167,139,250,0.25)',
+                            borderRadius: '18px',
                             padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '12px',
                             cursor: 'pointer', transition: 'all 0.3s',
                             animation: 'dashFadeUp 0.6s ease 0.7s both',
+                            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+                        onMouseEnter={e => {
+                            e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                            e.currentTarget.style.borderColor = 'rgba(167,139,250,0.4)';
+                        }}
+                        onMouseLeave={e => {
+                            e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                            e.currentTarget.style.borderColor = 'rgba(167,139,250,0.25)';
+                        }}
                     >
                         <Bell size={18} style={{ color: '#a78bfa' }} />
                         <div>
