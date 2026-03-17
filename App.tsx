@@ -30,6 +30,9 @@ import LongTermCreators from './components/LongTermCreators';
 import CreatorReachout from './components/CreatorReachout';
 import PendingReview from './components/PendingReview';
 import AdminTrainingCourse from './components/AdminTrainingCourse';
+import LoginScreen from './components/LoginScreen';
+import SettingsModal from './components/SettingsModal';
+import AddCreatorModal from './components/AddCreatorModal';
 import { subscribeToPush, sendPushNotification, getPermissionStatus, isSupported as isPushSupported } from './services/pushService';
 import { syncContentToDrive, ensureOOEDNMasterFolder } from './services/googleDriveService';
 import { getInboxSummary, EmailThread } from './services/gmailService';
@@ -141,17 +144,7 @@ function App() {
         } catch (e) { console.warn('[Theme] Toggle failed:', e); }
     }, [isDarkMode]);
 
-    // Emergency Login State - Only shown on error
-    const [showManualInput, setShowManualInput] = useState(false);
-    const [manualToken, setManualToken] = useState('');
 
-    const [addTab, setAddTab] = useState<'manual' | 'ai' | 'bulk'>('manual');
-    const [manualForm, setManualForm] = useState<Partial<Creator>>({
-        name: '',
-        handle: '',
-        platform: Platform.Instagram,
-        rate: 0
-    });
 
     const lastUpdateRef = useRef<string | null>(null);
 
@@ -271,7 +264,6 @@ function App() {
 
         setLoginError(null);
         setDebugInfo(null);
-        setShowManualInput(false);
         setShowConfigHelp(false);
 
         // Dynamic Client ID: Use Env Var if present (from Cloud Run config), otherwise fallback to the standard one
@@ -325,12 +317,12 @@ function App() {
         }
     };
 
-    const handleManualLogin = async () => {
+    const handleManualLogin = async (token: string) => {
         setLoginError(null);
         setIsLoadingInitial(true);
 
         // DEV BYPASS
-        if (manualToken === 'DEBUG_TOKEN_OOEDN') {
+        if (token === 'DEBUG_TOKEN_OOEDN') {
             setUserEmail('developer@ooedn.com');
             setSettings(s => ({ ...s, googleCloudToken: 'dev-token-mock' }));
             setIsConnected(true);
@@ -339,10 +331,10 @@ function App() {
         }
 
         try {
-            const email = await fetchUserProfile(manualToken);
+            const email = await fetchUserProfile(token);
             if (email) {
                 setUserEmail(email);
-                setSettings(s => ({ ...s, googleCloudToken: manualToken }));
+                setSettings(s => ({ ...s, googleCloudToken: token }));
                 setIsConnected(true);
             } else {
                 setLoginError("Invalid Token or User Profile Fetch Failed");
@@ -780,59 +772,14 @@ function App() {
 
     if (!isConnected) {
         return (
-            <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 relative overflow-hidden">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-emerald-900/20 via-black to-black animate-pulse"></div>
-
-                <div className="z-10 w-full max-w-md bg-neutral-900/50 border border-neutral-800 p-8 rounded-3xl backdrop-blur-xl shadow-2xl">
-                    <div className="flex justify-center mb-8">
-                        {settings.logoUrl ? <img src={settings.logoUrl} className="h-16 object-contain opacity-90" /> : <Flame size={64} className="text-emerald-500" />}
-                    </div>
-
-                    <h1 className="text-3xl font-black text-white text-center mb-2 uppercase tracking-tighter">OOEDN Tracker <span className="text-emerald-500 text-sm align-super">v4.31</span></h1>
-                    <p className="text-neutral-500 text-center mb-8 text-xs font-bold uppercase tracking-widest">Team Internal Access Portal</p>
-
-                    <button
-                        onClick={handleGoogleLogin}
-                        className="w-full bg-white text-black py-4 rounded-xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-neutral-200 transition-all shadow-xl active:scale-95 group"
-                    >
-                        {isLoadingInitial ? <Loader2 className="animate-spin" /> : <div className="p-1 bg-black rounded-full"><ArrowRight className="text-white" size={14} /></div>}
-                        Sign in with Google
-                    </button>
-
-                    {loginError && (
-                        <div className="mt-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-center animate-in slide-in-from-top-2">
-                            <p className="text-red-500 text-[10px] font-black uppercase tracking-widest mb-1 flex items-center justify-center gap-2"><AlertTriangle size={12} /> Login Error</p>
-                            <p className="text-red-400 text-xs">{loginError}</p>
-                            {showConfigHelp && (
-                                <div className="mt-2 text-[9px] text-neutral-400 text-left bg-black/40 p-2 rounded">
-                                    <p className="font-bold text-white mb-1">Troubleshooting:</p>
-                                    <ul className="list-disc pl-4 space-y-1">
-                                        <li>Authorized Origin mismatch. Ensure <code>window.location.origin</code> matches GCP Console.</li>
-                                        <li>Check if <code>CLIENT_ID</code> env var is set correctly in Cloud Run.</li>
-                                    </ul>
-                                </div>
-                            )}
-                            <button onClick={() => setShowManualInput(!showManualInput)} className="text-[9px] text-neutral-600 underline mt-2 hover:text-white">Use Emergency Token</button>
-                        </div>
-                    )}
-
-                    {showManualInput && (
-                        <div className="mt-4 space-y-2 animate-in fade-in">
-                            <input
-                                value={manualToken}
-                                onChange={(e) => setManualToken(e.target.value)}
-                                placeholder="Paste OAuth Token (Bearer)..."
-                                className="w-full bg-black border border-neutral-800 rounded-lg p-2 text-xs text-white"
-                            />
-                            <button onClick={handleManualLogin} className="w-full bg-neutral-800 text-white py-2 rounded-lg text-xs font-bold hover:bg-neutral-700">Validate Token</button>
-                        </div>
-                    )}
-
-                    <div className="mt-8 pt-6 border-t border-neutral-800 text-center">
-                        <p className="text-[9px] text-neutral-600 uppercase font-black">Protected System • OOEDN Holdings LLC</p>
-                    </div>
-                </div>
-            </div>
+            <LoginScreen
+                settings={settings}
+                isLoadingInitial={isLoadingInitial}
+                loginError={loginError}
+                showConfigHelp={showConfigHelp}
+                onGoogleLogin={handleGoogleLogin}
+                onManualLogin={handleManualLogin}
+            />
         );
     }
 
@@ -1520,163 +1467,22 @@ function App() {
 
             {/* MODALS */}
 
-            {/* ADD CREATOR MODAL */}
-            {
-                showAddModal && (
-                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                        <div className="bg-ooedn-dark border border-neutral-700 rounded-3xl w-full max-w-2xl p-8 shadow-2xl animate-in fade-in zoom-in duration-200">
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-xl font-black text-white uppercase tracking-tighter">Add to Roster</h3>
-                                <button onClick={() => setShowAddModal(false)} className="text-neutral-500 hover:text-white"><X size={24} /></button>
-                            </div>
+            {showAddModal && (
+                <AddCreatorModal
+                    onAdd={handleAddCreator}
+                    onClose={() => setShowAddModal(false)}
+                />
+            )}
 
-                            <div className="flex gap-4 mb-6 border-b border-neutral-800 pb-4">
-                                <button onClick={() => setAddTab('manual')} className={`text-xs font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${addTab === 'manual' ? 'text-white border-emerald-500' : 'text-neutral-600 border-transparent hover:text-neutral-400'}`}>Manual Entry</button>
-                                <button onClick={() => setAddTab('ai')} className={`text-xs font-black uppercase tracking-widest pb-2 border-b-2 transition-all flex items-center gap-2 ${addTab === 'ai' ? 'text-emerald-400 border-emerald-500' : 'text-neutral-600 border-transparent hover:text-neutral-400'}`}><Sparkles size={12} /> AI Magic Paste</button>
-                                <button onClick={() => setAddTab('bulk')} className={`text-xs font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${addTab === 'bulk' ? 'text-white border-emerald-500' : 'text-neutral-600 border-transparent hover:text-neutral-400'}`}>Bulk Import</button>
-                            </div>
-
-                            {addTab === 'manual' && (
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <input value={manualForm.name} onChange={e => setManualForm({ ...manualForm, name: e.target.value })} placeholder="Creator Name" className="bg-black border border-neutral-800 rounded-xl p-3 text-sm text-white focus:border-emerald-500 outline-none" />
-                                        <input value={manualForm.handle} onChange={e => setManualForm({ ...manualForm, handle: e.target.value })} placeholder="@Handle" className="bg-black border border-neutral-800 rounded-xl p-3 text-sm text-white focus:border-emerald-500 outline-none" />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <select value={manualForm.platform} onChange={e => setManualForm({ ...manualForm, platform: e.target.value as Platform })} className="bg-black border border-neutral-800 rounded-xl p-3 text-sm text-white focus:border-emerald-500 outline-none">
-                                            {Object.values(Platform).map(p => <option key={p} value={p}>{p}</option>)}
-                                        </select>
-                                        <input type="number" value={manualForm.rate} onChange={e => setManualForm({ ...manualForm, rate: Number(e.target.value) })} placeholder="Rate ($)" className="bg-black border border-neutral-800 rounded-xl p-3 text-sm text-white focus:border-emerald-500 outline-none" />
-                                    </div>
-                                    <button onClick={() => handleAddCreator([manualForm])} disabled={!manualForm.name} className="w-full bg-white text-black py-3 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-neutral-200 transition-all shadow-lg disabled:opacity-50">Create Profile</button>
-                                </div>
-                            )}
-
-                            {addTab === 'ai' && <MagicPaste onParsed={(data) => handleAddCreator([data])} />}
-                            {addTab === 'bulk' && <BulkAdd onAdded={handleAddCreator} />}
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* SETTINGS MODAL */}
-            {
-                showSettingsModal && (
-                    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-                        <div className="bg-ooedn-dark border border-neutral-700 rounded-3xl w-full max-w-2xl p-8 shadow-2xl animate-in slide-in-from-bottom-5">
-                            <div className="flex justify-between items-center mb-8">
-                                <div className="flex items-center gap-3">
-                                    <CloudCog size={28} className="text-emerald-500" />
-                                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">System Config</h3>
-                                </div>
-                                <button onClick={() => setShowSettingsModal(false)} className="text-neutral-500 hover:text-white"><X size={28} /></button>
-                            </div>
-
-                            <div className="space-y-6">
-                                <div>
-                                    <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest block mb-2">Google Cloud Project ID</label>
-                                    <input value={settings.googleProjectId} onChange={e => setSettings({ ...settings, googleProjectId: e.target.value })} className="w-full bg-black border border-neutral-800 rounded-xl p-4 text-white text-xs font-mono" />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest block mb-2">Google Cloud Storage Bucket</label>
-                                    <input value={settings.googleCloudBucket} onChange={e => setSettings({ ...settings, googleCloudBucket: e.target.value })} className="w-full bg-black border border-neutral-800 rounded-xl p-4 text-white text-xs font-mono" />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest block mb-2">Brand Bible (AI Context)</label>
-                                    <textarea value={settings.brandInfo} onChange={e => setSettings({ ...settings, brandInfo: e.target.value })} className="w-full bg-black border border-neutral-800 rounded-xl p-4 text-white text-xs h-32 resize-none leading-relaxed" placeholder="Define brand voice, do's/don'ts for the AI..." />
-                                </div>
-
-                                <div className="flex justify-end pt-4 border-t border-neutral-800">
-                                    <button onClick={() => { setSettings(s => ({ ...s })); setShowSettingsModal(false); }} className="bg-emerald-500 text-black px-8 py-3 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-emerald-400 transition-all shadow-xl">
-                                        Save Configuration
-                                    </button>
-                                </div>
-
-                                <div className="mt-8 border-t border-neutral-800 pt-6">
-                                    <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-4 flex items-center gap-2">🔔 Push Notifications</h4>
-                                    <div className="flex flex-wrap gap-3 items-center">
-                                        <span className="text-[10px] text-neutral-400 font-mono">
-                                            Status: {'Notification' in window ? Notification.permission : 'unsupported'}
-                                        </span>
-                                        <button
-                                            onClick={async () => {
-                                                try {
-                                                    const success = await subscribeToPush();
-                                                    alert(success ? '✅ Push notifications enabled! You\'ll receive alerts for new tasks, creators, and more.' : '❌ Could not enable push. Check if notifications are blocked in your browser settings.');
-                                                } catch (e: any) { alert('Error: ' + e.message); }
-                                            }}
-                                            className="bg-blue-500/10 text-blue-400 px-4 py-2 rounded-lg border border-blue-500/20 text-xs font-bold hover:bg-blue-500/20 transition-all"
-                                        >
-                                            Subscribe / Re-subscribe
-                                        </button>
-                                        <button
-                                            onClick={async () => {
-                                                try {
-                                                    await sendPushNotification('🔔 OOEDN Test', 'Push notifications are working! You\'ll get alerts for creator updates, tasks, and more.', '/', 'ooedn-test');
-                                                    alert('Test notification sent! You should see it pop up in a moment. If you don\'t see it, check your browser notification settings.');
-                                                } catch (e: any) { alert('Error: ' + e.message); }
-                                            }}
-                                            className="bg-emerald-500/10 text-emerald-400 px-4 py-2 rounded-lg border border-emerald-500/20 text-xs font-bold hover:bg-emerald-500/20 transition-all"
-                                        >
-                                            ⚡ Send Test Notification
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                localStorage.removeItem('ooedn_push_dismissed');
-                                                localStorage.removeItem('ooedn_push_enabled');
-                                                alert('Push preferences cleared. Reload the page to see the notification banner again.');
-                                            }}
-                                            className="text-[10px] text-neutral-500 hover:text-white transition-colors"
-                                        >
-                                            Reset Push Preferences
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="mt-8 border-t border-neutral-800 pt-6">
-                                    <h4 className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-4 flex items-center gap-2"><AlertTriangle size={14} /> Danger Zone / Tools</h4>
-                                    <button
-                                        onClick={() => {
-                                            if (!confirm("Start automated cleanup of duplicate pending shipments? (If a creator has a shipped package, their pending 'Preparing' tasks will be removed).")) return;
-
-                                            const cleanedCreators = creators.map(c => {
-                                                const shipments = c.shipments || [];
-                                                const hasShipped = shipments.some(s => s.trackingNumber && s.trackingNumber !== 'PENDING' && s.trackingNumber.length > 3);
-
-                                                if (hasShipped) {
-                                                    // If they have shipped items, remove any 'Preparing' items that have no tracking
-                                                    const cleanShipments = shipments.filter(s => {
-                                                        const isPending = s.status === ShipmentStatus.Preparing || (s.trackingNumber === 'PENDING');
-                                                        const isTracked = s.trackingNumber && s.trackingNumber !== 'PENDING' && s.trackingNumber.length > 3;
-
-                                                        // Keep if it has tracking OR if we haven't shipped anything (but we know we have shipped something)
-                                                        // So: Remove if (Pending AND Not Tracked)
-                                                        if (isPending && !isTracked) return false;
-                                                        return true;
-                                                    });
-
-                                                    if (cleanShipments.length !== shipments.length) {
-                                                        console.log(`Cleaning up ${shipments.length - cleanShipments.length} duplicates for ${c.name}`);
-                                                        return { ...c, shipments: cleanShipments };
-                                                    }
-                                                }
-                                                return c;
-                                            });
-
-                                            setCreators(cleanedCreators);
-                                            alert("Cleanup Complete! Validated all shipment records.");
-                                            setShowSettingsModal(false);
-                                        }}
-                                        className="w-full bg-red-900/20 text-red-500 border border-red-900/50 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2"
-                                    >
-                                        <Trash2 size={14} /> Auto-Cleanup Duplicate Shipments
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
+            {showSettingsModal && (
+                <SettingsModal
+                    settings={settings}
+                    onUpdateSettings={(updates) => setSettings(s => ({ ...s, ...updates }))}
+                    creators={creators}
+                    onUpdateCreators={setCreators}
+                    onClose={() => setShowSettingsModal(false)}
+                />
+            )}
 
             {/* EDIT CREATOR MODAL */}
             {
