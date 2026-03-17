@@ -95,7 +95,8 @@ async function runTests() {
   await test('Health endpoint responds', async () => {
     const { status, body } = await fetchJSON('/health');
     assert(status === 200, `Expected 200, got ${status}`);
-    assert(body.status === 'ok', `Expected status:ok, got ${body.status}`);
+    assert(body.status === 'ok' || body.status === 'degraded', `Expected ok/degraded, got ${body.status}`);
+    assert(body.checks, 'Expected checks object in health response');
   });
 
   // 2. Login endpoint exists (should return 400 without credentials, not 404)

@@ -109,8 +109,34 @@ loadSubscriptionsFromGCS();
 // ── Health Check ──
 // ═══════════════════════════════════════════════════
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '4.33', pushSubscribers: pushSubscriptions.length });
+app.get('/health', async (req, res) => {
+  const checks = {
+    server: 'ok',
+    firestore: 'unknown',
+    geminiApi: 'unknown',
+    gmailProxy: gmailAuthClient ? 'configured' : 'not configured',
+  };
+
+  // Check Firestore
+  try {
+    await firestoreDAL.loadAllData();
+    checks.firestore = 'ok';
+  } catch (e) {
+    checks.firestore = `error: ${e.message?.substring(0, 80)}`;
+  }
+
+  // Check Gemini API key is set
+  checks.geminiApi = config.API_KEY ? 'key set' : 'missing API_KEY';
+
+  const allOk = checks.firestore === 'ok' && checks.geminiApi === 'key set';
+
+  res.json({
+    status: allOk ? 'ok' : 'degraded',
+    timestamp: new Date().toISOString(),
+    version: '4.33',
+    pushSubscribers: pushSubscriptions.length,
+    checks,
+  });
 });
 
 // ═══════════════════════════════════════════════════
