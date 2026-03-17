@@ -41,7 +41,7 @@ export interface AuraResponse {
     };
 }
 
-export type AuraMode = 'chat' | 'task' | 'email' | 'brief' | 'polish' | 'caption' | 'digest';
+export type AuraMode = 'chat' | 'task' | 'email' | 'brief' | 'polish' | 'caption' | 'digest' | 'creator-chat';
 
 // ── Local session memory (in-memory for current tab) ──
 let sessionConversation: { role: string; parts: { text: string }[] }[] = [];
@@ -190,6 +190,11 @@ function buildSystemPrompt(mode: AuraMode, ctx: AuraContext, memoryContext: stri
     const appState = buildAppStateContext(ctx);
     const brandOverride = ctx.brandInfo ? `\n\n## Brand Bible Override\n${ctx.brandInfo}` : '';
 
+    // In creator-chat mode, strip internal team knowledge to prevent leaks
+    const safeKnowledge = mode === 'creator-chat'
+        ? '' // Creators should NOT see team emails, payment protocols, or internal operations
+        : knowledge;
+
     const modeInstructions: Record<AuraMode, string> = {
         chat: `You are in CHAT mode. Have a natural conversation. Reference data when relevant. Be proactive about suggesting next steps.`,
         task: `You are in TASK mode. Help the user accomplish a specific task. Be efficient and action-oriented.`,
@@ -206,6 +211,17 @@ If the user mentions a creator by name, look up their email from the creator dat
         polish: `You are in POLISH mode. Improve the given text while preserving meaning. Fix grammar, tighten sentences, match OOEDN brand voice. Return ONLY the improved text.`,
         caption: `You are in CAPTION mode. Generate a viral, high-engagement social media caption. Short, punchy, brand-aligned. Include relevant hashtags.`,
         digest: `You are in DIGEST mode. Create a morning briefing for the team. Summarize: overdue tasks, pending shipments, unread messages, upcoming deadlines. Be specific with numbers and names. Format as bullet points. Max 200 words.`,
+        'creator-chat': `You are in CREATOR CHAT mode. You are talking to a content creator who partners with OOEDN.
+Be warm, supportive, and encouraging — like a creative partner, not a corporate bot.
+Help them with:
+- Content ideas and brainstorming for their assigned campaigns
+- Writing captions and hooks
+- Understanding their campaign briefs
+- Figuring out what to work on next
+- General creative advice
+Reference their specific campaign data, tasks, and deadlines when relevant.
+Keep responses concise and actionable. Use emojis naturally.
+Never reveal internal team data, other creators' info, or sensitive business details.`,
     };
 
     return [
@@ -218,7 +234,7 @@ If the user mentions a creator by name, look up their email from the creator dat
         modeInstructions[mode],
         ``,
         `## Knowledge Base`,
-        knowledge,
+        safeKnowledge,
         brandOverride,
         ``,
         `## Memory & Context`,
@@ -313,13 +329,13 @@ export async function askAura(
             return { text: "I'm hitting my rate limit right now — give me a minute and try again. 🔄" };
         }
         if (error.message?.includes('API key') || error.message?.includes('not configured')) {
-            return { text: "My API key seems misconfigured. Check the system settings." };
+            return { text: "I'm having a little trouble connecting right now — try again in a moment! 🔄" };
         }
         if (error.message?.includes('not found') || error.message?.includes('404')) {
-            return { text: "The AI model I need isn't available right now. Try again in a moment." };
+            return { text: "I'm having a little trouble connecting right now — try again in a moment! 🔄" };
         }
 
-        return { text: "Something went wrong on my end. Try again in a sec." };
+        return { text: "Something went wrong on my end — try again in a sec! 🔄" };
     }
 }
 
