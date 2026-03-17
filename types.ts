@@ -70,6 +70,7 @@ export type CreatorRating = 'A+' | 'A' | 'B' | 'C' | 'D' | 'F' | null;
 
 export enum ContentStatus {
   Raw = 'Raw Asset',
+  Draft = 'Draft',
   Editing = 'Needs Editing',
   Ready = 'Ready to Post',
   Approved = 'Approved',
@@ -138,6 +139,9 @@ export interface ContentItem {
   reviewedBy?: string;              // Who reviewed it
   submittedByCreator?: boolean;     // True if uploaded from creator portal (not team-uploaded)
   revisionCount?: number;           // Number of times this content has been revised
+  // Draft system
+  isDraft?: boolean;                 // True if submitted as draft
+  teamFeedback?: string;             // Team's inline feedback text
 }
 
 export interface CampaignTask {

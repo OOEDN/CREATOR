@@ -6,6 +6,7 @@ import {
     FileText, Image, ListTodo, MessageSquare, ChevronDown, ChevronRight, Eye, Send,
     UserCircle2, Unlock, Check, Star, Zap, ChevronLeft, Lock, Shield, Target, Download, Bell, Pause
 } from 'lucide-react';
+import CampaignProgressBar from './CampaignProgressBar';
 
 interface Props {
     creator: Creator;
@@ -226,6 +227,11 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                 <p className="text-[10px] text-yellow-300 font-bold">📖 Review the full brief below before accepting. Scroll through the campaign details, choose your character & angle, then accept at the bottom.</p>
                                             </div>
                                         )}
+
+                                        {/* Campaign Progress Tracker */}
+                                        <div className="mb-4">
+                                            <CampaignProgressBar campaign={campaign} creator={creator} contentItems={contentItems} />
+                                        </div>
 
                                         {/* === GAMIFIED BRIEF HUB — progressive unlock === */}
                                         {(campaign.avatars?.length || 0) > 0 && (() => {

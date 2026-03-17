@@ -32,6 +32,7 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
     const [selectedCampaignId, setSelectedCampaignId] = useState<string>('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [preview, setPreview] = useState<string | null>(null);
+    const [isDraft, setIsDraft] = useState(false);
     const [expandedContentId, setExpandedContentId] = useState<string | null>(null);
     const [replyText, setReplyText] = useState('');
     const [showUploadForm, setShowUploadForm] = useState(true);
@@ -119,7 +120,7 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
                 campaignId: selectedCampaignId || undefined,
                 title,
                 type: contentType,
-                status: ContentStatus.Raw,
+                status: isDraft ? ContentStatus.Draft : ContentStatus.Raw,
                 platform,
                 fileUrl,
                 storageType,
@@ -127,6 +128,7 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
                 caption: caption || undefined,
                 tags: [creator.name, 'creator-upload', ...(selectedCampaign ? [selectedCampaign.title] : [])],
                 submittedByCreator: true,
+                isDraft: isDraft || undefined,
             };
             onUpload(item);
             setSelectedFile(null);
@@ -134,6 +136,7 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
             setCaption('');
             setSelectedCampaignId('');
             setPreview(null);
+            setIsDraft(false);
         } catch (e) {
             console.error('[Upload] Submit error:', e);
         } finally {
@@ -340,13 +343,33 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
                                     placeholder="Add a caption or notes for the team..."
                                 />
                             </div>
+
+                            {/* Draft Toggle */}
+                            <div className="flex items-center justify-between bg-black/50 border border-neutral-800 rounded-xl px-4 py-3 mb-3">
+                                <div>
+                                    <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Submit as Draft</p>
+                                    <p className="text-[9px] text-neutral-600">Team will review before it goes live</p>
+                                </div>
+                                <button
+                                    onClick={() => setIsDraft(!isDraft)}
+                                    className={`w-10 h-5 rounded-full transition-all relative ${isDraft ? 'bg-purple-500' : 'bg-neutral-700'}`}
+                                    title="Toggle draft mode"
+                                >
+                                    <div className={`w-4 h-4 rounded-full bg-white shadow-md absolute top-0.5 transition-all ${isDraft ? 'left-5' : 'left-0.5'}`} />
+                                </button>
+                            </div>
+
                             <button
                                 onClick={handleSubmit}
                                 disabled={isUploading || !title}
-                                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3.5 rounded-xl font-black uppercase tracking-widest text-sm hover:from-purple-400 hover:to-pink-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 active:scale-95"
+                                className={`w-full py-3.5 rounded-xl font-black uppercase tracking-widest text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg active:scale-95 ${
+                                    isDraft
+                                        ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black shadow-amber-500/20 hover:from-amber-400 hover:to-yellow-400'
+                                        : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-purple-500/20 hover:from-purple-400 hover:to-pink-400'
+                                }`}
                             >
                                 {isUploading ? <Loader2 className="animate-spin" size={16} /> : <UploadIcon size={16} />}
-                                Submit Content 🚀
+                                {isDraft ? 'Submit Draft for Review ✏️' : 'Submit Content 🚀'}
                             </button>
                         </div>
                     )}
