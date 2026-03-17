@@ -1,11 +1,12 @@
 // routes/aiRoutes.js — Vertex AI proxy + Coco memory
 import { Router } from 'express';
 import { VertexAI } from '@google-cloud/vertexai';
+import { config } from '../config.js';
 
 const router = Router();
 
-const VERTEX_PROJECT = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT || 'admin-tracker-490321';
-const VERTEX_LOCATION = 'us-central1';
+const VERTEX_PROJECT = config.GCP_PROJECT;
+const VERTEX_LOCATION = config.VERTEX_LOCATION;
 
 function getVertexModel(modelName) {
   const vertexAI = new VertexAI({ project: VERTEX_PROJECT, location: VERTEX_LOCATION });
@@ -70,7 +71,7 @@ router.post('/generate', async (req, res) => {
     console.error('[Vertex AI] Generate error:', e.message);
     // Fallback: try with API key if Vertex fails (during transition)
     try {
-      const apiKey = process.env.API_KEY;
+      const apiKey = config.API_KEY;
       if (apiKey) {
         const { GoogleGenAI } = await import('@google/genai');
         const ai = new GoogleGenAI({ apiKey });
@@ -125,7 +126,7 @@ router.post('/chat', async (req, res) => {
   } catch (e) {
     console.error('[Vertex AI] Chat error:', e.message);
     try {
-      const apiKey = process.env.API_KEY;
+      const apiKey = config.API_KEY;
       if (apiKey) {
         const { GoogleGenAI } = await import('@google/genai');
         const ai = new GoogleGenAI({ apiKey });
@@ -149,7 +150,7 @@ router.post('/embed', async (req, res) => {
     const { text, texts, taskType, dimensions } = req.body;
     if (!text && !texts) return res.status(400).json({ error: 'text or texts required' });
 
-    const apiKey = process.env.API_KEY;
+    const apiKey = config.API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'API_KEY not configured' });
 
     const { GoogleGenAI } = await import('@google/genai');

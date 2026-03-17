@@ -1,5 +1,6 @@
 // routes/emailRoutes.js — SMTP email send, morning reminder, Gmail proxy, receipt proxy
 import { Router } from 'express';
+import { config } from '../config.js';
 
 export default function createEmailRoutes({ gmailAuthClient, getGCSAuthToken, MAIN_BUCKET }) {
   const router = Router();
@@ -13,10 +14,10 @@ export default function createEmailRoutes({ gmailAuthClient, getGCSAuthToken, MA
       try { nodemailer = await import('nodemailer'); } catch { return res.status(500).json({ error: 'nodemailer not available' }); }
       const transporter = nodemailer.default.createTransport({
         service: 'gmail',
-        auth: { user: process.env.SMTP_USER || 'create@ooedn.com', pass: process.env.SMTP_PASS || '' }
+        auth: { user: config.SMTP_USER, pass: config.SMTP_PASS }
       });
       const mailOpts = {
-        from: `"OOEDN Creative Team" <${process.env.SMTP_USER || 'create@ooedn.com'}>`,
+        from: `"OOEDN Creative Team" <${config.SMTP_USER}>`,
         to, subject,
       };
       if (html) mailOpts.html = html;
@@ -43,13 +44,13 @@ export default function createEmailRoutes({ gmailAuthClient, getGCSAuthToken, MA
       try { nodemailer = await import('nodemailer'); } catch { return res.status(500).json({ error: 'nodemailer not available' }); }
       const transporter = nodemailer.default.createTransport({
         service: 'gmail',
-        auth: { user: process.env.SMTP_USER || 'create@ooedn.com', pass: process.env.SMTP_PASS || '' }
+        auth: { user: config.SMTP_USER, pass: config.SMTP_PASS }
       });
       let sent = 0, failed = 0;
       for (const email of emails) {
         try {
           await transporter.sendMail({
-            from: `"OOEDN Creative Team" <${process.env.SMTP_USER || 'create@ooedn.com'}>`,
+            from: `"OOEDN Creative Team" <${config.SMTP_USER}>`,
             to: email, subject,
             html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
               <div style="background:#000;padding:24px;border-radius:16px">
@@ -77,7 +78,7 @@ export default function createEmailRoutes({ gmailAuthClient, getGCSAuthToken, MA
 
   async function fetchMasterDB() {
     try {
-      const bucket = process.env.GCS_BUCKET || 'ooedn-tracker-data';
+      const bucket = config.GCS_BUCKET;
       const url = `https://storage.googleapis.com/storage/v1/b/${bucket}/o/ooedn_master_db.json?alt=media`;
       const res = await fetch(url);
       if (!res.ok) return null;

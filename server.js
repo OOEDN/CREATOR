@@ -1,6 +1,5 @@
 
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+import { config } from './config.js';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -23,7 +22,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const port = process.env.PORT || 8080;
+const port = config.PORT;
 
 // --- JSON body parser for API endpoints ---
 app.use(express.json({ limit: '50mb' }));
@@ -32,9 +31,9 @@ app.use(express.json({ limit: '50mb' }));
 // ── VAPID Configuration ──
 // ═══════════════════════════════════════════════════
 
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BCibI4a7TWgbM97VXFd9u73W-ZwS1FHRLciBfCOPjyMx-CVC8zqQk3DWsoMv-F8eMtR8Fz-2EZ_cJDfdZZgXBCo';
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'z0mdG9UnP7HYufX6x9YIJ6-3cZ4GhnwWm384ad1h2kI';
-const VAPID_EMAIL = process.env.VAPID_EMAIL || 'mailto:daniel@ooedn.com';
+const VAPID_PUBLIC_KEY = config.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = config.VAPID_PRIVATE_KEY;
+const VAPID_EMAIL = config.VAPID_EMAIL;
 
 try {
   webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
@@ -48,8 +47,8 @@ try {
 // ═══════════════════════════════════════════════════
 
 let pushSubscriptions = [];
-const GCS_BUCKET = process.env.GCS_BUCKET || 'ooedn-tracker-data';
-const MAIN_BUCKET = 'ai-studio-bucket-850668507460-us-west1';
+const GCS_BUCKET = config.GCS_BUCKET;
+const MAIN_BUCKET = config.MAIN_BUCKET;
 const SUBS_GCS_PATH = `push_subscriptions.json`;
 
 async function getGCSAuthToken() {
@@ -123,8 +122,8 @@ try {
   let credentials = null;
   const keyPath = path.join(__dirname, 'service-account-key.json');
 
-  if (process.env.GOOGLE_CREDENTIALS_JSON) {
-    credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+  if (config.GOOGLE_CREDENTIALS_JSON) {
+    credentials = JSON.parse(config.GOOGLE_CREDENTIALS_JSON);
   } else if (fs.existsSync(keyPath)) {
     credentials = JSON.parse(fs.readFileSync(keyPath, 'utf8'));
   }
@@ -134,7 +133,7 @@ try {
       email: credentials.client_email,
       key: credentials.private_key,
       scopes: ['https://mail.google.com/'],
-      subject: process.env.TEAM_EMAIL || 'create@ooedn.com'
+      subject: config.TEAM_EMAIL
     });
     console.log('[Gmail Proxy] Loaded service account credentials for Domain-Wide Delegation.');
   } else {
@@ -148,11 +147,11 @@ try {
 // ── DB Helpers: Dual-Mode (GCS ↔ Firestore) ──
 // ═══════════════════════════════════════════════════
 
-const JWT_SECRET = process.env.JWT_SECRET || 'ooedn-creator-portal-stable-secret-v18';
-const JWT_EXPIRY = '24h';
-const BCRYPT_ROUNDS = 10;
+const JWT_SECRET = config.JWT_SECRET;
+const JWT_EXPIRY = config.JWT_EXPIRY;
+const BCRYPT_ROUNDS = config.BCRYPT_ROUNDS;
 
-const DB_SOURCE = process.env.DB_SOURCE || 'dual-write';
+const DB_SOURCE = config.DB_SOURCE;
 console.log(`[DB] Source mode: ${DB_SOURCE}`);
 
 async function readMasterDB_GCS() {
@@ -298,7 +297,7 @@ console.log('[CreatorAuth] Creator Portal auth endpoints registered');
 // ── Static File Serving ──
 // ═══════════════════════════════════════════════════
 
-const CREATOR_MODE = process.env.CREATOR_MODE === 'true';
+const CREATOR_MODE = config.CREATOR_MODE;
 const DIST_DIR = CREATOR_MODE ? 'dist-creator' : 'dist';
 const INDEX_HTML = CREATOR_MODE ? 'creator-index.html' : 'index.html';
 
@@ -355,7 +354,7 @@ app.get('*', (req, res) => {
     const injection = `
       <script>
         window.env = { 
-            CLIENT_ID: "${process.env.CLIENT_ID || ''}"
+            CLIENT_ID: "${config.CLIENT_ID}"
         };
         window.APP_VERSION = "4.33";
         
