@@ -187,9 +187,10 @@ export default function createCreatorAuthRoutes({ firestoreDAL, bcrypt, jwt, JWT
         password: hashedPassword,
         displayName: name,
         createdAt: new Date().toISOString(),
-        linkedCreatorId: creatorId || undefined,
+        linkedCreatorId: creatorId || null,
         invitedByTeam: true,
         inviteEmailSent: false,
+        onboardingComplete: true,
       };
 
       await firestoreDAL.addAccount(newAccount);
