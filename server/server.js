@@ -321,6 +321,22 @@ console.log('[Server] All route modules mounted (including SSE realtime)');
 console.log('[CreatorAuth] Creator Portal auth endpoints registered');
 
 // ═══════════════════════════════════════════════════
+// ── Direct Firestore Message Poll (for team app) ──
+// ═══════════════════════════════════════════════════
+// The team app reads from GCS, but the creator service may not have GCS write access
+// (different GCP project). Messages always reach Firestore correctly.
+// This endpoint lets the team app poll Firestore directly for new messages.
+app.get('/api/messages/poll', async (req, res) => {
+  try {
+    const messages = await firestoreDAL.getAllMessages();
+    res.json({ teamMessages: messages });
+  } catch (e) {
+    console.error('[MessagePoll] Error:', e.message);
+    res.status(500).json({ error: 'Failed to load messages' });
+  }
+});
+
+// ═══════════════════════════════════════════════════
 // ── Static File Serving ──
 // ═══════════════════════════════════════════════════
 

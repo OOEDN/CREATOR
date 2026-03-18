@@ -526,22 +526,29 @@ function App() {
         if (!isConnected || !settings.googleCloudToken || !initialLoadCompleteRef.current) return;
         const interval = setInterval(async () => {
             try {
+                // 1. Poll messages directly from Firestore (reliable — creator always writes here)
+                try {
+                    const msgResp = await fetch(`${window.location.origin}/api/messages/poll`);
+                    if (msgResp.ok) {
+                        const msgData = await msgResp.json();
+                        if (msgData.teamMessages) {
+                            setTeamMessages(prev => {
+                                const existingIds = new Set(prev.map(m => m.id));
+                                const newMsgs = msgData.teamMessages.filter((m: TeamMessage) => !existingIds.has(m.id));
+                                if (newMsgs.length > 0) {
+                                    console.log(`[Poll] 📩 ${newMsgs.length} new messages from Firestore`);
+                                    return [...prev, ...newMsgs];
+                                }
+                                return prev;
+                            });
+                        }
+                    }
+                } catch (e) { /* Firestore poll failed — non-critical */ }
+
+                // 2. Poll GCS for content items and other data
                 const data = await loadRemoteState(settings);
                 if (!data) return;
-                // Merge new creator messages — use functional updater for fresh state
-                if (data.teamMessages) {
-                    setTeamMessages(prev => {
-                        const existingIds = new Set(prev.map(m => m.id));
-                        const newMsgs = data.teamMessages!.filter(m => !existingIds.has(m.id));
-                        if (newMsgs.length > 0) {
-                            console.log(`[Poll] 📩 ${newMsgs.length} new messages from creators`);
-                            return [...prev, ...newMsgs];
-                        }
-                        return prev;
-                    });
-                }
                 // Merge content items — use functional updater for fresh state
-                // Also update existing items (e.g. status/review changes from server)
                 if (data.contentItems) {
                     setContentItems(prev => {
                         const existingIds = new Set(prev.map(c => c.id));
@@ -561,7 +568,7 @@ function App() {
                 // Update creator accounts
                 if (data.creatorAccounts) setCreatorAccounts(data.creatorAccounts);
             } catch (e) { /* silent polling failure */ }
-        }, 120000); // 2-minute fallback (real-time SSE handles most updates)
+        }, 30000); // 30s poll for responsive messaging
         return () => clearInterval(interval);
     }, [isConnected, settings.googleCloudToken]);
 
