@@ -877,8 +877,21 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
 </div>
 </body>
 </html>`;
-                                                                            const win = window.open('', '_blank');
-                                                                            if (win) { win.document.write(briefHtml); win.document.close(); }
+                                                                            const blob = new Blob([briefHtml], { type: 'text/html' });
+                                                                            const url = URL.createObjectURL(blob);
+                                                                            // Try to open in new tab first (preferred — shows styled brief)
+                                                                            const win = window.open(url, '_blank');
+                                                                            if (!win) {
+                                                                                // Popup blocked — fallback to file download
+                                                                                const a = document.createElement('a');
+                                                                                a.href = url;
+                                                                                a.download = `${campaign.title.replace(/[^a-zA-Z0-9]/g, '_')}_Brief.html`;
+                                                                                document.body.appendChild(a);
+                                                                                a.click();
+                                                                                document.body.removeChild(a);
+                                                                            }
+                                                                            // Clean up after a delay (let the new tab load first)
+                                                                            setTimeout(() => URL.revokeObjectURL(url), 5000);
                                                                         }}
                                                                         className="w-full mt-2 flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-teal-600/10 to-cyan-500/10 border border-teal-500/20 rounded-xl text-teal-300 hover:from-teal-600/20 hover:to-cyan-500/20 hover:text-white transition-all group brief-section-reveal"
                                                                         style={{ animationDelay: '0.8s' }}
