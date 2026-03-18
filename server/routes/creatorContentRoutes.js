@@ -154,6 +154,18 @@ export default function createCreatorContentRoutes({ firestoreDAL, getGCSAuthTok
         const existingMsgIds = new Set((db.teamMessages || []).map(m => m.id));
         const newMessages = updates.teamMessages.filter(m => !existingMsgIds.has(m.id));
         db.teamMessages = [...(db.teamMessages || []), ...newMessages];
+
+        // 🔑 Write each new message directly to Firestore individually.
+        // This guarantees Firestore onSnapshot fires for the team app's SSE,
+        // regardless of GCS race conditions with the team's auto-save.
+        for (const msg of newMessages) {
+          try {
+            await firestoreDAL.addMessage(msg);
+            console.log(`[CreatorSave] 📩 Message written to Firestore: ${msg.id} from ${msg.sender || 'unknown'}`);
+          } catch (msgErr) {
+            console.warn(`[CreatorSave] Firestore message write failed (non-critical):`, msgErr.message);
+          }
+        }
       }
 
       if (updates.betaReleases) {
