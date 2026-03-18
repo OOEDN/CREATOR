@@ -727,161 +727,135 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                     {/* Download Brief */}
                                                                     <button
                                                                         onClick={() => {
-                                                                            const briefHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${campaign.title} — Creator Brief</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Inter', -apple-system, sans-serif; background: #0a0a0a; color: #e5e5e5; line-height: 1.6; padding: 0; }
-  .brief-container { max-width: 720px; margin: 0 auto; padding: 40px 32px 80px; }
+                                                                            // Helper: escape RTF special chars
+                                                                            const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/\{/g, '\\{').replace(/\}/g, '\\}');
+                                                                            // Helper: convert unicode to RTF unicode escape
+                                                                            const rtfText = (s: string) => {
+                                                                                let result = '';
+                                                                                for (const char of s) {
+                                                                                    const code = char.charCodeAt(0);
+                                                                                    if (code > 127) {
+                                                                                        result += `\\u${code}?`;
+                                                                                    } else {
+                                                                                        result += esc(char);
+                                                                                    }
+                                                                                }
+                                                                                return result;
+                                                                            };
 
-  /* Header */
-  .brief-header { text-align: center; padding: 48px 32px 40px; border-bottom: 1px solid rgba(100,170,170,0.15); margin-bottom: 40px; position: relative; overflow: hidden; }
-  .brief-header::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 0%, rgba(100,170,170,0.08) 0%, transparent 70%); pointer-events: none; }
-  .brief-logo { font-size: 11px; font-weight: 900; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(100,170,170,0.5); margin-bottom: 24px; }
-  .brief-title { font-size: 28px; font-weight: 900; color: #fff; letter-spacing: -0.02em; margin-bottom: 8px; }
-  .brief-subtitle { font-size: 13px; color: #737373; font-weight: 600; }
-  .brief-campaign-name { display: inline-block; background: linear-gradient(135deg, rgba(100,170,170,0.12), rgba(80,200,200,0.08)); border: 1px solid rgba(100,170,170,0.2); border-radius: 12px; padding: 8px 20px; margin-top: 16px; font-size: 14px; font-weight: 800; color: #5eead4; letter-spacing: 0.02em; }
+                                                                            const lines: string[] = [];
+                                                                            // RTF header with font and color tables
+                                                                            lines.push('{\\rtf1\\ansi\\deff0');
+                                                                            lines.push('{\\fonttbl{\\f0\\fswiss\\fcharset0 Helvetica;}{\\f1\\fswiss\\fcharset0 Arial;}}');
+                                                                            lines.push('{\\colortbl;\\red0\\green0\\blue0;\\red13\\green148\\blue136;\\red234\\green179\\blue8;\\red168\\green85\\blue247;\\red236\\green72\\blue153;\\red239\\green68\\blue68;\\red100\\green100\\blue100;}');
+                                                                            lines.push('\\viewkind4\\uc1\\pard\\f0');
+                                                                            lines.push('');
 
-  /* Sections */
-  .section { margin-bottom: 28px; border-radius: 16px; overflow: hidden; border: 1px solid; }
-  .section-header { padding: 14px 20px; font-size: 10px; font-weight: 900; letter-spacing: 0.15em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
-  .section-body { padding: 20px; font-size: 14px; line-height: 1.8; }
+                                                                            // Title
+                                                                            lines.push('\\pard\\qc\\sa200');
+                                                                            lines.push(`{\\fs16\\cf7 OOEDN CREATOR BRIEF}`);
+                                                                            lines.push('\\par');
+                                                                            lines.push(`{\\b\\fs40 ${rtfText(campaign.title)}}`);
+                                                                            lines.push('\\par');
+                                                                            lines.push(`{\\fs20\\cf7 Your Personalized Brief}`);
+                                                                            lines.push('\\par');
+                                                                            lines.push('\\pard\\ql\\sa100');
+                                                                            lines.push('\\par');
 
-  /* Section Variants */
-  .section-goal { border-color: rgba(16,185,129,0.2); background: rgba(16,185,129,0.03); }
-  .section-goal .section-header { background: rgba(16,185,129,0.06); color: #34d399; }
-  .section-character { border-color: rgba(168,85,247,0.2); background: rgba(168,85,247,0.03); }
-  .section-character .section-header { background: rgba(168,85,247,0.06); color: #c084fc; }
-  .section-hooks { border-color: rgba(234,179,8,0.2); background: rgba(234,179,8,0.03); }
-  .section-hooks .section-header { background: rgba(234,179,8,0.06); color: #fbbf24; }
-  .section-psychology { border-color: rgba(100,170,170,0.2); background: rgba(100,170,170,0.03); }
-  .section-psychology .section-header { background: rgba(100,170,170,0.06); color: #5eead4; }
-  .section-visual { border-color: rgba(236,72,153,0.2); background: rgba(236,72,153,0.03); }
-  .section-visual .section-header { background: rgba(236,72,153,0.06); color: #f472b6; }
-  .section-script { border-color: rgba(100,170,170,0.25); background: linear-gradient(135deg, rgba(100,170,170,0.04), rgba(80,200,200,0.02)); }
-  .section-script .section-header { background: rgba(100,170,170,0.08); color: #5eead4; }
-  .section-mandatories { border-color: rgba(239,68,68,0.2); background: rgba(239,68,68,0.03); }
-  .section-mandatories .section-header { background: rgba(239,68,68,0.06); color: #f87171; }
+                                                                            // Horizontal rule
+                                                                            const hr = () => { lines.push('{\\cf7 \\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?\\u8212?}'); lines.push('\\par\\par'); };
 
-  /* Hook Items */
-  .hook-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; border-left: 3px solid rgba(234,179,8,0.4); background: rgba(234,179,8,0.04); border-radius: 0 10px 10px 0; margin-bottom: 10px; }
-  .hook-number { flex-shrink: 0; width: 24px; height: 24px; border-radius: 8px; background: rgba(234,179,8,0.15); color: #fbbf24; font-size: 11px; font-weight: 900; display: flex; align-items: center; justify-content: center; }
-  .hook-text { font-size: 14px; font-weight: 600; color: #fde68a; font-style: italic; line-height: 1.6; }
+                                                                            // Campaign Goal
+                                                                            if (campaign.briefGoal) {
+                                                                                lines.push(`{\\b\\fs28\\cf2 CAMPAIGN GOAL}`);
+                                                                                lines.push('\\par\\sa120');
+                                                                                lines.push(`{\\fs24 ${rtfText(campaign.briefGoal)}}`);
+                                                                                lines.push('\\par\\par');
+                                                                                hr();
+                                                                            }
 
-  /* Script Content */
-  .script-content { white-space: pre-wrap; font-size: 14px; line-height: 1.9; color: #d4d4d4; }
-  .script-content strong, .script-content b { color: #5eead4; font-weight: 700; }
+                                                                            // Character
+                                                                            if (chosenAvatar) {
+                                                                                lines.push(`{\\b\\fs28\\cf4 YOUR CHARACTER: ${rtfText(chosenAvatar.name)}}`);
+                                                                                lines.push('\\par\\sa120');
+                                                                                lines.push(`{\\fs24 ${rtfText(chosenAvatar.description)}}`);
+                                                                                lines.push('\\par\\par');
+                                                                                hr();
+                                                                            }
 
-  /* Mandatories Content */
-  .mandatories-content { white-space: pre-wrap; }
-  .mandatories-content li, .mandatories-list li { padding: 4px 0; }
+                                                                            // Hooks
+                                                                            lines.push(`{\\b\\fs28\\cf3 YOUR CHOSEN HOOK${mySelectedHooks.length !== 1 ? 'S' : ''}}`);
+                                                                            lines.push('\\par\\sa120');
+                                                                            mySelectedHooks.forEach((h: string, i: number) => {
+                                                                                lines.push(`{\\fs24\\b ${i + 1}.} {\\fs24\\i  \\u8220?${rtfText(h)}\\u8221?}`);
+                                                                                lines.push('\\par\\sa80');
+                                                                            });
+                                                                            lines.push('\\par');
+                                                                            hr();
 
-  /* Print Button */
-  .print-bar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(10,10,10,0.95); backdrop-filter: blur(12px); border-top: 1px solid rgba(100,170,170,0.15); padding: 12px 32px; display: flex; align-items: center; justify-content: center; gap: 12px; z-index: 100; }
-  .print-btn { background: linear-gradient(135deg, #0d9488, #06b6d4); color: #fff; border: none; padding: 10px 28px; border-radius: 12px; font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: all 0.2s; }
-  .print-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(13,148,136,0.4); }
-  .print-hint { font-size: 11px; color: #525252; font-weight: 600; }
+                                                                            // Angles
+                                                                            relevantAngles.forEach((angle: any, idx: number) => {
+                                                                                if (angle.psychology) {
+                                                                                    lines.push(`{\\b\\fs28\\cf2 THE PSYCHOLOGY${relevantAngles.length > 1 ? ` (Angle ${idx + 1})` : ''}}`);
+                                                                                    lines.push('\\par\\sa120');
+                                                                                    lines.push(`{\\fs24 ${rtfText(angle.psychology)}}`);
+                                                                                    lines.push('\\par\\par');
+                                                                                }
+                                                                                if (angle.visualCue) {
+                                                                                    lines.push(`{\\b\\fs28\\cf5 VISUAL CUE${relevantAngles.length > 1 ? ` (Angle ${idx + 1})` : ''}}`);
+                                                                                    lines.push('\\par\\sa120');
+                                                                                    lines.push(`{\\fs24 ${rtfText(angle.visualCue)}}`);
+                                                                                    lines.push('\\par\\par');
+                                                                                }
+                                                                                if (angle.briefContent) {
+                                                                                    hr();
+                                                                                    lines.push(`{\\b\\fs28\\cf2 YOUR STORY SCRIPT${relevantAngles.length > 1 ? ` \\u8212? ${rtfText(angle.hook || 'Angle ' + (idx + 1))}` : ''}}`);
+                                                                                    lines.push('\\par\\sa120');
+                                                                                    // Split by newlines for proper paragraph formatting
+                                                                                    const scriptLines = angle.briefContent.split('\n');
+                                                                                    scriptLines.forEach((line: string) => {
+                                                                                        if (line.trim()) {
+                                                                                            lines.push(`{\\fs24 ${rtfText(line)}}`);
+                                                                                            lines.push('\\par\\sa60');
+                                                                                        } else {
+                                                                                            lines.push('\\par');
+                                                                                        }
+                                                                                    });
+                                                                                    lines.push('\\par');
+                                                                                }
+                                                                            });
 
-  /* Divider */
-  .section-divider { display: flex; align-items: center; gap: 12px; margin: 32px 0; }
-  .section-divider .divider-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(100,170,170,0.15), transparent); }
-  .section-divider .divider-label { font-size: 9px; font-weight: 800; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(100,170,170,0.3); }
+                                                                            // Mandatories
+                                                                            if (campaign.briefMandatories) {
+                                                                                hr();
+                                                                                lines.push(`{\\b\\fs28\\cf6 MANDATORIES \\u8212? EVERY VIDEO}`);
+                                                                                lines.push('\\par\\sa120');
+                                                                                const mandLines = campaign.briefMandatories.split('\n');
+                                                                                mandLines.forEach((line: string) => {
+                                                                                    if (line.trim()) {
+                                                                                        lines.push(`{\\fs24 ${rtfText(line)}}`);
+                                                                                        lines.push('\\par\\sa60');
+                                                                                    } else {
+                                                                                        lines.push('\\par');
+                                                                                    }
+                                                                                });
+                                                                            }
 
-  /* Footer */
-  .brief-footer { text-align: center; padding-top: 40px; border-top: 1px solid rgba(100,170,170,0.1); margin-top: 48px; }
-  .brief-footer p { font-size: 11px; color: #404040; font-weight: 600; }
+                                                                            // Footer
+                                                                            lines.push('\\par\\par');
+                                                                            hr();
+                                                                            lines.push('\\pard\\qc');
+                                                                            lines.push(`{\\fs18\\cf7 OOEDN Creator Brief \\u8226? ${rtfText(campaign.title)} \\u8226? Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}}`);
+                                                                            lines.push('\\par');
 
-  @media print {
-    body { background: #0a0a0a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    .print-bar { display: none !important; }
-    .brief-container { padding: 20px; }
-  }
-</style>
-</head>
-<body>
-<div class="brief-container">
-  <div class="brief-header">
-    <div class="brief-logo">⚡ OOEDN Creator Brief</div>
-    <h1 class="brief-title">Your Personalized Brief</h1>
-    <p class="brief-subtitle">Everything you need to create incredible content</p>
-    <div class="brief-campaign-name">🎯 ${campaign.title}</div>
-  </div>
+                                                                            lines.push('}'); // close RTF
 
-  ${campaign.briefGoal ? `
-  <div class="section section-goal">
-    <div class="section-header">🚀 Campaign Goal</div>
-    <div class="section-body">${campaign.briefGoal.replace(/\n/g, '<br>')}</div>
-  </div>` : ''}
-
-  ${chosenAvatar ? `
-  <div class="section section-character">
-    <div class="section-header">🎭 Your Character — ${chosenAvatar.name}</div>
-    <div class="section-body">${chosenAvatar.description.replace(/\n/g, '<br>')}</div>
-  </div>` : ''}
-
-  <div class="section section-hooks">
-    <div class="section-header">🎣 Your Chosen Hook${mySelectedHooks.length !== 1 ? 's' : ''}</div>
-    <div class="section-body">
-      ${mySelectedHooks.map((h: string, i: number) => `
-      <div class="hook-item">
-        <div class="hook-number">${i + 1}</div>
-        <div class="hook-text">"${h.replace(/"/g, '&quot;').replace(/</g, '&lt;')}"</div>
-      </div>`).join('')}
-    </div>
-  </div>
-
-  ${relevantAngles.map((angle: any, idx: number) => `
-  ${angle.psychology ? `
-  <div class="section section-psychology">
-    <div class="section-header">🧠 The Psychology${relevantAngles.length > 1 ? ` (Angle ${idx + 1})` : ''}</div>
-    <div class="section-body">${angle.psychology.replace(/\n/g, '<br>')}</div>
-  </div>` : ''}
-
-  ${angle.visualCue ? `
-  <div class="section section-visual">
-    <div class="section-header">👁️ Visual Cue${relevantAngles.length > 1 ? ` (Angle ${idx + 1})` : ''}</div>
-    <div class="section-body">${angle.visualCue.replace(/\n/g, '<br>')}</div>
-  </div>` : ''}
-
-  ${angle.briefContent ? `
-  <div class="section-divider">
-    <div class="divider-line"></div>
-    <div class="divider-label">📜 Your Story Script${relevantAngles.length > 1 ? ` — ${angle.hook || 'Angle ' + (idx + 1)}` : ''}</div>
-    <div class="divider-line"></div>
-  </div>
-  <div class="section section-script">
-    <div class="section-header">📜 Story Script${relevantAngles.length > 1 ? ` — ${angle.hook || 'Angle ' + (idx + 1)}` : ''}</div>
-    <div class="section-body"><div class="script-content">${angle.briefContent.replace(/\n/g, '<br>')}</div></div>
-  </div>` : ''}`).join('')}
-
-  ${campaign.briefMandatories ? `
-  <div class="section section-mandatories">
-    <div class="section-header">🛡️ Mandatories — Every Video</div>
-    <div class="section-body"><div class="mandatories-content">${campaign.briefMandatories.replace(/\n/g, '<br>')}</div></div>
-  </div>` : ''}
-
-  <div class="brief-footer">
-    <p>⚡ OOEDN Creator Brief • ${campaign.title} • Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
-    <p style="margin-top: 6px; color: #262626;">Save as PDF: Press Ctrl+P (or ⌘+P on Mac) → Save as PDF</p>
-  </div>
-</div>
-
-<div class="print-bar">
-  <button class="print-btn" onclick="window.print()">⬇ Save as PDF</button>
-  <span class="print-hint">Press ⌘P to save as PDF</span>
-</div>
-</body>
-</html>`;
-                                                                            const blob = new Blob([briefHtml], { type: 'text/html' });
+                                                                            const rtfContent = lines.join('\n');
+                                                                            const blob = new Blob([rtfContent], { type: 'application/rtf' });
                                                                             const url = URL.createObjectURL(blob);
                                                                             const a = document.createElement('a');
                                                                             a.href = url;
-                                                                            a.download = `${campaign.title.replace(/[^a-zA-Z0-9]/g, '_')}_Brief.html`;
+                                                                            a.download = `${campaign.title.replace(/[^a-zA-Z0-9]/g, '_')}_Brief.rtf`;
                                                                             document.body.appendChild(a);
                                                                             a.click();
                                                                             document.body.removeChild(a);
