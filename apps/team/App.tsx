@@ -351,7 +351,7 @@ function App() {
     useEffect(() => {
         if (isConnected && settings.googleCloudToken) {
             setIsSyncing(true);
-            loadRemoteState(settings).then(data => {
+            loadRemoteState(settings).then(async data => {
                 if (data) {
                     if (data.creators) {
                         // MIGRATION: Auto-convert legacy single shipment to array AND fix statuses
@@ -407,7 +407,23 @@ function App() {
                         }
                         setContentItems(deduped);
                     }
-                    if (data.teamMessages) setTeamMessages(data.teamMessages);
+                    // Messages: merge GCS + Firestore to catch creator messages that may only be in Firestore
+                    let mergedMessages = data.teamMessages || [];
+                    try {
+                        const msgResp = await fetch(`${window.location.origin}/api/messages/poll`);
+                        if (msgResp.ok) {
+                            const msgData = await msgResp.json();
+                            if (msgData.teamMessages) {
+                                const gcsIds = new Set(mergedMessages.map((m: TeamMessage) => m.id));
+                                const firestoreOnly = msgData.teamMessages.filter((m: TeamMessage) => !gcsIds.has(m.id));
+                                if (firestoreOnly.length > 0) {
+                                    console.log(`[InitLoad] 📩 Merging ${firestoreOnly.length} Firestore-only messages`);
+                                    mergedMessages = [...mergedMessages, ...firestoreOnly];
+                                }
+                            }
+                        }
+                    } catch (e) { /* Firestore poll failed — use GCS messages only */ }
+                    setTeamMessages(mergedMessages);
                     if (data.teamTasks) setTeamTasks(data.teamTasks);
                     if (data.betaTests) setBetaTests(data.betaTests);
                     if (data.betaReleases) setBetaReleases(data.betaReleases);
