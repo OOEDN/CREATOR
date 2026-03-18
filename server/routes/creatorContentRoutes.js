@@ -190,6 +190,29 @@ export default function createCreatorContentRoutes({ firestoreDAL, getGCSAuthTok
       const saved = await writeMasterDB(db);
       if (!saved) return res.status(500).json({ error: 'Failed to save' });
 
+      // 🔔 Payment Request Alert — notify team when a creator requests payment
+      if (updates.creator && updates.creator.paymentStatus === 'Processing') {
+        const creatorName = updates.creator.name || account.displayName || account.email;
+        const paymentAmount = updates.creator.rate || updates.creator.totalEarned || '??';
+        const contentCount = (updates.contentItems || []).filter(c => c.paymentRequested).length;
+        try {
+          // Fire push notification to all team subscribers via internal endpoint
+          await fetch(`http://localhost:${process.env.PORT || 8080}/api/push/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: `💰 Payment Request: ${creatorName}`,
+              body: `${creatorName} requested $${paymentAmount} for ${contentCount} video${contentCount !== 1 ? 's' : ''}. Review in Payment Hub.`,
+              url: '/',
+              tag: 'ooedn-payment-request'
+            })
+          });
+          console.log(`[CreatorSave] 🔔 Payment request alert sent for ${creatorName}`);
+        } catch (pushErr) {
+          console.warn('[CreatorSave] Push alert failed (non-critical):', pushErr.message);
+        }
+      }
+
       res.json({ success: true });
     } catch (e) {
       console.error('[CreatorAuth] Save error:', e);
