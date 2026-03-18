@@ -20,6 +20,8 @@ import CreatorOnboarding from './components/CreatorOnboarding';
 import CreatorBetaLab from './components/CreatorBetaLab';
 import CreatorAIChat from './components/CreatorAIChat';
 import CreatorPeerChat from './components/CreatorPeerChat';
+import LegalPages from './components/LegalPages';
+import CookieConsent from './components/CookieConsent';
 import { XP_REWARDS, checkAchievements, updateStreak, getLevel } from '../../shared/services/creatorXP';
 
 type CreatorView = 'dashboard' | 'chat' | 'upload' | 'payments' | 'profile' | 'shipments' | 'campaigns' | 'betaLab' | 'community';
@@ -73,6 +75,7 @@ function CreatorApp() {
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [showWelcomeIntro, setShowWelcomeIntro] = useState(false);
     const [peerMessages, setPeerMessages] = useState<PeerMessage[]>([]);
+    const [activeLegalPage, setActiveLegalPage] = useState<'terms' | 'privacy' | 'content-license' | null>(null);
 
     // JWT Token
     const [jwtToken, setJwtToken] = useState<string | null>(() => {
@@ -713,8 +716,15 @@ function CreatorApp() {
                         </div>
                     )}
                     <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
-                        <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.15)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>OOEDN Holdings LLC • Creator Portal</p>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                            <button onClick={() => setActiveLegalPage('terms')} style={{ background: 'none', border: 'none', color: 'rgba(127,181,181,0.4)', fontSize: '9px', fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Terms</button>
+                            <button onClick={() => setActiveLegalPage('privacy')} style={{ background: 'none', border: 'none', color: 'rgba(127,181,181,0.4)', fontSize: '9px', fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Privacy</button>
+                            <button onClick={() => setActiveLegalPage('content-license')} style={{ background: 'none', border: 'none', color: 'rgba(127,181,181,0.4)', fontSize: '9px', fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Content License</button>
+                        </div>
+                        <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.15)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>© 2026 OOEDN Holdings LLC</p>
                     </div>
+                    {activeLegalPage && <LegalPages page={activeLegalPage} onClose={() => setActiveLegalPage(null)} />}
+                    <CookieConsent onShowLegal={(page) => setActiveLegalPage(page)} />
                 </div>
 
                 <style>{`
@@ -1210,6 +1220,12 @@ function CreatorApp() {
                     campaigns={campaigns}
                     contentItems={contentItems}
                 />
+
+                {/* Legal pages overlay */}
+                {activeLegalPage && <LegalPages page={activeLegalPage} onClose={() => setActiveLegalPage(null)} />}
+
+                {/* Cookie consent banner */}
+                <CookieConsent onShowLegal={(page) => setActiveLegalPage(page)} />
             </main>
         </div>
     );
