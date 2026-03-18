@@ -107,8 +107,8 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
     return (
         <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center p-4">
             {/* Background effects */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900/20 via-black to-black" />
-            <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-purple-500/10 rounded-full blur-[120px] animate-pulse" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-teal-900/20 via-black to-black" />
+            <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-teal-500/10 rounded-full blur-[120px] animate-pulse" />
             <div className="absolute bottom-1/3 right-1/4 w-60 h-60 bg-pink-500/10 rounded-full blur-[100px] animate-pulse" />
 
             {/* Confetti */}
@@ -143,11 +143,11 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                 <div className="mb-6">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Step {step + 1} of {STEPS.length}</span>
-                        <span className="text-[10px] font-black text-purple-400 uppercase">{STEPS[step].title}</span>
+                        <span className="text-[10px] font-black text-teal-400 uppercase">{STEPS[step].title}</span>
                     </div>
                     <div className="h-1.5 bg-neutral-800 rounded-full overflow-hidden">
                         <div
-                            className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-500"
+                            className="h-full bg-gradient-to-r from-teal-600 to-cyan-500 rounded-full transition-all duration-500"
                             style={{ width: `${progress}%` }}
                         />
                     </div>
@@ -162,7 +162,7 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                             <div className="text-6xl mb-2">🎉</div>
                             <h2 className="text-3xl font-black text-white uppercase tracking-tight">Welcome, {account.displayName}!</h2>
                             <p className="text-neutral-400 text-sm leading-relaxed">
-                                You're now part of the <span className="text-purple-400 font-bold">OOEDN Creator Family</span>. This portal is your home base — let's walk through what's here.
+                                You're now part of the <span className="text-teal-400 font-bold">OOEDN Creator Family</span>. This portal is your home base — let's walk through what's here.
                             </p>
                             <div className="space-y-2 text-left">
                                 {[
@@ -207,7 +207,7 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                                         <div className="relative">
                                             <input value={newPassword} onChange={e => { setNewPassword(e.target.value); setPwError(''); }}
                                                 type={showNewPw ? 'text' : 'password'} placeholder="Enter new password (min 6 characters)"
-                                                className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 pr-10 text-sm text-white focus:border-purple-500 outline-none" />
+                                                className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 pr-10 text-sm text-white focus:border-teal-500 outline-none" />
                                             <button onClick={() => setShowNewPw(!showNewPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-white" type="button">
                                                 {showNewPw ? <EyeOff size={14} /> : <Eye size={14} />}
                                             </button>
@@ -217,7 +217,7 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                                         <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest block mb-1">Confirm Password</label>
                                         <input value={confirmPassword} onChange={e => { setConfirmPassword(e.target.value); setPwError(''); }}
                                             type="password" placeholder="Re-enter password"
-                                            className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 outline-none" />
+                                            className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 text-sm text-white focus:border-teal-500 outline-none" />
                                     </div>
                                     {pwError && <p className="text-red-400 text-xs text-center">{pwError}</p>}
                                     <button onClick={async () => {
@@ -227,7 +227,7 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                                             const ok = await onChangePassword(newPassword);
                                             if (ok) setPwSaved(true); else setPwError('Failed to save — try again');
                                         }
-                                    }} className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 hover:from-purple-400 hover:to-pink-400 transition-all active:scale-95 shadow-lg shadow-purple-500/20">
+                                    }} className="w-full bg-gradient-to-r from-teal-600 to-cyan-500 text-white py-3 rounded-xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 hover:from-teal-400 hover:to-cyan-400 transition-all active:scale-95 shadow-lg shadow-teal-500/20">
                                         <Lock size={14} /> Save New Password
                                     </button>
                                 </>
@@ -249,19 +249,19 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                             <div>
                                 <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest block mb-1">Your Name</label>
                                 <input value={name} onChange={e => setName(e.target.value)}
-                                    className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 outline-none" placeholder="Your name" />
+                                    className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 text-sm text-white focus:border-teal-500 outline-none" placeholder="Your name" />
                             </div>
                             <div>
                                 <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest block mb-1">Social Handle</label>
                                 <input value={handle} onChange={e => setHandle(e.target.value)}
-                                    className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 outline-none" placeholder="@yourhandle" />
+                                    className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 text-sm text-white focus:border-teal-500 outline-none" placeholder="@yourhandle" />
                             </div>
                             <div>
                                 <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest block mb-2">Main Platform</label>
                                 <div className="grid grid-cols-4 gap-2">
                                     {platforms.map(p => (
                                         <button key={p.id} onClick={() => setPlatform(p.id)}
-                                            className={`p-3 rounded-xl text-center transition-all border ${platform === p.id ? 'bg-purple-500/10 border-purple-500/30 text-white' : 'bg-black/50 border-neutral-800 text-neutral-500 hover:border-neutral-700'}`}>
+                                            className={`p-3 rounded-xl text-center transition-all border ${platform === p.id ? 'bg-teal-500/10 border-teal-500/30 text-white' : 'bg-black/50 border-neutral-800 text-neutral-500 hover:border-neutral-700'}`}>
                                             <div className="text-xl mb-1">{p.emoji}</div>
                                             <p className="text-[9px] font-bold uppercase">{p.label}</p>
                                         </button>
@@ -282,7 +282,7 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                             <div className="grid grid-cols-2 gap-2">
                                 {paymentMethods.map(pm => (
                                     <button key={pm.method} onClick={() => setSelectedPayment(pm.method)}
-                                        className={`p-3 rounded-xl text-center transition-all border ${selectedPayment === pm.method ? 'bg-purple-500/10 border-purple-500/30 text-white' : 'bg-black/50 border-neutral-800 text-neutral-500 hover:border-neutral-700'}`}>
+                                        className={`p-3 rounded-xl text-center transition-all border ${selectedPayment === pm.method ? 'bg-teal-500/10 border-teal-500/30 text-white' : 'bg-black/50 border-neutral-800 text-neutral-500 hover:border-neutral-700'}`}>
                                         <div className="text-xl mb-1">{pm.emoji}</div>
                                         <p className="text-[10px] font-bold uppercase">{pm.label}</p>
                                     </button>
@@ -295,7 +295,7 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                                     </label>
                                     <input value={paymentDetails} onChange={e => setPaymentDetails(e.target.value)}
                                         placeholder={paymentMethods.find(p => p.method === selectedPayment)?.placeholder}
-                                        className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 outline-none" />
+                                        className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 text-sm text-white focus:border-teal-500 outline-none" />
                                 </div>
                             )}
                             <p className="text-[10px] text-neutral-600 text-center">You can always add more methods later in your profile</p>
@@ -324,7 +324,7 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                                 ))}
                             </div>
                             <button onClick={onEnableNotifications}
-                                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 hover:from-purple-400 hover:to-pink-400 transition-all active:scale-95 shadow-lg shadow-purple-500/20">
+                                className="w-full bg-gradient-to-r from-teal-600 to-cyan-500 text-white py-3 rounded-xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 hover:from-teal-400 hover:to-cyan-400 transition-all active:scale-95 shadow-lg shadow-teal-500/20">
                                 <Bell size={16} /> Enable Notifications
                             </button>
                             <button onClick={handleNext} className="text-neutral-500 text-xs hover:text-white transition-colors">
@@ -342,7 +342,7 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                                 <p className="text-neutral-400 text-xs mt-1">Test products before anyone else</p>
                             </div>
                             <div className="bg-black/50 border border-neutral-800 rounded-xl p-4 text-sm text-neutral-300 leading-relaxed">
-                                <p className="mb-3">As an OOEDN creator, you may be invited to <span className="text-purple-400 font-bold">beta test unreleased products</span>. Here's how it works:</p>
+                                <p className="mb-3">As an OOEDN creator, you may be invited to <span className="text-teal-400 font-bold">beta test unreleased products</span>. Here's how it works:</p>
                                 <div className="space-y-2 text-xs">
                                     {[
                                         { emoji: '📦', text: 'Receive exclusive pre-release samples' },
@@ -358,7 +358,7 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                                     ))}
                                 </div>
                             </div>
-                            <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-4">
+                            <div className="bg-teal-500/5 border border-teal-500/20 rounded-xl p-4">
                                 <label className="flex items-start gap-3 cursor-pointer">
                                     <input type="checkbox" checked={betaOptIn} onChange={e => setBetaOptIn(e.target.checked)}
                                         className="mt-0.5 accent-purple-500" />
@@ -386,10 +386,10 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                                     { emoji: '✂️', label: 'Revisions', tip: 'Orange banners = team wants changes. Re-upload in Content Hub' },
                                     { emoji: '💬', label: 'Chat', tip: 'Message the team anytime — they\'ll see it immediately' },
                                 ].map(f => (
-                                    <div key={f.label} className="bg-gradient-to-br from-purple-500/5 to-pink-500/5 border border-purple-500/15 rounded-xl p-3">
+                                    <div key={f.label} className="bg-gradient-to-br from-teal-600/5 to-cyan-500/5 border border-teal-500/15 rounded-xl p-3">
                                         <div className="flex items-center gap-2">
                                             <span>{f.emoji}</span>
-                                            <p className="text-xs font-bold text-purple-400 uppercase">{f.label}</p>
+                                            <p className="text-xs font-bold text-teal-400 uppercase">{f.label}</p>
                                         </div>
                                         <p className="text-[10px] text-neutral-500 mt-1 pl-7">{f.tip}</p>
                                     </div>
@@ -408,18 +408,18 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
 
                         {step === 6 ? (
                             <button onClick={handleFinish}
-                                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-sm flex items-center gap-2 hover:from-purple-400 hover:to-pink-400 transition-all shadow-xl shadow-purple-500/20 active:scale-95">
+                                className="bg-gradient-to-r from-teal-600 to-cyan-500 text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-sm flex items-center gap-2 hover:from-teal-400 hover:to-cyan-400 transition-all shadow-xl shadow-teal-500/20 active:scale-95">
                                 <Rocket size={16} /> Let's Go!
                             </button>
                         ) : step === 4 ? (
                             // Notifications step has its own "next" flow
                             <button onClick={handleNext}
-                                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-black uppercase tracking-widest text-xs flex items-center gap-2 hover:from-purple-400 hover:to-pink-400 transition-all active:scale-95">
+                                className="bg-gradient-to-r from-teal-600 to-cyan-500 text-white px-6 py-3 rounded-xl font-black uppercase tracking-widest text-xs flex items-center gap-2 hover:from-teal-400 hover:to-cyan-400 transition-all active:scale-95">
                                 <ArrowRight size={14} /> Continue
                             </button>
                         ) : (
                             <button onClick={handleNext}
-                                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-black uppercase tracking-widest text-xs flex items-center gap-2 hover:from-purple-400 hover:to-pink-400 transition-all active:scale-95">
+                                className="bg-gradient-to-r from-teal-600 to-cyan-500 text-white px-6 py-3 rounded-xl font-black uppercase tracking-widest text-xs flex items-center gap-2 hover:from-teal-400 hover:to-cyan-400 transition-all active:scale-95">
                                 <ArrowRight size={14} /> Next
                             </button>
                         )}
@@ -432,8 +432,8 @@ const CreatorOnboarding: React.FC<Props> = ({ account, creator, onComplete, onUp
                         <button
                             key={i}
                             onClick={() => i <= step && setStep(i)}
-                            className={`transition-all rounded-full ${i === step ? 'w-8 h-2 bg-gradient-to-r from-purple-500 to-pink-500' :
-                                i < step ? 'w-2 h-2 bg-purple-500/50' :
+                            className={`transition-all rounded-full ${i === step ? 'w-8 h-2 bg-gradient-to-r from-teal-600 to-cyan-500' :
+                                i < step ? 'w-2 h-2 bg-teal-500/50' :
                                     'w-2 h-2 bg-neutral-800'
                                 }`}
                             title={s.title}

@@ -598,29 +598,29 @@ const CreatorEditModal: React.FC<CreatorEditModalProps> = ({
                 <div className="p-6 border-t border-neutral-800 bg-neutral-900/80 backdrop-blur space-y-3">
                     {/* Invite to Portal Section */}
                     {showInviteSection && (
-                        <div className="bg-purple-500/5 border border-purple-500/20 rounded-2xl p-4 space-y-3">
+                        <div className="bg-teal-500/5 border border-teal-500/20 rounded-2xl p-4 space-y-3">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <UserPlus size={14} className="text-purple-400" />
-                                    <span className="text-xs text-purple-400 font-black uppercase tracking-widest">Invite to Creator Portal</span>
+                                    <UserPlus size={14} className="text-teal-400" />
+                                    <span className="text-xs text-teal-400 font-black uppercase tracking-widest">Invite to Creator Portal</span>
                                 </div>
                                 <button onClick={() => setShowInviteSection(false)} className="text-neutral-500 hover:text-white" title="Close invite panel">
                                     <X size={14} />
                                 </button>
                             </div>
-                            <p className="text-[10px] text-neutral-400">This will create a login for the creator and email them their credentials. They can then sign in at <span className="text-purple-400 font-bold">/creator</span> to view campaigns, upload content, and chat with the team.</p>
+                            <p className="text-[10px] text-neutral-400">This will create a login for the creator and email them their credentials. They can then sign in at <span className="text-teal-400 font-bold">/creator</span> to view campaigns, upload content, and chat with the team.</p>
                             <div className="flex gap-2">
                                 <input
                                     type="email"
                                     value={inviteEmail}
                                     onChange={e => setInviteEmail(e.target.value)}
                                     placeholder="creator@email.com"
-                                    className="flex-1 bg-black border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-purple-500 outline-none"
+                                    className="flex-1 bg-black border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-teal-500 outline-none"
                                 />
                                 <button
                                     onClick={handleInviteToPortal}
                                     disabled={isInviting || inviteSent || !inviteEmail.trim()}
-                                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] font-black uppercase tracking-widest hover:from-purple-400 hover:to-pink-400 transition-all active:scale-95 disabled:opacity-50 shadow-lg shadow-purple-500/20"
+                                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-500 text-white text-[10px] font-black uppercase tracking-widest hover:from-teal-400 hover:to-cyan-400 transition-all active:scale-95 disabled:opacity-50 shadow-lg shadow-teal-500/20"
                                 >
                                     {isInviting ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
                                     {inviteSent ? '✓ Sent!' : 'Send Invite'}
@@ -645,7 +645,7 @@ const CreatorEditModal: React.FC<CreatorEditModalProps> = ({
                         <button onClick={() => { if (confirm('Blackburn this creator?')) onSave(creator.id, { status: CreatorStatus.Blackburn }); onClose(); }} className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-900/20 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">Blackburn</button>
                         <button
                             onClick={() => setShowInviteSection(!showInviteSection)}
-                            className={`flex items-center gap-2 px-5 py-3 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${showInviteSection ? 'bg-purple-500 text-white border-purple-500' : 'bg-purple-500/10 text-purple-400 border-purple-500/30 hover:bg-purple-500 hover:text-black'}`}
+                            className={`flex items-center gap-2 px-5 py-3 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${showInviteSection ? 'bg-teal-500 text-white border-teal-500' : 'bg-teal-500/10 text-teal-400 border-teal-500/30 hover:bg-teal-500 hover:text-black'}`}
                         >
                             <UserPlus size={14} />
                             Invite to Portal

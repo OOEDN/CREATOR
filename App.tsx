@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-    LayoutDashboard, Users, Flame, Settings, Plus, Search, Menu, X, CreditCard, CalendarDays, Loader2, Briefcase, RefreshCw, Sparkles, Link, Database, Truck, Package, Library, Inbox, FolderLock, MapPin, Layers, Cloud, LogOut, AlertTriangle, ShieldCheck, Globe, Info, Terminal, UserPlus, CloudCog, Archive, Copy, KeyRound, ExternalLink, ArrowRight, Wrench, Trash2, Sun, Moon, Mail, Crown, Eye, FlaskConical
+    LayoutDashboard, Users, Flame, Settings, Plus, Search, Menu, X, CreditCard, CalendarDays, Loader2, Briefcase, RefreshCw, Sparkles, Link, Database, Truck, Package, Library, Inbox, FolderLock, MapPin, Layers, Cloud, LogOut, AlertTriangle, ShieldCheck, Globe, Info, Terminal, UserPlus, CloudCog, Archive, Copy, KeyRound, ExternalLink, ArrowRight, Wrench, Trash2, Sun, Moon, Mail, Crown, Eye, FlaskConical, MessageSquare
 } from 'lucide-react';
 import { Creator, CreatorStatus, PaymentStatus, Platform, ContentItem, AppSettings, ShipmentStatus, Campaign, ContentStatus, PaymentOption, Shipment, TeamMessage, TeamTask, BetaTest, BetaRelease, CreatorAccount, ReachoutStatus } from './types';
 import { syncTrackingWithAI } from './services/geminiService';
@@ -26,6 +26,7 @@ import DailyDigestWidget from './components/DailyDigestWidget';
 import ContentPipelineWidget from './components/ContentPipelineWidget';
 import QuickNotesWidget from './components/QuickNotesWidget';
 import CreatorInbox from './components/CreatorInbox';
+import CreatorChatPage from './components/CreatorChatPage';
 import LongTermCreators from './components/LongTermCreators';
 import CreatorReachout from './components/CreatorReachout';
 import PendingReview from './components/PendingReview';
@@ -105,7 +106,7 @@ function App() {
     const [betaTests, setBetaTests] = useState<BetaTest[]>([]);
     const [betaReleases, setBetaReleases] = useState<BetaRelease[]>([]);
     const [creatorAccounts, setCreatorAccounts] = useState<CreatorAccount[]>([]);
-    const [view, setView] = useState<'dashboard' | 'active' | 'inactive' | 'blackburn' | 'payments' | 'calendar' | 'campaigns' | 'pending-review' | 'asset-pool' | 'team-assets' | 'master-library' | 'team' | 'inbox' | 'partners' | 'reachout' | 'betaLab'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'active' | 'inactive' | 'blackburn' | 'payments' | 'calendar' | 'campaigns' | 'pending-review' | 'asset-pool' | 'team-assets' | 'master-library' | 'team' | 'inbox' | 'creator-chat' | 'partners' | 'reachout' | 'betaLab'>('dashboard');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -823,6 +824,7 @@ function App() {
                         { id: 'pending-review', icon: Eye, label: 'Pending Review' },
                         { id: 'team-assets', icon: FolderLock, label: 'Team Assets' },
                         { id: 'master-library', icon: Database, label: 'Master Library' },
+                        { id: 'creator-chat', icon: MessageSquare, label: 'Creator Chat' },
                         { id: 'inbox', icon: Mail, label: 'Creator Inbox' },
                         { id: 'partners', icon: Crown, label: 'Long-Term Partners' },
                         { id: 'reachout', icon: UserPlus, label: 'Creator Reachout' },
@@ -1407,6 +1409,24 @@ function App() {
                     )}
 
                     {/* CREATOR INBOX */}
+                    {view === 'creator-chat' && (
+                        <CreatorChatPage
+                            teamMessages={teamMessages}
+                            creators={creators}
+                            currentUser={userEmail || 'Anonymous'}
+                            onSendMessage={(msg) => {
+                                setTeamMessages(prev => [...prev, msg]);
+                            }}
+                            onMarkRead={(creatorId) => {
+                                setTeamMessages(prev => prev.map(m =>
+                                    m.creatorId === creatorId && m.isCreatorMessage && !m.readByTeam
+                                        ? { ...m, readByTeam: true }
+                                        : m
+                                ));
+                            }}
+                        />
+                    )}
+
                     {view === 'inbox' && (
                         <CreatorInbox
                             creators={creators}

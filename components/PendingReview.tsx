@@ -24,6 +24,7 @@ const PendingReview: React.FC<PendingReviewProps> = ({ contentItems, onUpdateCon
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [noteText, setNoteText] = useState('');
     const [filter, setFilter] = useState<'all' | 'pending' | 'changes' | 'approved'>('pending');
+    const [mediaErrorIds, setMediaErrorIds] = useState<Set<string>>(new Set());
 
     // Only show content that was UPLOADED FROM the creator portal
     // submittedByCreator flag is set during creator upload — works regardless of GCS success
@@ -261,48 +262,61 @@ const PendingReview: React.FC<PendingReviewProps> = ({ contentItems, onUpdateCon
                                     )}
 
                                     {/* MEDIA PREVIEW */}
-                                    {item.fileUrl && (() => {
+                                    {(item.fileUrl || item.thumbnail) && (() => {
                                         // Route GCS URLs through server proxy for CORS/ACL compat
-                                        const isGcs = item.fileUrl.includes('storage.googleapis.com');
-                                        const mediaSrc = isGcs
-                                            ? `/api/media-proxy?url=${encodeURIComponent(item.fileUrl)}`
-                                            : item.fileUrl;
+                                        const isGcs = item.fileUrl?.includes('storage.googleapis.com');
+                                        const mediaSrc = mediaErrorIds.has(item.id)
+                                            ? (item.thumbnail || '') // Fallback to thumbnail if proxy/direct failed
+                                            : isGcs
+                                                ? `/api/media-proxy?url=${encodeURIComponent(item.fileUrl)}`
+                                                : item.fileUrl;
+                                        const handleMediaError = () => {
+                                            if (!mediaErrorIds.has(item.id) && item.thumbnail) {
+                                                setMediaErrorIds(prev => new Set(prev).add(item.id));
+                                            }
+                                        };
                                         return (
                                             <div className="bg-black/50 rounded-xl border border-neutral-800 overflow-hidden">
                                                 <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-800">
                                                     <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
                                                         <Eye size={10} /> Quick Preview
+                                                        {mediaErrorIds.has(item.id) && <span className="text-amber-400 ml-1">(Thumbnail)</span>}
                                                     </span>
                                                     {item.revisionCount && item.revisionCount > 0 && (
                                                         <span className="text-[9px] font-bold bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded-lg">
                                                             Revision #{item.revisionCount}
                                                         </span>
                                                     )}
-                                                    <a
-                                                        href={mediaSrc}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-[9px] text-fuchsia-400 hover:text-fuchsia-300 font-bold flex items-center gap-1"
-                                                        onClick={e => e.stopPropagation()}
-                                                    >
-                                                        Open Full ↗
-                                                    </a>
+                                                    {item.fileUrl && !mediaErrorIds.has(item.id) && (
+                                                        <a
+                                                            href={mediaSrc}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-[9px] text-fuchsia-400 hover:text-fuchsia-300 font-bold flex items-center gap-1"
+                                                            onClick={e => e.stopPropagation()}
+                                                        >
+                                                            Open Full ↗
+                                                        </a>
+                                                    )}
                                                 </div>
-                                                {item.type === ContentType.Video ? (
+                                                {mediaSrc && item.type === ContentType.Video && !mediaErrorIds.has(item.id) ? (
                                                     <video
                                                         src={mediaSrc}
                                                         controls
                                                         preload="metadata"
+                                                        poster={item.thumbnail || undefined}
                                                         className="w-full max-h-[400px] bg-black"
                                                         style={{ objectFit: 'contain' }}
+                                                        onError={handleMediaError}
                                                     />
-                                                ) : (
+                                                ) : mediaSrc ? (
                                                     <img
                                                         src={mediaSrc}
                                                         alt={item.title}
                                                         className="w-full max-h-[400px] object-contain bg-black"
+                                                        onError={handleMediaError}
                                                     />
-                                                )}
+                                                ) : null}
                                             </div>
                                         );
                                     })()}

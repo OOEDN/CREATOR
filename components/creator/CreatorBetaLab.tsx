@@ -58,7 +58,7 @@ const CreatorBetaLab: React.FC<Props> = ({ creator, account, betaTests, betaRele
         const release = getRelease(test.id);
         if (!release || !release.agreed) return { label: 'Sign Release', emoji: '📋', color: 'text-yellow-400 bg-yellow-500/10', step: 1 };
         if (!release.sampleShipped) return { label: 'Awaiting Sample', emoji: '⏳', color: 'text-blue-400 bg-blue-500/10', step: 2 };
-        if (!release.sampleReceived) return { label: 'Sample Shipped', emoji: '📦', color: 'text-purple-400 bg-purple-500/10', step: 3 };
+        if (!release.sampleReceived) return { label: 'Sample Shipped', emoji: '📦', color: 'text-teal-400 bg-teal-500/10', step: 3 };
         if (!release.reviewSubmitted) return { label: 'Review Sample', emoji: '⭐', color: 'text-amber-400 bg-amber-500/10', step: 4 };
         if (!release.contentApprovedByTeam) return { label: 'Pending Approval', emoji: '⏳', color: 'text-orange-400 bg-orange-500/10', step: 5 };
         return { label: 'Approved', emoji: '✅', color: 'text-emerald-400 bg-emerald-500/10', step: 6 };
@@ -119,7 +119,7 @@ const CreatorBetaLab: React.FC<Props> = ({ creator, account, betaTests, betaRele
                         <div className="space-y-3 mb-8 text-left">
                             {[
                                 { icon: Gift, color: 'text-pink-400', bg: 'bg-pink-500/5 border-pink-500/20', text: 'Free samples shipped to your door', emoji: '🎁' },
-                                { icon: Rocket, color: 'text-purple-400', bg: 'bg-purple-500/5 border-purple-500/20', text: 'Be the first to try unreleased products', emoji: '🚀' },
+                                { icon: Rocket, color: 'text-teal-400', bg: 'bg-teal-500/5 border-teal-500/20', text: 'Be the first to try unreleased products', emoji: '🚀' },
                                 { icon: Star, color: 'text-amber-400', bg: 'bg-amber-500/5 border-amber-500/20', text: 'Your feedback directly shapes the final product', emoji: '⭐' },
                                 { icon: Camera, color: 'text-blue-400', bg: 'bg-blue-500/5 border-blue-500/20', text: 'Exclusive content opportunities nobody else has', emoji: '📸' },
                                 { icon: Heart, color: 'text-red-400', bg: 'bg-red-500/5 border-red-500/20', text: 'Build a deeper connection with the brand', emoji: '💜' },
@@ -309,7 +309,7 @@ const CreatorBetaLab: React.FC<Props> = ({ creator, account, betaTests, betaRele
 
                                         {release?.agreed && release?.sampleShipped && !release?.sampleReceived && (
                                             <button onClick={() => onMarkSampleReceived(test.id)}
-                                                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 hover:from-purple-400 hover:to-pink-400 transition-all active:scale-95">
+                                                className="w-full bg-gradient-to-r from-teal-600 to-cyan-500 text-white py-3 rounded-xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 hover:from-teal-400 hover:to-cyan-400 transition-all active:scale-95">
                                                 <Package size={14} /> I Received My Sample 📦
                                             </button>
                                         )}
@@ -345,8 +345,8 @@ const CreatorBetaLab: React.FC<Props> = ({ creator, account, betaTests, betaRele
 
                                         {release?.agreed && release?.sampleReceived && (
                                             <button onClick={() => onNavigate('upload')}
-                                                className="w-full flex items-center justify-between p-3 bg-purple-500/5 border border-purple-500/20 rounded-xl hover:border-purple-500/40 transition-all group">
-                                                <div className="flex items-center gap-2 text-purple-400">
+                                                className="w-full flex items-center justify-between p-3 bg-teal-500/5 border border-teal-500/20 rounded-xl hover:border-teal-500/40 transition-all group">
+                                                <div className="flex items-center gap-2 text-teal-400">
                                                     <Camera size={14} />
                                                     <span className="text-xs font-bold">Upload beta content</span>
                                                 </div>

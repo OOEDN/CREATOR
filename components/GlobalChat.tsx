@@ -35,6 +35,8 @@ interface Message {
 }
 
 const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], onSendTeamMessage, currentUser = 'Anonymous', brandInfo }) => {
+    // Filter out creator messages — team chat is internal only
+    const internalMessages = teamMessages.filter(m => !m.isCreatorMessage && !m.creatorId);
     const [isOpen, setIsOpen] = useState(false);
     const [mode, setMode] = useState<'ai' | 'team'>('ai');
     const [messages, setMessages] = useState<Message[]>([]);
@@ -153,7 +155,7 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages, isOpen, mode, teamMessages]);
+    }, [messages, isOpen, mode, internalMessages]);
 
     const handleSend = async () => {
         if (!inputText.trim()) return;
@@ -300,8 +302,8 @@ const GlobalChat: React.FC<GlobalChatProps> = ({ appState, teamMessages = [], on
                             </>
                         ) : (
                             <>
-                                {teamMessages.length === 0 && <p className="text-center text-neutral-500 text-xs mt-10">No messages yet. Start chatting!</p>}
-                                {teamMessages.map(msg => (
+                                {internalMessages.length === 0 && <p className="text-center text-neutral-500 text-xs mt-10">No messages yet. Start chatting!</p>}
+                                {internalMessages.map(msg => (
                                     <div key={msg.id} className={`flex flex-col ${msg.sender === currentUser ? 'items-end' : 'items-start'}`}>
                                         <span className="text-[9px] text-neutral-500 font-bold uppercase mb-1 ml-1">{msg.sender}</span>
                                         <div className={`max-w-[85%] rounded-2xl p-3 text-sm leading-relaxed ${msg.sender === currentUser

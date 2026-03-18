@@ -46,36 +46,36 @@ const StatCard: React.FC<{
         style={{
             flex: '1 1 0',
             minWidth: '120px',
-            background: `linear-gradient(135deg, rgba(${tint},0.12) 0%, rgba(${tint},0.04) 100%)`,
-            backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
-            border: `1px solid rgba(${tint},0.15)`,
-            borderTop: `1px solid rgba(${tint},0.25)`,
-            borderLeft: `1px solid rgba(${tint},0.2)`,
-            borderRadius: '20px',
-            padding: '20px 18px',
+            background: `linear-gradient(135deg, rgba(${tint},0.18) 0%, rgba(${tint},0.05) 100%)`,
+            backdropFilter: 'blur(80px) saturate(1.8)', WebkitBackdropFilter: 'blur(80px) saturate(1.8)',
+            border: `1px solid rgba(${tint},0.2)`,
+            borderTop: `1px solid rgba(${tint},0.35)`,
+            borderLeft: `1px solid rgba(${tint},0.25)`,
+            borderRadius: '22px',
+            padding: '22px 20px',
             cursor: onClick ? 'pointer' : 'default',
             transition: 'all 0.4s cubic-bezier(0.22,1,0.36,1)',
             animation: `dashFadeUp 0.6s ease ${delay}s both`,
-            boxShadow: `0 4px 24px rgba(${tint},0.08), inset 0 1px 0 rgba(255,255,255,0.06)`,
+            boxShadow: `0 8px 40px rgba(${tint},0.12), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)`,
             position: 'relative' as const,
             overflow: 'hidden',
         }}
         onMouseEnter={e => {
-            e.currentTarget.style.transform = 'translateY(-4px) scale(1.02) rotateX(5deg) rotateY(2deg)';
-            e.currentTarget.style.borderColor = `rgba(${tint},0.35)`;
-            e.currentTarget.style.boxShadow = `0 16px 40px rgba(${tint},0.2), inset 0 1px 0 rgba(255,255,255,0.1)`;
+            e.currentTarget.style.transform = 'translateY(-6px) scale(1.03) rotateX(6deg) rotateY(3deg)';
+            e.currentTarget.style.borderColor = `rgba(${tint},0.45)`;
+            e.currentTarget.style.boxShadow = `0 20px 60px rgba(${tint},0.25), 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.12)`;
         }}
         onMouseLeave={e => {
             e.currentTarget.style.transform = 'translateY(0) scale(1) rotateX(0) rotateY(0)';
-            e.currentTarget.style.borderColor = `rgba(${tint},0.15)`;
-            e.currentTarget.style.boxShadow = `0 4px 24px rgba(${tint},0.08), inset 0 1px 0 rgba(255,255,255,0.06)`;
+            e.currentTarget.style.borderColor = `rgba(${tint},0.2)`;
+            e.currentTarget.style.boxShadow = `0 8px 40px rgba(${tint},0.12), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)`;
         }}
     >
         {/* Inner highlight overlay */}
         <div style={{
-            position: 'absolute', top: 0, left: 0, right: 0, height: '50%',
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 100%)',
-            borderRadius: '20px 20px 0 0', pointerEvents: 'none',
+            position: 'absolute', top: 0, left: 0, right: 0, height: '55%',
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 100%)',
+            borderRadius: '22px 22px 0 0', pointerEvents: 'none',
         }} />
         <p style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 10px', position: 'relative' as const }}>
             {label}
@@ -93,7 +93,7 @@ const StatCard: React.FC<{
 export default function CreatorDashboard({ creator, campaigns, contentItems, teamMessages, onNavigate, onEnableNotifications }: Props) {
     const myContent = contentItems.filter(c => c.creatorId === creator.id);
     const myMessages = teamMessages.filter(m => m.creatorId === creator.id);
-    const myCampaigns = campaigns.filter(c => c.assignedCreatorIds?.includes(creator.id) || c.status === 'Final Campaign');
+    const myCampaigns = campaigns.filter(c => (c.assignedCreatorIds?.includes(creator.id) || c.status === 'Final Campaign') && c.status !== 'Paused');
     const pendingCampaigns = myCampaigns.filter(c => !c.acceptedByCreatorIds?.includes(creator.id));
     const acceptedCampaigns = myCampaigns.filter(c => c.acceptedByCreatorIds?.includes(creator.id));
 
@@ -127,7 +127,7 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
             id: c.id,
             label: c.title || 'Content',
             status: c.status,
-            color: c.status === ContentStatus.Approved ? '134,239,172' : c.status === ContentStatus.Posted ? '103,232,249' : '167,139,250',
+            color: c.status === ContentStatus.Approved ? '134,239,172' : c.status === ContentStatus.Posted ? '103,232,249' : '127,181,181',
             time: c.uploadDate || '',
         })),
     ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 4);
@@ -161,7 +161,7 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
             <div style={{
                 position: 'fixed', top: '-15%', right: '-10%',
                 width: '500px', height: '500px',
-                background: 'radial-gradient(circle, rgba(167,139,250,0.1) 0%, rgba(236,72,153,0.05) 40%, transparent 70%)',
+                background: 'radial-gradient(circle, rgba(127,181,181,0.1) 0%, rgba(140,197,197,0.05) 40%, transparent 70%)',
                 borderRadius: '50%', filter: 'blur(80px)',
                 pointerEvents: 'none', zIndex: 0,
                 animation: 'ambientDrift 15s ease-in-out infinite',
@@ -177,10 +177,10 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                     {/* Avatar */}
                     <div style={{
                         width: '44px', height: '44px', borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #a78bfa, #ec4899)',
+                        background: 'linear-gradient(135deg, #7fb5b5, #8cc5c5)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         border: '2px solid rgba(255,255,255,0.15)',
-                        boxShadow: '0 4px 16px rgba(167,139,250,0.25)',
+                        boxShadow: '0 4px 16px rgba(127,181,181,0.25)',
                         overflow: 'hidden',
                     }}>
                         {creator.profileImage
@@ -202,13 +202,13 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                             <div style={{
                                 height: '100%', borderRadius: '3px',
                                 width: `${progressPercent}%`,
-                                background: `linear-gradient(90deg, var(--xp-start, #a78bfa), var(--xp-end, #67e8f9))`,
+                                background: `linear-gradient(90deg, var(--xp-start, #7fb5b5), var(--xp-end, #67e8f9))`,
                                 backgroundSize: '200% 100%',
                                 animation: 'dashProgressFill 1s ease 0.5s both, dashXpShimmer 3s ease-in-out infinite',
                             }} />
                         </div>
                         <div style={{
-                            background: `linear-gradient(135deg, var(--level-start, #a78bfa), var(--level-end, #67e8f9))`,
+                            background: `linear-gradient(135deg, var(--level-start, #7fb5b5), var(--level-end, #67e8f9))`,
                             borderRadius: '10px', padding: '3px 10px',
                             display: 'flex', alignItems: 'center', gap: '4px',
                         }}>
@@ -232,12 +232,12 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                         {earnedAchievements.length > 0 && (
                             <div style={{
                                 display: 'flex', alignItems: 'center', gap: '3px',
-                                background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.2)',
+                                background: 'rgba(100,170,170,0.12)', border: '1px solid rgba(100,170,170,0.2)',
                                 borderRadius: '10px', padding: '3px 8px',
                                 cursor: 'pointer',
                             }} onClick={() => onNavigate('profile')}>
-                                <Trophy size={10} style={{ color: '#a855f7' }} />
-                                <span style={{ fontSize: '11px', fontWeight: 800, color: '#a855f7' }}>{earnedAchievements.length}</span>
+                                <Trophy size={10} style={{ color: '#d4a574' }} />
+                                <span style={{ fontSize: '11px', fontWeight: 800, color: '#d4a574' }}>{earnedAchievements.length}</span>
                             </div>
                         )}
                     </div>
@@ -251,7 +251,7 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                     }}>
                         {greeting},<br />
                         <span style={{
-                            background: 'linear-gradient(135deg, #a78bfa, #ec4899)',
+                            background: 'linear-gradient(135deg, #7fb5b5, #8cc5c5)',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
                             backgroundClip: 'text',
@@ -276,8 +276,8 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                             {/* Glowing purple accent bar */}
                             <div style={{
                                 width: '40px', height: '3px', borderRadius: '2px',
-                                background: 'linear-gradient(90deg, #a78bfa, #ec4899)',
-                                boxShadow: '0 0 12px rgba(167,139,250,0.4)',
+                                background: 'linear-gradient(90deg, #7fb5b5, #8cc5c5)',
+                                boxShadow: '0 0 12px rgba(127,181,181,0.4)',
                             }} />
                         </div>
                         {streak > 0 && (
@@ -295,7 +295,7 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                     </div>
                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                         <StatCard label="Earnings" value={totalEarned > 0 ? `$${totalEarned}` : '$0'} icon={<DollarSign size={16} />}
-                            tint="167,139,250" suffix={totalEarned > 0 ? '↑' : ''} onClick={() => onNavigate('payments')} delay={0.3} />
+                            tint="127,181,181" suffix={totalEarned > 0 ? '↑' : ''} onClick={() => onNavigate('payments')} delay={0.3} />
                         <StatCard label="Tasks" value={completedCount} icon={<CheckCircle size={16} />}
                             tint="251,191,36" suffix="↓" onClick={() => onNavigate('campaigns')} delay={0.35} />
                         <StatCard label="Uploads" value={totalUploads} icon={<Upload size={16} />}
@@ -310,16 +310,19 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                     <div
                         onClick={() => onNavigate('campaigns')}
                         style={{
-                            background: 'linear-gradient(135deg, rgba(167,139,250,0.15), rgba(236,72,153,0.1))',
-                            border: '1px solid rgba(167,139,250,0.2)',
-                            borderRadius: '18px', padding: '16px 20px',
+                            background: 'linear-gradient(135deg, rgba(127,181,181,0.2), rgba(140,197,197,0.12))',
+                            backdropFilter: 'blur(60px) saturate(1.8)', WebkitBackdropFilter: 'blur(60px) saturate(1.8)',
+                            border: '1px solid rgba(127,181,181,0.25)',
+                            borderTop: '1px solid rgba(127,181,181,0.35)',
+                            borderRadius: '22px', padding: '18px 22px',
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                             cursor: 'pointer', marginBottom: '28px',
                             transition: 'all 0.3s',
                             animation: 'dashFadeUp 0.6s ease 0.5s both',
+                            boxShadow: '0 8px 40px rgba(127,181,181,0.15), inset 0 1px 0 rgba(255,255,255,0.08)',
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'rgba(167,139,250,0.35)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(167,139,250,0.2)'; }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'rgba(127,181,181,0.35)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(127,181,181,0.2)'; }}
                     >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <span style={{ fontSize: '20px' }}>🎉</span>
@@ -357,7 +360,7 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                                 <div style={{
                                     height: '100%', borderRadius: '3px',
                                     width: `${campaignProgress}%`,
-                                    background: 'linear-gradient(90deg, #a78bfa, #67e8f9)',
+                                    background: 'linear-gradient(90deg, #7fb5b5, #67e8f9)',
                                     transition: 'width 1s ease',
                                     animation: 'dashProgressFill 1.2s ease 0.8s both',
                                 }} />
@@ -370,7 +373,7 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                 {activeCampaign && focusTasks.length > 0 && (
                     <div style={{ marginBottom: '28px', animation: 'dashFadeUp 0.6s ease 0.6s both' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                            <Target size={15} style={{ color: '#a78bfa' }} />
+                            <Target size={15} style={{ color: '#7fb5b5' }} />
                             <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', margin: 0 }}>Current Focus</h3>
                         </div>
                         <div style={{
@@ -385,8 +388,8 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                                 <span style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{activeCampaign.title}</span>
                                 <span style={{
-                                    fontSize: '11px', fontWeight: 700, color: '#a78bfa',
-                                    background: 'rgba(167,139,250,0.12)', borderRadius: '8px', padding: '2px 8px',
+                                    fontSize: '11px', fontWeight: 700, color: '#7fb5b5',
+                                    background: 'rgba(127,181,181,0.12)', borderRadius: '8px', padding: '2px 8px',
                                 }}>{campaignProgress}%</span>
                             </div>
                             {/* Mini progress bar */}
@@ -394,7 +397,7 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                                 <div style={{
                                     height: '100%', borderRadius: '2px',
                                     width: `${campaignProgress}%`,
-                                    background: 'linear-gradient(90deg, #a78bfa, #67e8f9)',
+                                    background: 'linear-gradient(90deg, #7fb5b5, #67e8f9)',
                                     transition: 'width 1s ease',
                                 }} />
                             </div>
@@ -524,7 +527,7 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                     <p style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>📊 Your Impact</p>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
                         <div style={{ textAlign: 'center' }}>
-                            <p style={{ fontSize: '18px', fontWeight: 800, color: '#a78bfa', margin: 0 }}><AnimNum value={totalUploads} /></p>
+                            <p style={{ fontSize: '18px', fontWeight: 800, color: '#7fb5b5', margin: 0 }}><AnimNum value={totalUploads} /></p>
                             <p style={{ fontSize: '8px', color: 'rgba(255,255,255,0.3)', fontWeight: 600, textTransform: 'uppercase', margin: '2px 0 0' }}>Uploads</p>
                         </div>
                         <div style={{ textAlign: 'center' }}>
@@ -582,7 +585,7 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                             marginTop: '28px',
                             background: 'rgba(255,255,255,0.03)',
                             backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-                            border: '1px dashed rgba(167,139,250,0.25)',
+                            border: '1px dashed rgba(127,181,181,0.25)',
                             borderRadius: '18px',
                             padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '12px',
                             cursor: 'pointer', transition: 'all 0.3s',
@@ -591,14 +594,14 @@ export default function CreatorDashboard({ creator, campaigns, contentItems, tea
                         }}
                         onMouseEnter={e => {
                             e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                            e.currentTarget.style.borderColor = 'rgba(167,139,250,0.4)';
+                            e.currentTarget.style.borderColor = 'rgba(127,181,181,0.4)';
                         }}
                         onMouseLeave={e => {
                             e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
-                            e.currentTarget.style.borderColor = 'rgba(167,139,250,0.25)';
+                            e.currentTarget.style.borderColor = 'rgba(127,181,181,0.25)';
                         }}
                     >
-                        <Bell size={18} style={{ color: '#a78bfa' }} />
+                        <Bell size={18} style={{ color: '#7fb5b5' }} />
                         <div>
                             <p style={{ fontWeight: 600, color: 'rgba(255,255,255,0.7)', fontSize: '13px', margin: 0 }}>Enable notifications</p>
                             <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: '2px 0 0' }}>Get alerts for campaigns, payments & messages</p>

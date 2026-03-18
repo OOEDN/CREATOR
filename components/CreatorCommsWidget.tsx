@@ -103,28 +103,28 @@ const CreatorCommsWidget: React.FC<CreatorCommsWidgetProps> = ({
             <div className="bg-ooedn-gray border border-neutral-800 rounded-3xl p-6 shadow-2xl">
                 <div className="flex items-center justify-between mb-5">
                     <h3 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2">
-                        <Megaphone size={16} className="text-purple-400" /> Broadcast to All Creators
+                        <Megaphone size={16} className="text-teal-400" /> Broadcast to All Creators
                     </h3>
                     <button onClick={() => setShowBroadcast(false)} className="text-neutral-500 hover:text-white text-xs font-bold">Cancel</button>
                 </div>
                 <div className="flex gap-2 mb-4">
                     <button onClick={() => setBroadcastType('push')}
-                        className={`flex-1 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${broadcastType === 'push' ? 'bg-purple-500 text-black' : 'bg-neutral-800 text-neutral-500'}`}>
+                        className={`flex-1 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${broadcastType === 'push' ? 'bg-teal-500 text-black' : 'bg-neutral-800 text-neutral-500'}`}>
                         <Bell size={12} className="inline mr-1" /> Push Notification
                     </button>
                     <button onClick={() => setBroadcastType('email')}
-                        className={`flex-1 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${broadcastType === 'email' ? 'bg-purple-500 text-black' : 'bg-neutral-800 text-neutral-500'}`}>
+                        className={`flex-1 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${broadcastType === 'email' ? 'bg-teal-500 text-black' : 'bg-neutral-800 text-neutral-500'}`}>
                         <Mail size={12} className="inline mr-1" /> Email
                     </button>
                 </div>
                 <input value={broadcastTitle} onChange={e => setBroadcastTitle(e.target.value)}
                     placeholder={broadcastType === 'push' ? 'Notification Title' : 'Email Subject'}
-                    className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-purple-500/50 mb-3" />
+                    className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-teal-500/50 mb-3" />
                 <textarea value={broadcastBody} onChange={e => setBroadcastBody(e.target.value)}
                     placeholder="Your message to all creators..."
-                    className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-purple-500/50 h-28 resize-none mb-3" />
+                    className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-3 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-teal-500/50 h-28 resize-none mb-3" />
                 <button onClick={handleBroadcast} disabled={!broadcastBody.trim()}
-                    className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-black py-3 rounded-xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 hover:from-purple-400 hover:to-pink-400 disabled:opacity-30 transition-all active:scale-95">
+                    className="w-full bg-gradient-to-r from-teal-600 to-cyan-500 text-black py-3 rounded-xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 hover:from-teal-400 hover:to-cyan-400 disabled:opacity-30 transition-all active:scale-95">
                     <Megaphone size={14} /> Send to {creators.length} Creators
                 </button>
             </div>
@@ -152,7 +152,7 @@ const CreatorCommsWidget: React.FC<CreatorCommsWidgetProps> = ({
                     </div>
                     <div className="flex gap-2">
                         <button onClick={() => onPushNotify([selectedCreatorId], 'OOEDN', 'You have a new message!')}
-                            className="p-2 bg-purple-500/10 rounded-lg text-purple-400 hover:bg-purple-500/20 transition-all" title="Send Push">
+                            className="p-2 bg-teal-500/10 rounded-lg text-teal-400 hover:bg-teal-500/20 transition-all" title="Send Push">
                             <Bell size={14} />
                         </button>
                     </div>
@@ -170,9 +170,9 @@ const CreatorCommsWidget: React.FC<CreatorCommsWidgetProps> = ({
                         <div key={msg.id} className={`flex ${msg.isCreatorMessage ? 'justify-start' : 'justify-end'}`}>
                             <div className={`max-w-[80%] ${msg.isCreatorMessage
                                 ? 'bg-teal-500/10 border border-teal-500/20 rounded-2xl rounded-bl-md'
-                                : 'bg-purple-500/10 border border-purple-500/20 rounded-2xl rounded-br-md'
+                                : 'bg-teal-500/10 border border-teal-500/20 rounded-2xl rounded-br-md'
                                 } p-3`}>
-                                <p className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${msg.isCreatorMessage ? 'text-teal-400' : 'text-purple-400'}`}>
+                                <p className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${msg.isCreatorMessage ? 'text-teal-400' : 'text-teal-400'}`}>
                                     {msg.isCreatorMessage ? `👤 ${msg.creatorName || creatorName}` : msg.sender}
                                 </p>
                                 <p className="text-sm text-white leading-relaxed">{msg.text}</p>
@@ -188,9 +188,9 @@ const CreatorCommsWidget: React.FC<CreatorCommsWidgetProps> = ({
                     <input value={replyText} onChange={e => setReplyText(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleSendReply()}
                         placeholder={`Reply to ${creatorName}...`}
-                        className="flex-1 bg-black border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-purple-500/50" />
+                        className="flex-1 bg-black border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-teal-500/50" />
                     <button onClick={handleSendReply} disabled={!replyText.trim()}
-                        className="bg-gradient-to-r from-purple-500 to-pink-500 text-black p-2.5 rounded-xl hover:from-purple-400 hover:to-pink-400 disabled:opacity-30 transition-all active:scale-95" title="Send">
+                        className="bg-gradient-to-r from-teal-600 to-cyan-500 text-black p-2.5 rounded-xl hover:from-teal-400 hover:to-cyan-400 disabled:opacity-30 transition-all active:scale-95" title="Send">
                         <Send size={16} />
                     </button>
                 </div>
@@ -207,7 +207,7 @@ const CreatorCommsWidget: React.FC<CreatorCommsWidgetProps> = ({
                     {creatorIds.length > 0 && <span className="text-[10px] text-neutral-500 font-mono ml-1">{creatorIds.length} threads</span>}
                 </h3>
                 <button onClick={() => setShowBroadcast(true)}
-                    className="text-[9px] font-black uppercase tracking-widest text-purple-400 hover:text-white transition-colors flex items-center gap-1 bg-purple-500/10 px-3 py-1.5 rounded-lg">
+                    className="text-[9px] font-black uppercase tracking-widest text-teal-400 hover:text-white transition-colors flex items-center gap-1 bg-teal-500/10 px-3 py-1.5 rounded-lg">
                     <Megaphone size={10} /> Broadcast
                 </button>
             </div>

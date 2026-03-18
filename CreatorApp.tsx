@@ -244,6 +244,62 @@ function CreatorApp() {
         }
     }, []);
 
+    // --- Poll for new team messages/content updates every 30s ---
+    useEffect(() => {
+        if (!isConnected || !jwtToken) return;
+        const interval = setInterval(async () => {
+            try {
+                const resp = await fetch('/api/creator/me', {
+                    headers: { 'Authorization': `Bearer ${jwtToken}` }
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                // Merge new team messages (team→creator replies)
+                if (data.teamMessages) {
+                    setTeamMessages(prev => {
+                        const existingIds = new Set(prev.map(m => m.id));
+                        const newMsgs = data.teamMessages.filter((m: TeamMessage) => !existingIds.has(m.id));
+                        if (newMsgs.length > 0) {
+                            console.log(`[CreatorPoll] 📩 ${newMsgs.length} new messages`);
+                            return [...prev, ...newMsgs];
+                        }
+                        return prev;
+                    });
+                }
+
+                // Merge content updates (status changes, review notes from team)
+                if (data.contentItems) {
+                    setContentItems(prev => {
+                        const serverMap = new Map(data.contentItems.map((c: ContentItem) => [c.id, c]));
+                        let changed = false;
+                        const merged = prev.map(local => {
+                            const server = serverMap.get(local.id) as ContentItem | undefined;
+                            if (server && (server.status !== local.status || (server.teamNotes?.length || 0) > (local.teamNotes?.length || 0))) {
+                                changed = true;
+                                return { ...local, ...server };
+                            }
+                            return local;
+                        });
+                        // Add any new items from server
+                        const localIds = new Set(prev.map(c => c.id));
+                        const brandNew = data.contentItems.filter((c: ContentItem) => !localIds.has(c.id));
+                        if (brandNew.length > 0) changed = true;
+                        return changed ? [...merged, ...brandNew] : prev;
+                    });
+                }
+
+                // Update campaigns (new campaigns assigned, brief changes)
+                if (data.campaigns) {
+                    setCampaigns(data.campaigns);
+                }
+            } catch (e) {
+                console.warn('[CreatorPoll] Poll failed:', e);
+            }
+        }, 30000);
+        return () => clearInterval(interval);
+    }, [isConnected, jwtToken]);
+
     const handleLogout = () => {
         localStorage.removeItem('ooedn_creator_session');
         localStorage.removeItem('ooedn_creator_jwt');
@@ -590,8 +646,8 @@ function CreatorApp() {
         return (
             <div style={{ minHeight: '100vh', background: '#07070a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', position: 'relative', overflow: 'hidden', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif' }}>
                 {/* Animated gradient orbs */}
-                <div style={{ position: 'absolute', top: '15%', left: '20%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(139,92,246,0.15), transparent 70%)', borderRadius: '50%', filter: 'blur(60px)', animation: 'creatorOrb1 8s ease-in-out infinite' }} />
-                <div style={{ position: 'absolute', bottom: '15%', right: '15%', width: '350px', height: '350px', background: 'radial-gradient(circle, rgba(236,72,153,0.12), transparent 70%)', borderRadius: '50%', filter: 'blur(60px)', animation: 'creatorOrb2 10s ease-in-out infinite' }} />
+                <div style={{ position: 'absolute', top: '15%', left: '20%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(90,158,158,0.15), transparent 70%)', borderRadius: '50%', filter: 'blur(60px)', animation: 'creatorOrb1 8s ease-in-out infinite' }} />
+                <div style={{ position: 'absolute', bottom: '15%', right: '15%', width: '350px', height: '350px', background: 'radial-gradient(circle, rgba(140,197,197,0.12), transparent 70%)', borderRadius: '50%', filter: 'blur(60px)', animation: 'creatorOrb2 10s ease-in-out infinite' }} />
                 <div style={{ position: 'absolute', top: '50%', left: '60%', width: '250px', height: '250px', background: 'radial-gradient(circle, rgba(103,232,249,0.08), transparent 70%)', borderRadius: '50%', filter: 'blur(60px)', animation: 'creatorOrb3 12s ease-in-out infinite' }} />
 
                 {/* Login card — frosted glass */}
@@ -605,12 +661,12 @@ function CreatorApp() {
                     opacity: 0, transform: 'translateY(20px)',
                 }}>
                     {/* Top light accent line */}
-                    <div style={{ position: 'absolute', top: 0, left: '20%', right: '20%', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(167,139,250,0.4), transparent)' }} />
+                    <div style={{ position: 'absolute', top: 0, left: '20%', right: '20%', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(127,181,181,0.4), transparent)' }} />
 
                     <div style={{ textAlign: 'center', marginBottom: '28px' }}>
                         {settings.logoUrl
                             ? <img src={settings.logoUrl} alt="OOEDN Logo" style={{ height: '40px', objectFit: 'contain', margin: '0 auto 16px', opacity: 0.9 }} />
-                            : <Flame size={40} style={{ color: '#a78bfa', margin: '0 auto 16px' }} />}
+                            : <Flame size={40} style={{ color: '#7fb5b5', margin: '0 auto 16px' }} />}
                         <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'white', letterSpacing: '-0.03em', margin: '0 0 4px' }}>Creator Portal</h1>
                         <p style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.2em' }}>OOEDN Partner Access</p>
                     </div>
@@ -620,7 +676,7 @@ function CreatorApp() {
                             <Mail size={14} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.2)' }} />
                             <input value={formEmail} onChange={e => setFormEmail(e.target.value)} placeholder="Email address" type="email"
                                 style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '14px 16px 14px 40px', fontSize: '14px', color: 'white', outline: 'none', transition: 'border-color 0.3s', boxSizing: 'border-box' }}
-                                onFocus={e => e.target.style.borderColor = 'rgba(167,139,250,0.4)'}
+                                onFocus={e => e.target.style.borderColor = 'rgba(127,181,181,0.4)'}
                                 onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
                         </div>
                         <div style={{ position: 'relative' }}>
@@ -629,7 +685,7 @@ function CreatorApp() {
                                 type={showPassword ? 'text' : 'password'}
                                 onKeyDown={e => e.key === 'Enter' && handleSignIn()}
                                 style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '14px 42px 14px 40px', fontSize: '14px', color: 'white', outline: 'none', transition: 'border-color 0.3s', boxSizing: 'border-box' }}
-                                onFocus={e => e.target.style.borderColor = 'rgba(167,139,250,0.4)'}
+                                onFocus={e => e.target.style.borderColor = 'rgba(127,181,181,0.4)'}
                                 onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
                             <button onClick={() => setShowPassword(!showPassword)} type="button"
                                 style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'pointer', padding: 0 }}>
@@ -639,14 +695,14 @@ function CreatorApp() {
                         <button onClick={handleSignIn} disabled={isLoading}
                             style={{
                                 width: '100%', padding: '14px', borderRadius: '14px', border: 'none', cursor: 'pointer',
-                                background: 'linear-gradient(135deg, #8b5cf6, #ec4899)', color: 'white',
+                                background: 'linear-gradient(135deg, #5a9e9e, #8cc5c5)', color: 'white',
                                 fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                                boxShadow: '0 8px 32px rgba(139,92,246,0.25)', transition: 'all 0.3s cubic-bezier(0.22,1,0.36,1)',
+                                boxShadow: '0 8px 32px rgba(90,158,158,0.25)', transition: 'all 0.3s cubic-bezier(0.22,1,0.36,1)',
                                 marginTop: '4px', opacity: isLoading ? 0.5 : 1,
                             }}
-                            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(139,92,246,0.35)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 8px 32px rgba(139,92,246,0.25)'; }}>
+                            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(90,158,158,0.35)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 8px 32px rgba(90,158,158,0.25)'; }}>
                             {isLoading ? <Loader2 className="animate-spin" size={16} /> : <><ArrowRight size={14} /> Sign In</>}
                         </button>
                     </div>
@@ -675,7 +731,7 @@ function CreatorApp() {
         return (
             <div style={{ minHeight: '100vh', background: '#07070a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', animation: 'creatorSlideUp 0.6s ease forwards', opacity: 0, transform: 'translateY(10px)' }}>
-                    <Loader2 size={32} style={{ color: '#a78bfa', animation: 'spin 1s linear infinite' }} />
+                    <Loader2 size={32} style={{ color: '#7fb5b5', animation: 'spin 1s linear infinite' }} />
                     <p style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Loading your portal...</p>
                 </div>
                 <style>{`@keyframes creatorSlideUp { to { opacity: 1; transform: translateY(0); } }`}</style>
@@ -693,8 +749,8 @@ function CreatorApp() {
 
                 {/* Gradient BG */}
                 <div className="absolute inset-0" style={{ animation: 'introFadeIn 0.5s ease-out 0.3s both' }}>
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-900/50 via-black to-black" />
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-purple-600/15 rounded-full blur-[150px]" style={{ animation: 'introPulseGlow 2s ease-in-out infinite' }} />
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-teal-900/50 via-black to-black" />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-teal-600/15 rounded-full blur-[150px]" style={{ animation: 'introPulseGlow 2s ease-in-out infinite' }} />
                 </div>
 
                 {/* SLAM Content */}
@@ -703,7 +759,7 @@ function CreatorApp() {
                     <div style={{ animation: 'introSlamIn 0.4s cubic-bezier(0, 0, 0.2, 1) 0.2s both' }}>
                         {settings.logoUrl
                             ? <img src={settings.logoUrl} alt="OOEDN" className="h-20 object-contain mb-6" />
-                            : <Flame size={80} className="text-purple-500 mb-6" />}
+                            : <Flame size={80} className="text-teal-500 mb-6" />}
                     </div>
 
                     {/* BIG TEXT — slams in with scale */}
@@ -713,11 +769,11 @@ function CreatorApp() {
                     </h1>
 
                     {/* Divider line — snaps open */}
-                    <div className="h-1 w-0 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 rounded-full my-6"
+                    <div className="h-1 w-0 bg-gradient-to-r from-teal-500 via-cyan-400 to-teal-500 rounded-full my-6"
                         style={{ animation: 'introExpandLine 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.7s both' }} />
 
                     {/* Creator name — slides up */}
-                    <p className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 text-center"
+                    <p className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-cyan-300 to-teal-400 text-center"
                         style={{ animation: 'introSlideUp 0.6s ease-out 0.9s both' }}>
                         {creatorRecord?.name || currentAccount?.displayName || 'Welcome'}
                     </p>
@@ -731,7 +787,7 @@ function CreatorApp() {
                     {/* Enter button */}
                     <button
                         onClick={(e) => { e.stopPropagation(); setShowWelcomeIntro(false); }}
-                        className="mt-10 px-12 py-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl font-black text-sm uppercase tracking-widest text-white shadow-2xl shadow-purple-500/40 hover:shadow-purple-500/60 hover:scale-110 active:scale-95 transition-all"
+                        className="mt-10 px-12 py-4 bg-gradient-to-r from-teal-600 to-cyan-500 rounded-2xl font-black text-sm uppercase tracking-widest text-white shadow-2xl shadow-teal-500/40 hover:shadow-teal-500/60 hover:scale-110 active:scale-95 transition-all"
                         style={{ animation: 'introSlideUp 0.5s ease-out 1.4s both' }}>
                         Enter →
                     </button>
@@ -757,7 +813,7 @@ function CreatorApp() {
     if (!creatorRecord) {
         return (
             <div style={{ minHeight: '100vh', background: '#07070a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', position: 'relative', overflow: 'hidden', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif' }}>
-                <div style={{ position: 'absolute', top: '20%', left: '30%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(139,92,246,0.12), transparent 70%)', borderRadius: '50%', filter: 'blur(60px)', animation: 'creatorOrb1 8s ease-in-out infinite' }} />
+                <div style={{ position: 'absolute', top: '20%', left: '30%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(90,158,158,0.12), transparent 70%)', borderRadius: '50%', filter: 'blur(60px)', animation: 'creatorOrb1 8s ease-in-out infinite' }} />
                 <div style={{ width: '100%', maxWidth: '400px', background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(40px) saturate(1.8)', WebkitBackdropFilter: 'blur(40px) saturate(1.8)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '28px', padding: '40px 32px', textAlign: 'center', animation: 'creatorSlideUp 0.8s cubic-bezier(0.22,1,0.36,1) forwards', opacity: 0, transform: 'translateY(20px)', position: 'relative', zIndex: 10 }}>
                     <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
                     <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'white', margin: '0 0 8px', letterSpacing: '-0.02em' }}>Welcome, {currentAccount?.displayName}!</h2>
@@ -789,10 +845,26 @@ function CreatorApp() {
     const newCampaignCount = myCampaigns.filter(c => !c.acceptedByCreatorIds?.includes(creatorRecord.id)).length;
 
     return (
-        <div style={{ display: 'flex', height: '100vh', background: '#0a0a0f', color: 'white', overflow: 'hidden', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif', position: 'relative' }} className={!isDarkMode ? 'light-mode' : ''}>
-            {/* Subtle ambient glow — Apple style */}
-            <div style={{ position: 'absolute', top: '-10%', right: '-5%', width: '600px', height: '600px', background: 'radial-gradient(circle, rgba(167,139,250,0.06), transparent 70%)', borderRadius: '50%', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0 }} />
-            <div style={{ position: 'absolute', bottom: '-10%', left: '-5%', width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(236,72,153,0.04), transparent 70%)', borderRadius: '50%', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0 }} />
+        <div style={{ display: 'flex', height: '100vh', background: '#050508', color: 'white', overflow: 'hidden', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif', position: 'relative' }} className={!isDarkMode ? 'light-mode' : ''}>
+            {/* PRODUCT SHOT — full-screen background */}
+            <div style={{
+                position: 'absolute', inset: 0, zIndex: 0,
+                backgroundImage: 'url(/product-bg.png)',
+                backgroundSize: 'cover', backgroundPosition: 'center center',
+                backgroundRepeat: 'no-repeat',
+                filter: 'blur(8px) brightness(0.40) saturate(1.3)',
+                transform: 'scale(1.05)',
+            }} />
+            {/* Soft gradient overlay for readability */}
+            <div style={{
+                position: 'absolute', inset: 0, zIndex: 0,
+                background: 'linear-gradient(160deg, rgba(10,14,16,0.5) 0%, rgba(8,12,14,0.35) 40%, rgba(12,16,18,0.4) 70%, rgba(8,12,16,0.5) 100%)',
+                pointerEvents: 'none',
+            }} />
+            {/* Ambient glows — intense, now bleed through glass */}
+            <div style={{ position: 'absolute', top: '-15%', right: '-10%', width: '800px', height: '800px', background: 'radial-gradient(circle, rgba(127,181,181,0.12), rgba(90,158,158,0.04) 40%, transparent 70%)', borderRadius: '50%', filter: 'blur(120px)', pointerEvents: 'none', zIndex: 1, animation: 'ambientDrift 20s ease-in-out infinite' }} />
+            <div style={{ position: 'absolute', bottom: '-15%', left: '-10%', width: '700px', height: '700px', background: 'radial-gradient(circle, rgba(180,200,190,0.10), rgba(140,170,160,0.04) 40%, transparent 70%)', borderRadius: '50%', filter: 'blur(120px)', pointerEvents: 'none', zIndex: 1, animation: 'ambientDrift 25s ease-in-out infinite reverse' }} />
+            <div style={{ position: 'absolute', top: '40%', left: '30%', width: '600px', height: '600px', background: 'radial-gradient(circle, rgba(200,210,200,0.06), transparent 60%)', borderRadius: '50%', filter: 'blur(140px)', pointerEvents: 'none', zIndex: 1, animation: 'ambientDrift 30s ease-in-out infinite' }} />
 
             {/* CONFETTI OVERLAY */}
             {showConfetti && (
@@ -848,15 +920,16 @@ function CreatorApp() {
             {/* SIDEBAR — refined Apple style */}
             <aside style={{
                 width: isSidebarOpen ? '200px' : '68px', flexShrink: 0, display: 'flex', flexDirection: 'column',
-                background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(40px) saturate(1.5)',
-                WebkitBackdropFilter: 'blur(40px) saturate(1.5)',
-                borderRight: '1px solid rgba(255,255,255,0.06)',
+                background: 'rgba(12,16,18,0.35)', backdropFilter: 'blur(80px) saturate(1.6) brightness(1.1)',
+                WebkitBackdropFilter: 'blur(80px) saturate(1.6) brightness(1.1)',
+                borderRight: '1px solid rgba(200,215,210,0.08)',
+                boxShadow: '1px 0 30px rgba(0,0,0,0.15), inset -1px 0 0 rgba(255,255,255,0.03)',
                 transition: 'width 0.3s cubic-bezier(0.22,1,0.36,1)', zIndex: 50,
             }}>
                 <div style={{ height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                     {isSidebarOpen
-                        ? settings.logoUrl ? <img src={settings.logoUrl} alt="OOEDN" style={{ height: '24px', objectFit: 'contain' }} /> : <h1 style={{ fontWeight: 800, fontSize: '16px', letterSpacing: '-0.03em', color: '#a78bfa', margin: 0 }}>ooedn</h1>
-                        : <Flame style={{ color: '#a78bfa' }} size={18} />}
+                        ? settings.logoUrl ? <img src={settings.logoUrl} alt="OOEDN" style={{ height: '24px', objectFit: 'contain' }} /> : <h1 style={{ fontWeight: 800, fontSize: '16px', letterSpacing: '-0.03em', color: '#7fb5b5', margin: 0 }}>ooedn</h1>
+                        : <Flame style={{ color: '#7fb5b5' }} size={18} />}
                 </div>
                 <nav style={{ flex: 1, overflowY: 'auto', padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                     {navItems.map(item => {
@@ -868,20 +941,20 @@ function CreatorApp() {
                                     width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: isSidebarOpen ? '10px 12px' : '10px',
                                     borderRadius: '12px', border: 'none', cursor: 'pointer', position: 'relative',
                                     justifyContent: isSidebarOpen ? 'flex-start' : 'center',
-                                    background: isActive ? 'rgba(167,139,250,0.12)' : 'transparent',
+                                    background: isActive ? 'rgba(127,181,181,0.12)' : 'transparent',
                                     transition: 'all 0.2s ease',
                                 }}
                                 onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
                                 onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
-                                {isActive && <div style={{ position: 'absolute', left: isSidebarOpen ? '0' : '-8px', top: '50%', transform: 'translateY(-50%)', width: '3px', height: '18px', borderRadius: '2px', background: 'linear-gradient(180deg, #a78bfa, #ec4899)' }} />}
-                                <item.icon size={isSidebarOpen ? 16 : 18} style={{ color: isActive ? '#a78bfa' : 'rgba(255,255,255,0.3)', flexShrink: 0, transition: 'color 0.2s' }} />
+                                {isActive && <div style={{ position: 'absolute', left: isSidebarOpen ? '0' : '-8px', top: '50%', transform: 'translateY(-50%)', width: '3px', height: '18px', borderRadius: '2px', background: 'linear-gradient(180deg, #7fb5b5, #8cc5c5)' }} />}
+                                <item.icon size={isSidebarOpen ? 16 : 18} style={{ color: isActive ? '#a0d4d4' : 'rgba(255,255,255,0.5)', flexShrink: 0, transition: 'color 0.2s' }} />
                                 {isSidebarOpen && (
-                                    <span style={{ fontSize: '12px', fontWeight: isActive ? 700 : 600, color: isActive ? 'white' : 'rgba(255,255,255,0.4)', textAlign: 'left', whiteSpace: 'nowrap' }}>{item.label}</span>
+                                    <span style={{ fontSize: '12px', fontWeight: isActive ? 700 : 600, color: isActive ? 'white' : 'rgba(255,255,255,0.55)', textAlign: 'left', whiteSpace: 'nowrap' }}>{item.label}</span>
                                 )}
                                 {item.id === 'campaigns' && newCampaignCount > 0 && (
                                     isSidebarOpen
-                                        ? <span style={{ marginLeft: 'auto', width: '18px', height: '18px', borderRadius: '50%', background: '#a78bfa', color: 'white', fontSize: '9px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{newCampaignCount}</span>
-                                        : <span style={{ position: 'absolute', top: '6px', right: '6px', width: '6px', height: '6px', background: '#a78bfa', borderRadius: '50%' }} />
+                                        ? <span style={{ marginLeft: 'auto', width: '18px', height: '18px', borderRadius: '50%', background: '#7fb5b5', color: 'white', fontSize: '9px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{newCampaignCount}</span>
+                                        : <span style={{ position: 'absolute', top: '6px', right: '6px', width: '6px', height: '6px', background: '#7fb5b5', borderRadius: '50%' }} />
                                 )}
                             </button>
                         );
@@ -911,13 +984,14 @@ function CreatorApp() {
 
                 {/* TOP BAR — refined frosted glass */}
                 <header style={{
-                    height: '60px', borderBottom: '1px solid rgba(255,255,255,0.06)',
-                    background: 'rgba(10,10,15,0.7)', backdropFilter: 'blur(40px) saturate(1.5)',
-                    WebkitBackdropFilter: 'blur(40px) saturate(1.5)',
+                    height: '60px', borderBottom: '1px solid rgba(200,215,210,0.06)',
+                    background: 'rgba(10,14,16,0.35)', backdropFilter: 'blur(80px) saturate(1.6)',
+                    WebkitBackdropFilter: 'blur(80px) saturate(1.6)',
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '0 24px', zIndex: 40, position: 'relative',
+                    boxShadow: '0 1px 20px rgba(0,0,0,0.2), inset 0 -1px 0 rgba(200,215,210,0.04)',
                 }}>
-                    <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                    <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'rgba(255,255,255,0.75)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                         <span>{navItems.find(n => n.id === view)?.emoji}</span>
                         {navItems.find(n => n.id === view)?.label || 'Home'}
                     </h2>
@@ -925,20 +999,22 @@ function CreatorApp() {
                         {/* Bell */}
                         <button
                             onClick={() => setShowNotifPanel(!showNotifPanel)}
-                            style={{ position: 'relative', padding: '8px', background: 'none', border: 'none', color: unreadNotifs > 0 ? '#a78bfa' : 'rgba(255,255,255,0.3)', cursor: 'pointer', transition: 'color 0.2s' }}
+                            style={{ position: 'relative', padding: '8px', background: 'none', border: 'none', color: unreadNotifs > 0 ? '#7fb5b5' : 'rgba(255,255,255,0.3)', cursor: 'pointer', transition: 'color 0.2s' }}
                             title="Notifications">
                             {unreadNotifs > 0 ? <BellDot size={17} /> : <Bell size={17} />}
                             {unreadNotifs > 0 && (
-                                <span style={{ position: 'absolute', top: '4px', right: '4px', width: '14px', height: '14px', background: '#8b5cf6', borderRadius: '50%', fontSize: '8px', fontWeight: 900, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unreadNotifs}</span>
+                                <span style={{ position: 'absolute', top: '4px', right: '4px', width: '14px', height: '14px', background: '#5a9e9e', borderRadius: '50%', fontSize: '8px', fontWeight: 900, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unreadNotifs}</span>
                             )}
                         </button>
                         {/* Avatar pill */}
                         <div style={{
                             display: 'flex', alignItems: 'center', gap: '8px',
-                            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                            background: 'rgba(127,181,181,0.06)', border: '1px solid rgba(127,181,181,0.12)',
+                            backdropFilter: 'blur(60px)', WebkitBackdropFilter: 'blur(60px)',
                             padding: '4px 14px 4px 4px', borderRadius: '100px',
+                            boxShadow: '0 4px 20px rgba(127,181,181,0.08), inset 0 1px 0 rgba(255,255,255,0.06)',
                         }}>
-                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #a78bfa, #ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: '11px' }}>
+                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #7fb5b5, #8cc5c5)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: '11px' }}>
                                 {creatorRecord.name?.[0]?.toUpperCase() || 'C'}
                             </div>
                             <span style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>{creatorRecord.name?.split(' ')[0] || 'Creator'}</span>
@@ -952,7 +1028,7 @@ function CreatorApp() {
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                             <span style={{ fontSize: '11px', fontWeight: 800, color: 'white', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Notifications</span>
                             {unreadNotifs > 0 && (
-                                <button onClick={markAllRead} style={{ fontSize: '10px', color: '#a78bfa', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer' }}>
+                                <button onClick={markAllRead} style={{ fontSize: '10px', color: '#7fb5b5', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer' }}>
                                     Mark all read
                                 </button>
                             )}
@@ -965,7 +1041,7 @@ function CreatorApp() {
                                 </div>
                             ) : (
                                 notifications.slice(0, 10).map(n => (
-                                    <div key={n.id} style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', background: n.read ? 'transparent' : 'rgba(139,92,246,0.04)' }}>
+                                    <div key={n.id} style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', background: n.read ? 'transparent' : 'rgba(90,158,158,0.04)' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
                                             <span style={{ fontSize: '11px', fontWeight: 700, color: 'white' }}>{n.title}</span>
                                             <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.15)' }}>{new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>

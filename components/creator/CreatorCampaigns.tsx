@@ -55,7 +55,7 @@ const CampaignConfetti: React.FC<{ active: boolean }> = ({ active }) => {
 };
 
 const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, onMarkTaskDone, onAcceptCampaign, onDeclineCampaign, onNavigate, onAddComment, onSelectAngle, onJoinWaitlist }) => {
-    const myCampaigns = campaigns.filter(c => c.assignedCreatorIds?.includes(creator.id) || c.status === 'Final Campaign');
+    const myCampaigns = campaigns.filter(c => (c.assignedCreatorIds?.includes(creator.id) || c.status === 'Final Campaign') && c.status !== 'Paused');
     const [completedCampaignId, setCompletedCampaignId] = useState<string | null>(null);
     const [recentlyCompleted, setRecentlyCompleted] = useState<Set<string>>(new Set());
     const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
@@ -121,13 +121,13 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
         <div className="max-w-5xl mx-auto space-y-6">
             <div className="text-center mb-2">
                 <h2 className="text-2xl font-black text-white uppercase tracking-tight flex items-center justify-center gap-2">
-                    <Briefcase size={24} className="text-purple-400" /> My Campaigns
+                    <Briefcase size={24} className="text-teal-400" /> My Campaigns
                 </h2>
                 <p className="text-neutral-500 text-xs mt-1">View briefs, moodboards, complete deliverables, and track deadlines</p>
             </div>
 
             {myCampaigns.length === 0 ? (
-                <div className="bg-neutral-900/80 border border-neutral-800 rounded-2xl p-12 text-center">
+                <div className="bg-neutral-900/40 backdrop-blur-[80px] border border-teal-500/[0.08] rounded-2xl p-12 text-center">
                     <div className="text-5xl mb-3">📋</div>
                     <p className="text-neutral-400 text-sm font-bold">No campaigns assigned yet</p>
                     <p className="text-neutral-600 text-[10px] mt-1">When the team assigns you a campaign, it'll show up here with all the details 🎯</p>
@@ -154,7 +154,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                         return (
                             <div
                                 key={campaign.id}
-                                className={`bg-neutral-900/80 border rounded-2xl relative overflow-hidden transition-all ${isNew ? 'border-yellow-500/30 bg-yellow-500/5' :
+                                className={`bg-neutral-900/30 backdrop-blur-[80px] border rounded-2xl relative overflow-hidden transition-all ${isNew ? 'border-yellow-500/30 bg-yellow-500/5' :
                                     isComplete ? 'border-emerald-500/20' :
                                         'border-neutral-800'
                                     }`}
@@ -171,7 +171,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                             {isExpanded ? <ChevronDown size={14} className="text-neutral-500" /> : <ChevronRight size={14} className="text-neutral-500" />}
                                             {isComplete && <span className="text-xl">🏆</span>}
                                             {recentlyCompleted.has(campaign.id) && <span className="text-xl">🎉</span>}
-                                            <h3 className="text-lg font-black text-white group-hover:text-purple-400 transition-colors">{campaign.title}</h3>
+                                            <h3 className="text-lg font-black text-white group-hover:text-teal-400 transition-colors">{campaign.title}</h3>
                                         </div>
                                         <div className="flex items-center gap-2 mt-1 ml-6 flex-wrap">
                                             <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg ${campaign.status === 'Final Campaign' ? 'bg-emerald-500/10 text-emerald-400' :
@@ -197,7 +197,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                         {totalTasks > 0 && !isExpanded && (
                                             <div className="ml-6 mt-2 h-1.5 bg-neutral-800 rounded-full overflow-hidden max-w-xs">
                                                 <div
-                                                    className={`h-full rounded-full transition-all duration-700 ${isComplete ? 'bg-emerald-500' : 'bg-gradient-to-r from-purple-500 to-pink-500'}`}
+                                                    className={`h-full rounded-full transition-all duration-700 ${isComplete ? 'bg-emerald-500' : 'bg-gradient-to-r from-teal-600 to-cyan-500'}`}
                                                     style={{ width: `${progress}%` }}
                                                 />
                                             </div>
@@ -277,8 +277,8 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                 <>
                                                     <style>{`
                                                         @keyframes quest-glow {
-                                                            0%, 100% { box-shadow: 0 0 20px rgba(168,85,247,0.15), 0 0 60px rgba(168,85,247,0.05); }
-                                                            50% { box-shadow: 0 0 40px rgba(168,85,247,0.3), 0 0 80px rgba(168,85,247,0.1); }
+                                                            0%, 100% { box-shadow: 0 0 20px rgba(100,170,170,0.15), 0 0 60px rgba(100,170,170,0.05); }
+                                                            50% { box-shadow: 0 0 40px rgba(100,170,170,0.3), 0 0 80px rgba(100,170,170,0.1); }
                                                         }
                                                         @keyframes float-icon {
                                                             0%, 100% { transform: translateY(0px); }
@@ -314,9 +314,9 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                             100% { background-position: 200% 0; }
                                                         }
                                                         @keyframes pulse-ring {
-                                                            0% { box-shadow: 0 0 0 0 rgba(168,85,247,0.4); }
-                                                            70% { box-shadow: 0 0 0 12px rgba(168,85,247,0); }
-                                                            100% { box-shadow: 0 0 0 0 rgba(168,85,247,0); }
+                                                            0% { box-shadow: 0 0 0 0 rgba(100,170,170,0.4); }
+                                                            70% { box-shadow: 0 0 0 12px rgba(100,170,170,0); }
+                                                            100% { box-shadow: 0 0 0 0 rgba(100,170,170,0); }
                                                         }
                                                         .quest-glow { animation: quest-glow 3s ease-in-out infinite; }
                                                         .float-icon { animation: float-icon 3s ease-in-out infinite; }
@@ -325,30 +325,30 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                         .card-entrance { animation: card-entrance 0.5s ease-out forwards; }
                                                         .epic-unlock { animation: epic-unlock 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
                                                         .brief-section-reveal { animation: brief-section-reveal 0.5s ease-out forwards; }
-                                                        .shimmer-bg { background: linear-gradient(90deg, transparent 0%, rgba(168,85,247,0.08) 50%, transparent 100%); background-size: 200% 100%; animation: shimmer 2s ease-in-out infinite; }
+                                                        .shimmer-bg { background: linear-gradient(90deg, transparent 0%, rgba(100,170,170,0.08) 50%, transparent 100%); background-size: 200% 100%; animation: shimmer 2s ease-in-out infinite; }
                                                         .pulse-ring { animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-                                                        .avatar-pick:hover { transform: translateY(-4px) scale(1.02); box-shadow: 0 8px 30px rgba(168,85,247,0.2); }
+                                                        .avatar-pick:hover { transform: translateY(-4px) scale(1.02); box-shadow: 0 8px 30px rgba(100,170,170,0.2); }
                                                         .avatar-pick { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
                                                     `}</style>
 
-                                                    <div className="mb-5 bg-gradient-to-br from-purple-500/5 via-neutral-900/95 to-pink-500/5 border border-purple-500/20 rounded-2xl overflow-hidden quest-glow">
+                                                    <div className="mb-5 bg-gradient-to-br from-teal-600/5 via-neutral-900/95 to-cyan-500/5 border border-teal-500/20 rounded-2xl overflow-hidden quest-glow">
                                                         {/* === EPIC HEADER === */}
-                                                        <div className="relative bg-gradient-to-r from-purple-900/40 via-purple-800/20 to-pink-900/40 px-5 py-5 border-b border-purple-500/15 overflow-hidden">
+                                                        <div className="relative bg-gradient-to-r from-teal-900/40 via-teal-700/20 to-cyan-900/40 px-5 py-5 border-b border-teal-500/15 overflow-hidden">
                                                             <div className="absolute inset-0 shimmer-bg" />
                                                             <div className="relative z-10 flex items-center gap-3 mb-3">
-                                                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/30 float-icon pulse-ring">
+                                                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-teal-500/30 float-icon pulse-ring">
                                                                     <Star size={22} className="text-white" />
                                                                 </div>
                                                                 <div className="flex-1">
                                                                     <h3 className="text-lg font-black text-white tracking-tight">🗡️ Your Quest Begins</h3>
-                                                                    <p className="text-[10px] text-purple-300/60">
+                                                                    <p className="text-[10px] text-teal-300/60">
                                                                         {currentStep === 1 && 'Choose your path wisely, creator...'}
                                                                         {currentStep === 2 && '🎣 Now choose your hooks — your opening lines...'}
                                                                         {currentStep === 3 && '✨ Your destiny has been revealed!'}
                                                                     </p>
                                                                 </div>
                                                                 <div className="text-right">
-                                                                    <p className="text-[9px] font-bold text-purple-300/50 uppercase tracking-widest">Step</p>
+                                                                    <p className="text-[9px] font-bold text-teal-300/50 uppercase tracking-widest">Step</p>
                                                                     <p className="text-2xl font-black text-white">{currentStep}<span className="text-[10px] text-neutral-500">/3</span></p>
                                                                 </div>
                                                             </div>
@@ -361,14 +361,14 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                             <div
                                                                                 className={`h-full rounded-full transition-all duration-700 ease-out ${
                                                                                     currentStep > step ? 'bg-gradient-to-r from-emerald-400 to-emerald-500 w-full'
-                                                                                    : currentStep === step ? 'bg-gradient-to-r from-purple-500 to-pink-500 w-1/2'
+                                                                                    : currentStep === step ? 'bg-gradient-to-r from-teal-600 to-cyan-500 w-1/2'
                                                                                     : 'w-0'
                                                                                 }`}
                                                                                 style={{ width: currentStep > step ? '100%' : currentStep === step ? '50%' : '0%' }}
                                                                             />
                                                                         </div>
                                                                         <p className={`text-[7px] font-black uppercase tracking-widest mt-1 text-center transition-colors ${
-                                                                            currentStep > step ? 'text-emerald-400' : currentStep === step ? 'text-purple-300' : 'text-neutral-700'
+                                                                            currentStep > step ? 'text-emerald-400' : currentStep === step ? 'text-teal-300' : 'text-neutral-700'
                                                                         }`}>
                                                                             {step === 1 ? 'Character' : step === 2 ? 'Hook' : 'Brief'}
                                                                         </p>
@@ -447,14 +447,14 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                                     key={avatar.id}
                                                                                     onClick={() => { if (!isFull) setActiveAvatar(prev => ({ ...prev, [campaign.id]: avatar.id })); }}
                                                                                     className={`avatar-pick text-left bg-gradient-to-br from-neutral-900/90 to-neutral-800/50 rounded-2xl overflow-hidden group ${
-                                                                                        isFull ? 'opacity-50 cursor-not-allowed border border-neutral-800' : 'border border-neutral-700/40 hover:border-purple-500/50 cursor-pointer'
+                                                                                        isFull ? 'opacity-50 cursor-not-allowed border border-neutral-800' : 'border border-neutral-700/40 hover:border-teal-500/50 cursor-pointer'
                                                                                     }`}
                                                                                     style={{ animationDelay: `${idx * 0.12}s` }}
                                                                                     disabled={isFull}
                                                                                 >
-                                                                                    <div className={`h-1 bg-gradient-to-r ${avatar.color || 'from-purple-500 to-pink-500'} group-hover:h-1.5 transition-all`} />
+                                                                                    <div className={`h-1 bg-gradient-to-r ${avatar.color || 'from-teal-600 to-cyan-500'} group-hover:h-1.5 transition-all`} />
                                                                                     <div className="p-5 flex items-start gap-4">
-                                                                                        <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${avatar.color || 'from-purple-500 to-pink-500'} flex items-center justify-center shadow-lg flex-shrink-0 group-hover:scale-110 transition-transform`}>
+                                                                                        <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${avatar.color || 'from-teal-600 to-cyan-500'} flex items-center justify-center shadow-lg flex-shrink-0 group-hover:scale-110 transition-transform`}>
                                                                                             {avatar.imageUrl ? (
                                                                                                 <img src={avatar.imageUrl} alt={avatar.name} className="w-full h-full object-cover rounded-xl" />
                                                                                             ) : (
@@ -462,12 +462,12 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                                             )}
                                                                                         </div>
                                                                                         <div className="flex-1 min-w-0">
-                                                                                            <h4 className="text-base font-black text-white group-hover:text-purple-300 transition-colors">{avatar.name}</h4>
+                                                                                            <h4 className="text-base font-black text-white group-hover:text-teal-300 transition-colors">{avatar.name}</h4>
                                                                                             <p className="text-[11px] text-neutral-400 leading-relaxed mt-1">{avatar.description}</p>
                                                                                             {avatar.traits.length > 0 && (
                                                                                                 <div className="flex flex-wrap gap-1 mt-2">
                                                                                                     {avatar.traits.map((trait, i) => (
-                                                                                                        <span key={i} className="text-[7px] font-bold text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">{trait}</span>
+                                                                                                        <span key={i} className="text-[7px] font-bold text-teal-300 bg-teal-500/10 px-2 py-0.5 rounded-full border border-teal-500/20">{trait}</span>
                                                                                                     ))}
                                                                                                 </div>
                                                                                             )}
@@ -476,7 +476,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                                             {isFull ? (
                                                                                                 <span className="text-[8px] font-bold text-red-400 bg-red-500/10 px-3 py-1.5 rounded-lg border border-red-500/20">🔒 Full</span>
                                                                                             ) : (
-                                                                                                <span className="text-[9px] font-black text-purple-400 bg-purple-500/10 px-4 py-2 rounded-xl border border-purple-500/20 group-hover:bg-purple-500 group-hover:text-white transition-all">
+                                                                                                <span className="text-[9px] font-black text-teal-400 bg-teal-500/10 px-4 py-2 rounded-xl border border-teal-500/20 group-hover:bg-teal-500 group-hover:text-white transition-all">
                                                                                                     This is me →
                                                                                                 </span>
                                                                                             )}
@@ -497,7 +497,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                     {/* Chosen Character Hero Badge */}
                                                                     <div className="chosen-hero bg-gradient-to-r from-emerald-500/5 to-purple-500/5 rounded-2xl p-4 border border-emerald-500/20">
                                                                         <div className="flex items-center gap-3">
-                                                                            <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${chosenAvatar.color || 'from-purple-500 to-pink-500'} flex items-center justify-center shadow-lg`}>
+                                                                            <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${chosenAvatar.color || 'from-teal-600 to-cyan-500'} flex items-center justify-center shadow-lg`}>
                                                                                 {chosenAvatar.imageUrl ? (
                                                                                     <img src={chosenAvatar.imageUrl} alt={chosenAvatar.name} className="w-full h-full object-cover rounded-xl" />
                                                                                 ) : (
@@ -515,7 +515,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                                     setSelectedHooks(prev => ({ ...prev, [angleKey]: [] }));
                                                                                     setBriefRevealed(prev => ({ ...prev, [angleKey]: false }));
                                                                                 }}
-                                                                                className="text-[8px] text-neutral-500 hover:text-purple-400 transition-colors font-bold px-2 py-1 rounded-lg hover:bg-purple-500/10"
+                                                                                className="text-[8px] text-neutral-500 hover:text-teal-400 transition-colors font-bold px-2 py-1 rounded-lg hover:bg-teal-500/10"
                                                                             >
                                                                                 Change
                                                                             </button>
@@ -559,9 +559,9 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                                     >
                                                                                         <div className="flex items-start gap-4">
                                                                                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${
-                                                                                                isSelected ? 'bg-yellow-500/20 border border-yellow-500/30' : 'bg-purple-500/10 border border-purple-500/20 group-hover:bg-yellow-500/15'
+                                                                                                isSelected ? 'bg-yellow-500/20 border border-yellow-500/30' : 'bg-teal-500/10 border border-teal-500/20 group-hover:bg-yellow-500/15'
                                                                                             }`}>
-                                                                                                {isSelected ? <Check size={18} className="text-yellow-400" /> : <Zap size={18} className="text-purple-400 group-hover:text-yellow-400 transition-colors" />}
+                                                                                                {isSelected ? <Check size={18} className="text-yellow-400" /> : <Zap size={18} className="text-teal-400 group-hover:text-yellow-400 transition-colors" />}
                                                                                             </div>
                                                                                             <div className="flex-1">
                                                                                                 <p className={`text-[12px] font-bold leading-relaxed transition-colors ${
@@ -579,7 +579,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                                                 {isSelected ? (
                                                                                                     <span className="text-[8px] font-black text-yellow-400 bg-yellow-500/15 px-3 py-1.5 rounded-lg border border-yellow-500/30">✓ Selected</span>
                                                                                                 ) : (
-                                                                                                    <span className="text-[9px] font-black text-purple-400 bg-purple-500/10 px-3 py-1.5 rounded-lg border border-purple-500/20 group-hover:bg-yellow-500 group-hover:text-black transition-all">
+                                                                                                    <span className="text-[9px] font-black text-teal-400 bg-teal-500/10 px-3 py-1.5 rounded-lg border border-teal-500/20 group-hover:bg-yellow-500 group-hover:text-black transition-all">
                                                                                                         Select →
                                                                                                     </span>
                                                                                                 )}
@@ -625,7 +625,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                     {/* Mini Context Bar — Character + Hook(s) */}
                                                                     <div className="flex gap-3 flex-wrap">
                                                                         <div className="flex-1 min-w-[140px] bg-emerald-500/5 rounded-xl p-3 border border-emerald-500/15 flex items-center gap-2">
-                                                                            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${chosenAvatar.color || 'from-purple-500 to-pink-500'} flex items-center justify-center flex-shrink-0`}>
+                                                                            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${chosenAvatar.color || 'from-teal-600 to-cyan-500'} flex items-center justify-center flex-shrink-0`}>
                                                                                 <UserCircle2 size={16} className="text-white" />
                                                                             </div>
                                                                             <div>
@@ -649,13 +649,13 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                                 setSelectedAngles(prev => ({ ...prev, [angleKey]: '' }));
                                                                                 setActiveAvatar(prev => ({ ...prev, [campaign.id]: '' }));
                                                                             }}
-                                                                            className="text-[8px] text-neutral-500 hover:text-purple-400 transition-colors font-bold px-2 self-center"
+                                                                            className="text-[8px] text-neutral-500 hover:text-teal-400 transition-colors font-bold px-2 self-center"
                                                                         >Start Over</button>
                                                                     </div>
 
                                                                     {/* Epic Title */}
                                                                     <div className="text-center py-3">
-                                                                        <p className="text-[10px] font-bold text-purple-300/50 uppercase tracking-[0.2em] mb-1">Your destiny has been revealed</p>
+                                                                        <p className="text-[10px] font-bold text-teal-300/50 uppercase tracking-[0.2em] mb-1">Your destiny has been revealed</p>
                                                                         <h4 className="text-xl font-black text-white">✨ Your Personalized Brief</h4>
                                                                     </div>
 
@@ -680,8 +680,8 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                             {(angle.psychology || angle.visualCue) && (
                                                                                 <div className="grid grid-cols-2 gap-3 brief-section-reveal" style={{ animationDelay: `${0.25 + angleIdx * 0.1}s` }}>
                                                                                     {angle.psychology && (
-                                                                                        <div className="bg-purple-500/5 rounded-xl p-4 border border-purple-500/15">
-                                                                                            <p className="text-[8px] font-black text-purple-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                                                                                        <div className="bg-teal-500/5 rounded-xl p-4 border border-teal-500/15">
+                                                                                            <p className="text-[8px] font-black text-teal-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
                                                                                                 <Target size={8} /> The Psychology
                                                                                             </p>
                                                                                             <p className="text-[10px] text-neutral-300 leading-relaxed">{angle.psychology}</p>
@@ -700,8 +700,8 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
 
                                                                             {/* Story Script from this angle */}
                                                                             {angle.briefContent && (
-                                                                                <div className="bg-gradient-to-br from-purple-500/5 to-pink-500/5 rounded-xl p-5 border border-purple-500/15 brief-section-reveal mt-3" style={{ animationDelay: `${0.4 + angleIdx * 0.1}s` }}>
-                                                                                    <p className="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+                                                                                <div className="bg-gradient-to-br from-teal-600/5 to-cyan-500/5 rounded-xl p-5 border border-teal-500/15 brief-section-reveal mt-3" style={{ animationDelay: `${0.4 + angleIdx * 0.1}s` }}>
+                                                                                    <p className="text-[9px] font-black text-teal-400 uppercase tracking-widest mb-3 flex items-center gap-1">
                                                                                         <FileText size={9} /> 📜 Your Story Script {relevantAngles.length > 1 ? `(${angle.hook || `Angle ${angleIdx + 1}`})` : ''}
                                                                                     </p>
                                                                                     <div className="text-[11px] text-neutral-200 leading-relaxed whitespace-pre-wrap">
@@ -746,7 +746,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                             a.href = url; a.download = `${campaign.title.replace(/[^a-zA-Z0-9]/g, '_')}_Brief.txt`; a.click();
                                                                             URL.revokeObjectURL(url);
                                                                         }}
-                                                                        className="w-full mt-2 flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl text-purple-300 hover:from-purple-500/20 hover:to-pink-500/20 hover:text-white transition-all group brief-section-reveal"
+                                                                        className="w-full mt-2 flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-teal-600/10 to-cyan-500/10 border border-teal-500/20 rounded-xl text-teal-300 hover:from-teal-600/20 hover:to-cyan-500/20 hover:text-white transition-all group brief-section-reveal"
                                                                         style={{ animationDelay: '0.8s' }}
                                                                     >
                                                                         <Download size={14} className="group-hover:scale-110 transition-transform" />
@@ -763,10 +763,10 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
 
                                         {/* FALLBACK: Show raw brief when no avatars exist */}
                                         {(!campaign.avatars || campaign.avatars.length === 0) && (campaign.description || campaign.briefGoal) && (
-                                            <div className="mb-5 bg-gradient-to-br from-purple-500/5 via-neutral-900/90 to-pink-500/5 border border-purple-500/20 rounded-2xl overflow-hidden">
-                                                <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 px-5 py-4 border-b border-purple-500/10">
+                                            <div className="mb-5 bg-gradient-to-br from-teal-600/5 via-neutral-900/90 to-cyan-500/5 border border-teal-500/20 rounded-2xl overflow-hidden">
+                                                <div className="bg-gradient-to-r from-teal-600/10 to-cyan-500/10 px-5 py-4 border-b border-teal-500/10">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/25">
+                                                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-teal-500/25">
                                                             <Star size={20} className="text-white" />
                                                         </div>
                                                         <div className="flex-1">
@@ -786,7 +786,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                     )}
                                                     {campaign.description && (
                                                         <div className="bg-black/30 border border-neutral-800 rounded-xl p-4">
-                                                            <p className="text-[10px] text-purple-400 font-bold uppercase mb-2 flex items-center gap-1.5">
+                                                            <p className="text-[10px] text-teal-400 font-bold uppercase mb-2 flex items-center gap-1.5">
                                                                 <FileText size={10} /> Full Brief
                                                             </p>
                                                             <div className="text-xs text-neutral-300 leading-relaxed whitespace-pre-wrap max-h-[400px] overflow-y-auto pr-2">{campaign.description}</div>
@@ -803,7 +803,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                     key={tab.id}
                                                     onClick={() => setTab(campaign.id, tab.id)}
                                                     className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-all text-[10px] font-black uppercase tracking-widest ${currentTab === tab.id
-                                                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/20'
+                                                        ? 'bg-gradient-to-r from-teal-600 to-cyan-500 text-white shadow-lg shadow-teal-500/20'
                                                         : 'text-neutral-500 hover:text-white hover:bg-neutral-800'
                                                         }`}
                                                 >
@@ -822,8 +822,8 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                             <div className="space-y-4">
                                                 {/* Style Notes */}
                                                 {campaign.styleNotes && (
-                                                    <div className="bg-gradient-to-br from-purple-500/5 to-pink-500/5 border border-purple-500/20 rounded-xl p-4">
-                                                        <p className="text-[10px] text-purple-400 font-bold uppercase mb-2 flex items-center gap-1.5">
+                                                    <div className="bg-gradient-to-br from-teal-600/5 to-cyan-500/5 border border-teal-500/20 rounded-xl p-4">
+                                                        <p className="text-[10px] text-teal-400 font-bold uppercase mb-2 flex items-center gap-1.5">
                                                             <Palette size={10} /> Style Notes & Visual Direction
                                                         </p>
                                                         <p className="text-sm text-neutral-300 leading-relaxed whitespace-pre-wrap">{campaign.styleNotes}</p>
@@ -843,11 +843,11 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                     href={link}
                                                                     target="_blank"
                                                                     rel="noopener noreferrer"
-                                                                    className="flex items-center gap-2 bg-black/50 border border-neutral-800 rounded-xl p-3 hover:border-purple-500/30 group transition-all"
+                                                                    className="flex items-center gap-2 bg-black/50 border border-neutral-800 rounded-xl p-3 hover:border-teal-500/30 group transition-all"
                                                                 >
-                                                                    <LinkIcon size={12} className="text-purple-400 flex-shrink-0" />
-                                                                    <span className="text-xs text-purple-400 group-hover:text-purple-300 truncate flex-1">{link}</span>
-                                                                    <ExternalLink size={10} className="text-neutral-600 group-hover:text-purple-400" />
+                                                                    <LinkIcon size={12} className="text-teal-400 flex-shrink-0" />
+                                                                    <span className="text-xs text-teal-400 group-hover:text-teal-300 truncate flex-1">{link}</span>
+                                                                    <ExternalLink size={10} className="text-neutral-600 group-hover:text-teal-400" />
                                                                 </a>
                                                             ))}
                                                         </div>
@@ -865,7 +865,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                 <button
                                                                     key={asset.id}
                                                                     onClick={() => setLightboxImage(asset.fileUrl)}
-                                                                    className="relative aspect-square bg-neutral-800 rounded-xl overflow-hidden group border border-neutral-700 hover:border-purple-500/30 transition-all"
+                                                                    className="relative aspect-square bg-neutral-800 rounded-xl overflow-hidden group border border-neutral-700 hover:border-teal-500/30 transition-all"
                                                                 >
                                                                     {asset.fileUrl ? (
                                                                         <img src={asset.fileUrl} alt={asset.title} className="w-full h-full object-cover" />
@@ -909,7 +909,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                         </div>
                                                         <div className="h-2.5 bg-neutral-800 rounded-full overflow-hidden">
                                                             <div
-                                                                className={`h-full rounded-full transition-all duration-700 ${isComplete ? 'bg-gradient-to-r from-emerald-500 to-green-400' : 'bg-gradient-to-r from-purple-500 to-pink-500'}`}
+                                                                className={`h-full rounded-full transition-all duration-700 ${isComplete ? 'bg-gradient-to-r from-emerald-500 to-green-400' : 'bg-gradient-to-r from-teal-600 to-cyan-500'}`}
                                                                 style={{ width: `${progress}%` }}
                                                             />
                                                         </div>
@@ -926,7 +926,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                 disabled={task.isDone}
                                                                 className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${task.isDone
                                                                     ? 'bg-emerald-500/5 border border-emerald-500/10'
-                                                                    : 'bg-black/50 border border-neutral-800 hover:border-purple-500/30 cursor-pointer hover:scale-[1.01] active:scale-95'
+                                                                    : 'bg-black/50 border border-neutral-800 hover:border-teal-500/30 cursor-pointer hover:scale-[1.01] active:scale-95'
                                                                     }`}
                                                             >
                                                                 {task.isDone ? (
@@ -980,13 +980,13 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                 {!isComplete && isAccepted && (
                                                     <button
                                                         onClick={() => onNavigate('upload')}
-                                                        className="w-full flex items-center justify-between p-3 bg-purple-500/5 border border-purple-500/20 rounded-xl hover:border-purple-500/40 transition-all group"
+                                                        className="w-full flex items-center justify-between p-3 bg-teal-500/5 border border-teal-500/20 rounded-xl hover:border-teal-500/40 transition-all group"
                                                     >
-                                                        <div className="flex items-center gap-2 text-purple-400">
+                                                        <div className="flex items-center gap-2 text-teal-400">
                                                             <Upload size={14} />
                                                             <span className="text-xs font-bold">Upload content for this campaign</span>
                                                         </div>
-                                                        <ArrowRight size={12} className="text-neutral-600 group-hover:text-purple-400 transition-colors" />
+                                                        <ArrowRight size={12} className="text-neutral-600 group-hover:text-teal-400 transition-colors" />
                                                     </button>
                                                 )}
                                             </div>
@@ -1005,11 +1005,11 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                     )}
                                                     {(campaign.comments || []).map(comment => (
                                                         <div key={comment.id} className={`rounded-xl p-3 border ${comment.isCreatorComment
-                                                            ? 'bg-purple-500/5 border-purple-500/20 ml-4'
+                                                            ? 'bg-teal-500/5 border-teal-500/20 ml-4'
                                                             : 'bg-black/50 border-neutral-800 mr-4'
                                                             }`}>
                                                             <div className="flex items-center justify-between mb-1">
-                                                                <span className={`text-[10px] font-bold ${comment.isCreatorComment ? 'text-purple-400' : 'text-emerald-400'
+                                                                <span className={`text-[10px] font-bold ${comment.isCreatorComment ? 'text-teal-400' : 'text-emerald-400'
                                                                     }`}>
                                                                     {comment.isCreatorComment ? `${creator.name} (You)` : comment.user || 'Team'}
                                                                 </span>
@@ -1032,7 +1032,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                 }
                                                             }}
                                                             placeholder="Add a note or question..."
-                                                            className="flex-1 bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-purple-500 outline-none"
+                                                            className="flex-1 bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:border-teal-500 outline-none"
                                                         />
                                                         <button
                                                             onClick={() => {
@@ -1041,7 +1041,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                                     setNoteText(prev => ({ ...prev, [campaign.id]: '' }));
                                                                 }
                                                             }}
-                                                            className="bg-purple-500 text-white p-2 rounded-lg hover:bg-purple-400 transition-colors"
+                                                            className="bg-teal-500 text-white p-2 rounded-lg hover:bg-purple-400 transition-colors"
                                                             title="Send note"
                                                         ><Send size={14} /></button>
                                                     </div>
@@ -1055,7 +1055,7 @@ const CreatorCampaigns: React.FC<Props> = ({ creator, campaigns, contentItems, o
                                                 {!reviewedCampaigns.has(campaign.id) ? (
                                                     <button
                                                         onClick={() => setReviewedCampaigns(prev => new Set([...prev, campaign.id]))}
-                                                        className="w-full py-3 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl text-purple-300 hover:from-purple-500/20 hover:to-pink-500/20 hover:text-white transition-all flex items-center justify-center gap-2 group"
+                                                        className="w-full py-3 bg-gradient-to-r from-teal-600/10 to-cyan-500/10 border border-teal-500/20 rounded-xl text-teal-300 hover:from-teal-600/20 hover:to-cyan-500/20 hover:text-white transition-all flex items-center justify-center gap-2 group"
                                                     >
                                                         <Eye size={14} className="group-hover:scale-110 transition-transform" />
                                                         <span className="text-[10px] font-black uppercase tracking-widest">✅ I've Reviewed the Brief — Show Accept Button</span>

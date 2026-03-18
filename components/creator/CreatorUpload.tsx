@@ -19,7 +19,7 @@ const statusColors: Record<string, { bg: string; text: string; emoji: string }> 
     'In Review': { bg: 'bg-blue-500/10', text: 'text-blue-400', emoji: '👁️' },
     'Approved': { bg: 'bg-emerald-500/10', text: 'text-emerald-400', emoji: '✅' },
     'Needs Changes': { bg: 'bg-orange-500/10', text: 'text-orange-400', emoji: '✏️' },
-    'Published': { bg: 'bg-purple-500/10', text: 'text-purple-400', emoji: '🚀' },
+    'Published': { bg: 'bg-teal-500/10', text: 'text-teal-400', emoji: '🚀' },
 };
 
 const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUpload, onReplyToNote, onUpdateContent }) => {
@@ -209,7 +209,7 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
             {/* HEADER */}
             <div className="text-center mb-2">
                 <h2 className="text-2xl font-black text-white uppercase tracking-tight flex items-center justify-center gap-2">
-                    <UploadIcon size={24} className="text-purple-400" /> Content Hub
+                    <UploadIcon size={24} className="text-teal-400" /> Content Hub
                 </h2>
                 <p className="text-neutral-500 text-xs mt-1">Upload content and view team feedback</p>
             </div>
@@ -218,14 +218,14 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
             <div className="flex bg-neutral-900 rounded-xl p-1">
                 <button
                     onClick={() => setShowUploadForm(true)}
-                    className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${showUploadForm ? 'bg-purple-500 text-black' : 'text-neutral-500 hover:text-white'
+                    className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${showUploadForm ? 'bg-teal-500 text-black' : 'text-neutral-500 hover:text-white'
                         }`}
                 >
                     <UploadIcon size={12} /> Upload
                 </button>
                 <button
                     onClick={() => setShowUploadForm(false)}
-                    className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${!showUploadForm ? 'bg-purple-500 text-black' : 'text-neutral-500 hover:text-white'
+                    className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${!showUploadForm ? 'bg-teal-500 text-black' : 'text-neutral-500 hover:text-white'
                         }`}
                 >
                     <Eye size={12} /> My Videos ({myContent.length})
@@ -240,9 +240,9 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
                         onDragLeave={() => setIsDragging(false)}
                         onDrop={handleDrop}
                         onClick={() => fileRef.current?.click()}
-                        className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${isDragging ? 'border-purple-500 bg-purple-500/5 scale-[1.02]' :
+                        className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${isDragging ? 'border-teal-500 bg-teal-500/5 scale-[1.02]' :
                             selectedFile ? 'border-emerald-500/30 bg-emerald-500/5' :
-                                'border-neutral-800 hover:border-purple-500/30 bg-neutral-900/80'
+                                'border-neutral-800 hover:border-teal-500/30 bg-neutral-900/80'
                             }`}
                     >
                         <input
@@ -256,7 +256,7 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
                         {selectedFile ? (
                             <div className="space-y-3">
                                 {preview && <img src={preview} alt="Preview" className="w-28 h-28 object-cover rounded-xl mx-auto border border-neutral-700" />}
-                                {!preview && <Video size={40} className="text-purple-400 mx-auto" />}
+                                {!preview && <Video size={40} className="text-teal-400 mx-auto" />}
                                 <p className="text-sm font-bold text-white">{selectedFile.name}</p>
                                 <p className="text-[10px] text-neutral-500">{(selectedFile.size / (1024 * 1024)).toFixed(2)} MB</p>
                                 <button
@@ -266,8 +266,8 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                <div className="w-16 h-16 rounded-2xl bg-purple-500/10 flex items-center justify-center mx-auto">
-                                    <UploadIcon size={28} className="text-purple-400" />
+                                <div className="w-16 h-16 rounded-2xl bg-teal-500/10 flex items-center justify-center mx-auto">
+                                    <UploadIcon size={28} className="text-teal-400" />
                                 </div>
                                 <p className="text-sm text-neutral-300 font-bold">Drop your file here or click to browse</p>
                                 <p className="text-[10px] text-neutral-600">Supports images and video 🎬</p>
@@ -276,14 +276,14 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
                     </div>
 
                     {selectedFile && (
-                        <div className="bg-neutral-900/80 border border-neutral-800 rounded-2xl p-5 space-y-4">
+                        <div className="bg-neutral-900/40 backdrop-blur-[80px] border border-teal-500/[0.08] rounded-2xl p-5 space-y-4">
                             <div>
                                 <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest block mb-1" htmlFor="upload-title">Title</label>
                                 <input
                                     id="upload-title"
                                     value={title}
                                     onChange={e => setTitle(e.target.value)}
-                                    className="w-full bg-black border border-neutral-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50"
+                                    className="w-full bg-black border border-neutral-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500/50"
                                 />
                             </div>
                             {/* Campaign Selector */}
@@ -294,7 +294,7 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
                                         id="upload-campaign"
                                         value={selectedCampaignId}
                                         onChange={e => setSelectedCampaignId(e.target.value)}
-                                        className="w-full bg-black border border-neutral-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50"
+                                        className="w-full bg-black border border-neutral-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500/50"
                                     >
                                         <option value="">No campaign (general upload)</option>
                                         {myCampaigns.map(c => (
@@ -339,7 +339,7 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
                                     value={caption}
                                     onChange={e => setCaption(e.target.value)}
                                     rows={3}
-                                    className="w-full bg-black border border-neutral-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50 resize-none"
+                                    className="w-full bg-black border border-neutral-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500/50 resize-none"
                                     placeholder="Add a caption or notes for the team..."
                                 />
                             </div>
@@ -352,7 +352,7 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
                                 </div>
                                 <button
                                     onClick={() => setIsDraft(!isDraft)}
-                                    className={`w-10 h-5 rounded-full transition-all relative ${isDraft ? 'bg-purple-500' : 'bg-neutral-700'}`}
+                                    className={`w-10 h-5 rounded-full transition-all relative ${isDraft ? 'bg-teal-500' : 'bg-neutral-700'}`}
                                     title="Toggle draft mode"
                                 >
                                     <div className={`w-4 h-4 rounded-full bg-white shadow-md absolute top-0.5 transition-all ${isDraft ? 'left-5' : 'left-0.5'}`} />
@@ -365,7 +365,7 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
                                 className={`w-full py-3.5 rounded-xl font-black uppercase tracking-widest text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg active:scale-95 ${
                                     isDraft
                                         ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black shadow-amber-500/20 hover:from-amber-400 hover:to-yellow-400'
-                                        : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-purple-500/20 hover:from-purple-400 hover:to-pink-400'
+                                        : 'bg-gradient-to-r from-teal-600 to-cyan-500 text-white shadow-teal-500/20 hover:from-teal-400 hover:to-cyan-400'
                                 }`}
                             >
                                 {isUploading ? <Loader2 className="animate-spin" size={16} /> : <UploadIcon size={16} />}
@@ -380,7 +380,7 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
             {!showUploadForm && (
                 <div className="space-y-3">
                     {myContent.length === 0 ? (
-                        <div className="bg-neutral-900/80 border border-neutral-800 rounded-2xl p-12 text-center">
+                        <div className="bg-neutral-900/40 backdrop-blur-[80px] border border-teal-500/[0.08] rounded-2xl p-12 text-center">
                             <div className="text-4xl mb-3">🎬</div>
                             <p className="text-neutral-400 text-sm">No uploads yet</p>
                             <p className="text-neutral-600 text-[10px]">Switch to Upload tab to submit your first video</p>
@@ -393,14 +393,14 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
                             const hasNotes = notes.length > 0;
 
                             return (
-                                <div key={content.id} className="bg-neutral-900/80 border border-neutral-800 rounded-2xl overflow-hidden transition-all">
+                                <div key={content.id} className="bg-neutral-900/40 backdrop-blur-[80px] border border-teal-500/[0.08] rounded-2xl overflow-hidden transition-all">
                                     {/* Video Header */}
                                     <div
                                         className="p-4 flex items-center gap-3 cursor-pointer hover:bg-neutral-800/50 transition-colors"
                                         onClick={() => setExpandedContentId(isExpanded ? null : content.id)}
                                     >
-                                        <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center flex-shrink-0">
-                                            {content.type === 'Video' ? <Video size={18} className="text-purple-400" /> :
+                                        <div className="w-10 h-10 rounded-xl bg-teal-500/10 flex items-center justify-center flex-shrink-0">
+                                            {content.type === 'Video' ? <Video size={18} className="text-teal-400" /> :
                                                 content.type === 'Image' ? <Image size={18} className="text-blue-400" /> :
                                                     <FileText size={18} className="text-neutral-400" />}
                                         </div>
@@ -442,12 +442,12 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
                                                             <div
                                                                 key={note.id}
                                                                 className={`p-3 rounded-xl border ${note.isCreatorReply
-                                                                    ? 'bg-purple-500/5 border-purple-500/10 ml-4'
+                                                                    ? 'bg-teal-500/5 border-teal-500/10 ml-4'
                                                                     : 'bg-blue-500/5 border-blue-500/10'
                                                                     }`}
                                                             >
                                                                 <div className="flex items-center justify-between mb-1">
-                                                                    <span className={`text-[10px] font-bold ${note.isCreatorReply ? 'text-purple-400' : 'text-blue-400'}`}>
+                                                                    <span className={`text-[10px] font-bold ${note.isCreatorReply ? 'text-teal-400' : 'text-blue-400'}`}>
                                                                         {note.isCreatorReply ? '💬 You' : `📣 ${note.user}`}
                                                                     </span>
                                                                     <span className="text-[9px] text-neutral-600">{new Date(note.date).toLocaleDateString()}</span>
@@ -464,12 +464,12 @@ const CreatorUpload: React.FC<Props> = ({ creator, campaigns, contentItems, onUp
                                                             onChange={e => setReplyText(e.target.value)}
                                                             onKeyDown={e => e.key === 'Enter' && handleReply(content.id)}
                                                             placeholder="Reply to feedback..."
-                                                            className="flex-1 bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-purple-500/50"
+                                                            className="flex-1 bg-black border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-teal-500/50"
                                                         />
                                                         <button
                                                             onClick={() => handleReply(content.id)}
                                                             disabled={!replyText.trim()}
-                                                            className="p-2 bg-purple-500 text-black rounded-lg hover:bg-purple-400 transition-all disabled:opacity-30"
+                                                            className="p-2 bg-teal-500 text-black rounded-lg hover:bg-purple-400 transition-all disabled:opacity-30"
                                                             title="Send reply"
                                                         >
                                                             <Send size={12} />

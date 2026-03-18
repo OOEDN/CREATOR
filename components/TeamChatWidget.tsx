@@ -11,6 +11,8 @@ interface TeamChatWidgetProps {
 }
 
 const TeamChatWidget: React.FC<TeamChatWidgetProps> = ({ teamMessages = [], onSendTeamMessage, currentUser, teamEmails = [] }) => {
+    // Filter out creator messages — team comms is internal only
+    const internalMessages = teamMessages.filter(m => !m.isCreatorMessage && !m.creatorId);
     const [inputText, setInputText] = useState('');
     const [showMentions, setShowMentions] = useState(false);
     const [mentionFilter, setMentionFilter] = useState('');
@@ -45,18 +47,18 @@ const TeamChatWidget: React.FC<TeamChatWidgetProps> = ({ teamMessages = [], onSe
 
     useEffect(() => {
         scrollToBottom();
-    }, [teamMessages]);
+    }, [internalMessages]);
 
     // Extract unique team names from emails + messages
     const allTeamNames = React.useMemo(() => {
         const names = new Set<string>();
         teamEmails.forEach(e => names.add(e.split('@')[0]));
-        teamMessages.forEach(m => {
+        internalMessages.forEach(m => {
             if (m.sender) names.add(m.sender.split('@')[0]);
         });
         names.delete(currentUser.split('@')[0]); // Don't suggest self
         return Array.from(names).filter(Boolean);
-    }, [teamEmails, teamMessages, currentUser]);
+    }, [teamEmails, internalMessages, currentUser]);
 
     const filteredMentions = allTeamNames.filter(name =>
         name.toLowerCase().includes(mentionFilter.toLowerCase())
@@ -170,13 +172,13 @@ const TeamChatWidget: React.FC<TeamChatWidgetProps> = ({ teamMessages = [], onSe
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
-                {teamMessages.length === 0 && (
+                {internalMessages.length === 0 && (
                     <div className="h-full flex flex-col items-center justify-center text-neutral-600 space-y-2 opacity-50">
                         <MessageSquare size={24} />
                         <p className="text-xs font-bold uppercase">No messages yet</p>
                     </div>
                 )}
-                {teamMessages.map(msg => (
+                {internalMessages.map(msg => (
                     <div key={msg.id} className={`flex flex-col ${msg.sender === currentUser ? 'items-end' : 'items-start'}`}>
                         <div className="flex items-center gap-2 mb-1">
                             <span className="text-[9px] text-neutral-500 font-bold uppercase">{msg.sender.split('@')[0]}</span>

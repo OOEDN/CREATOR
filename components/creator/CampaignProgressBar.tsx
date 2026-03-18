@@ -85,7 +85,7 @@ const CampaignProgressBar: React.FC<Props> = ({ campaign, creator, contentItems,
     }
 
     return (
-        <div className="bg-black/30 rounded-xl p-4 border border-neutral-800">
+        <div className="bg-black/20 backdrop-blur-[60px] rounded-xl p-4 border border-purple-500/[0.08] shadow-[0_4px_24px_rgba(127,181,181,0.04),inset_0_1px_0_rgba(255,255,255,0.04)]">
             <div className="flex items-center justify-between mb-3">
                 <span className="text-[9px] font-black text-neutral-500 uppercase tracking-widest">Campaign Progress</span>
                 <span className="text-[10px] font-bold text-purple-400">{percent}%</span>

@@ -13,8 +13,8 @@ interface Props {
 
 const paymentIcons: Record<string, { emoji: string; gradient: string }> = {
     'Venmo': { emoji: '💙', gradient: 'from-blue-500/20 to-cyan-500/20 border-blue-500/30' },
-    'PayPal': { emoji: '💛', gradient: 'from-blue-600/20 to-indigo-500/20 border-blue-600/30' },
-    'Zelle': { emoji: '💜', gradient: 'from-purple-500/20 to-violet-500/20 border-purple-500/30' },
+    'PayPal': { emoji: '💛', gradient: 'from-blue-600/20 to-teal-500/20 border-blue-600/30' },
+    'Zelle': { emoji: '💜', gradient: 'from-teal-600/20 to-teal-500/20 border-teal-500/30' },
     'Bank Transfer': { emoji: '🏦', gradient: 'from-emerald-500/20 to-green-500/20 border-emerald-500/30' },
     'Gifted': { emoji: '🎁', gradient: 'from-pink-500/20 to-rose-500/20 border-pink-500/30' },
     'Other': { emoji: '💳', gradient: 'from-neutral-500/20 to-gray-500/20 border-neutral-500/30' },
@@ -88,12 +88,12 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
     return (
         <div className="max-w-2xl mx-auto space-y-5">
             {/* HERO HEADER */}
-            <div className="bg-gradient-to-br from-purple-600/20 via-pink-500/10 to-indigo-500/15 border border-purple-500/20 rounded-3xl p-6 relative overflow-hidden">
-                <div className="absolute -top-20 -right-20 w-60 h-60 bg-purple-500/5 rounded-full blur-3xl" />
+            <div className="bg-gradient-to-br from-teal-700/20 via-cyan-500/10 to-teal-500/15 border border-teal-500/20 rounded-3xl p-6 relative overflow-hidden">
+                <div className="absolute -top-20 -right-20 w-60 h-60 bg-teal-500/5 rounded-full blur-3xl" />
                 <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-pink-500/5 rounded-full blur-3xl" />
                 <div className="relative flex items-center gap-5">
                     <div className="relative group">
-                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-black font-black text-3xl shadow-xl shadow-purple-500/20 overflow-hidden">
+                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-teal-600 to-cyan-500 flex items-center justify-center text-black font-black text-3xl shadow-xl shadow-teal-500/20 overflow-hidden">
                             {creator.profileImage ? (
                                 <img src={creator.profileImage} alt={creator.name} className="w-full h-full object-cover" />
                             ) : (
@@ -107,7 +107,7 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
                     <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                             <h2 className="text-2xl font-black text-white">{creator.name}</h2>
-                            <Shield size={16} className="text-purple-400" />
+                            <Shield size={16} className="text-teal-400" />
                         </div>
                         <p className="text-sm text-neutral-400">{creator.handle} • {creator.platform}</p>
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -120,7 +120,7 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
                                     <Star size={8} /> {creator.rating}
                                 </span>
                             )}
-                            <span className="text-[10px] font-black text-purple-400 bg-purple-500/10 px-2.5 py-1 rounded-lg border border-purple-500/20">
+                            <span className="text-[10px] font-black text-teal-400 bg-teal-500/10 px-2.5 py-1 rounded-lg border border-teal-500/20">
                                 {currentLevel.emoji} {currentLevel.name}
                             </span>
                         </div>
@@ -134,7 +134,7 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
                         <p className="text-[8px] text-neutral-500 font-bold uppercase tracking-widest">Lifetime Earned</p>
                     </div>
                     <div className="bg-black/30 backdrop-blur-sm rounded-xl p-3 text-center border border-white/5">
-                        <p className="text-lg font-black text-purple-400">${(creator.rate || 0).toLocaleString()}</p>
+                        <p className="text-lg font-black text-teal-400">${(creator.rate || 0).toLocaleString()}</p>
                         <p className="text-[8px] text-neutral-500 font-bold uppercase tracking-widest">Per Video</p>
                     </div>
                     <div className="bg-black/30 backdrop-blur-sm rounded-xl p-3 text-center border border-white/5">
@@ -145,9 +145,9 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
             </div>
 
             {/* XP PROGRESS BAR */}
-            <div className="bg-neutral-900/80 backdrop-blur-sm border border-neutral-800 rounded-2xl p-5">
+            <div className="bg-neutral-900/40 backdrop-blur-[80px] border border-teal-500/[0.08] rounded-2xl p-5 shadow-[0_8px_40px_rgba(127,181,181,0.06),inset_0_1px_0_rgba(255,255,255,0.06)]">
                 <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-purple-400 flex items-center gap-2">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-teal-400 flex items-center gap-2">
                         <Zap size={14} /> Level {currentLevel.level} — {currentLevel.emoji} {currentLevel.name}
                     </h3>
                     <span className="text-[10px] font-bold text-neutral-500">{creator.xp || 0} XP</span>
@@ -167,95 +167,71 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
                         <span className="text-[9px] font-bold text-amber-400">🔥 {creator.streak || 0} day streak</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <Trophy size={10} className="text-purple-400" />
-                        <span className="text-[9px] font-bold text-purple-400">{(creator.achievements || []).length}/{ACHIEVEMENTS.length} achievements</span>
+                        <Trophy size={10} className="text-teal-400" />
+                        <span className="text-[9px] font-bold text-teal-400">{(creator.achievements || []).length}/{ACHIEVEMENTS.length} achievements</span>
                     </div>
                 </div>
             </div>
 
-            {/* ACHIEVEMENTS GALLERY */}
-            <div className="bg-neutral-900/80 backdrop-blur-sm border border-neutral-800 rounded-2xl p-5">
-                <h3 className="text-sm font-black uppercase tracking-widest text-purple-400 flex items-center gap-2 mb-4">
-                    <Trophy size={14} /> Achievements
-                </h3>
-                {categories.map(cat => {
-                    const catAchievements = ACHIEVEMENTS.filter(a => a.category === cat);
-                    return (
-                        <div key={cat} className="mb-4 last:mb-0">
-                            <p className="text-[9px] font-black text-neutral-500 uppercase tracking-widest mb-2">{cat}</p>
-                            <div className="grid grid-cols-2 gap-2">
-                                {catAchievements.map(ach => {
-                                    const unlocked = earnedSet.has(ach.id);
-                                    return (
-                                        <div
-                                            key={ach.id}
-                                            className={`rounded-xl p-3 border transition-all ${
-                                                unlocked
-                                                    ? 'bg-purple-500/10 border-purple-500/20'
-                                                    : 'bg-black/30 border-neutral-800 opacity-50'
-                                            }`}
-                                        >
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-lg">{unlocked ? ach.emoji : '🔒'}</span>
-                                                <span className={`text-[10px] font-black ${unlocked ? 'text-white' : 'text-neutral-500'}`}>
-                                                    {ach.name}
-                                                </span>
-                                            </div>
-                                            <p className="text-[9px] text-neutral-500 leading-relaxed">{ach.description}</p>
-                                            <p className="text-[8px] font-bold text-purple-400 mt-1">+{ach.xpReward} XP</p>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
+            {/* CONTACT INFO */}
+            <div className="bg-neutral-900/40 backdrop-blur-[80px] border border-teal-500/[0.08] rounded-2xl p-5 shadow-[0_8px_40px_rgba(127,181,181,0.06),inset_0_1px_0_rgba(255,255,255,0.06)] space-y-4">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-teal-400 flex items-center gap-2">
+                        <User size={14} /> Contact Info
+                    </h3>
+                    {!editMode ? (
+                        <button onClick={() => setEditMode(true)} className="text-[10px] font-bold text-teal-400 hover:text-teal-300 bg-teal-500/10 px-3 py-1.5 rounded-lg flex items-center gap-1">
+                            <Edit3 size={8} /> Edit
+                        </button>
+                    ) : (
+                        <button onClick={handleSave} className="text-[10px] font-bold text-black bg-emerald-500 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-emerald-400 active:scale-95 transition-all">
+                            <Save size={8} /> Save Changes
+                        </button>
+                    )}
+                </div>
 
-            {/* PROFILE THEME */}
-            <div className="bg-neutral-900/80 backdrop-blur-sm border border-neutral-800 rounded-2xl p-5">
-                <h3 className="text-sm font-black uppercase tracking-widest text-purple-400 flex items-center gap-2 mb-4">
-                    <Sparkles size={14} /> Profile Theme
-                </h3>
-                <p className="text-[9px] text-neutral-500 font-bold uppercase tracking-widest mb-3">Accent Color</p>
-                <div className="flex flex-wrap gap-2">
-                    {[
-                        { id: '#a855f7', label: 'Purple' },
-                        { id: '#ec4899', label: 'Pink' },
-                        { id: '#06b6d4', label: 'Cyan' },
-                        { id: '#10b981', label: 'Emerald' },
-                        { id: '#f59e0b', label: 'Amber' },
-                        { id: '#ef4444', label: 'Red' },
-                        { id: '#3b82f6', label: 'Blue' },
-                        { id: '#8b5cf6', label: 'Violet' },
-                        { id: '#f97316', label: 'Orange' },
-                        { id: '#14b8a6', label: 'Teal' },
-                    ].map(color => {
-                        const isActive = (creator.profileTheme?.accent || '#a855f7') === color.id;
-                        return (
-                            <button
-                                key={color.id}
-                                title={color.label}
-                                onClick={() => onUpdate({ profileTheme: { ...(creator.profileTheme || {}), accent: color.id } })}
-                                className={`w-8 h-8 rounded-xl border-2 transition-all active:scale-90 ${
-                                    isActive ? 'border-white scale-110 shadow-lg' : 'border-transparent hover:scale-105'
-                                }`}
-                                style={{ background: color.id, boxShadow: isActive ? `0 0 16px ${color.id}50` : 'none' }}
-                            />
-                        );
-                    })}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest block mb-1.5" htmlFor="profile-email">Email</label>
+                        {editMode ? (
+                            <input id="profile-email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                                className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500/50" />
+                        ) : (
+                            <p className="text-sm text-white bg-black/50 rounded-xl px-3 py-2.5 border border-neutral-800">{creator.email || '✏️ Not set'}</p>
+                        )}
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest block mb-1.5" htmlFor="profile-handle">Handle</label>
+                        {editMode ? (
+                            <input id="profile-handle" value={form.handle} onChange={e => setForm(f => ({ ...f, handle: e.target.value }))}
+                                className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500/50" />
+                        ) : (
+                            <p className="text-sm text-white bg-black/50 rounded-xl px-3 py-2.5 border border-neutral-800">{creator.handle || '✏️ Not set'}</p>
+                        )}
+                    </div>
+                </div>
+
+                <div>
+                    <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest block mb-1.5" htmlFor="profile-address">Shipping Address</label>
+                    {editMode ? (
+                        <textarea id="profile-address" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
+                            rows={2} className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500/50 resize-none"
+                            placeholder="Your shipping address for product seedings..." />
+                    ) : (
+                        <p className="text-sm text-white bg-black/50 rounded-xl px-3 py-2.5 border border-neutral-800">{creator.address || '✏️ Not set — add for product seedings'}</p>
+                    )}
                 </div>
             </div>
 
-            {/* PAYMENT METHODS — main feature */}
-            <div className="bg-neutral-900/80 backdrop-blur-sm border border-neutral-800 rounded-2xl p-5">
+            {/* PAYMENT METHODS */}
+            <div className="bg-neutral-900/40 backdrop-blur-[80px] border border-teal-500/[0.08] rounded-2xl p-5 shadow-[0_8px_40px_rgba(127,181,181,0.06),inset_0_1px_0_rgba(255,255,255,0.06)]">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-purple-400 flex items-center gap-2">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-teal-400 flex items-center gap-2">
                         <CreditCard size={14} /> Payment Methods
                     </h3>
                     <button
                         onClick={() => setShowAddPayment(true)}
-                        className="flex items-center gap-1.5 text-[10px] font-black text-black bg-gradient-to-r from-purple-500 to-pink-500 px-3 py-1.5 rounded-lg hover:from-purple-400 hover:to-pink-400 transition-all active:scale-95 shadow-lg shadow-purple-500/20"
+                        className="flex items-center gap-1.5 text-[10px] font-black text-black bg-gradient-to-r from-teal-600 to-cyan-500 px-3 py-1.5 rounded-lg hover:from-teal-400 hover:to-cyan-400 transition-all active:scale-95 shadow-lg shadow-teal-500/20"
                     >
                         <Plus size={10} /> Add Method
                     </button>
@@ -268,7 +244,7 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
                         <p className="text-neutral-600 text-[10px] mb-4">Add a payment method so the team knows how to pay you</p>
                         <button
                             onClick={() => setShowAddPayment(true)}
-                            className="inline-flex items-center gap-2 text-xs font-black text-black bg-gradient-to-r from-purple-500 to-pink-500 px-5 py-2.5 rounded-xl hover:from-purple-400 hover:to-pink-400 transition-all active:scale-95 shadow-lg shadow-purple-500/20"
+                            className="inline-flex items-center gap-2 text-xs font-black text-black bg-gradient-to-r from-teal-600 to-cyan-500 px-5 py-2.5 rounded-xl hover:from-teal-400 hover:to-cyan-400 transition-all active:scale-95 shadow-lg shadow-teal-500/20"
                         >
                             <Plus size={12} /> Add Your First Payment Method 🎉
                         </button>
@@ -291,7 +267,7 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
                                                     value={po.method}
                                                     onChange={e => updatePaymentOption(i, 'method', e.target.value)}
                                                     title="Payment method"
-                                                    className="bg-black border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                                                    className="bg-black border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-teal-500"
                                                 >
                                                     {Object.values(PaymentMethod).filter(m => m !== 'None').map(m => (
                                                         <option key={m} value={m}>{m}</option>
@@ -301,7 +277,7 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
                                                     value={po.details}
                                                     onChange={e => updatePaymentOption(i, 'details', e.target.value)}
                                                     placeholder="Username, email, or account #"
-                                                    className="flex-1 bg-black border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-purple-500"
+                                                    className="flex-1 bg-black border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-teal-500"
                                                 />
                                             </div>
                                             <div className="flex gap-2 justify-end">
@@ -344,9 +320,9 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
 
                 {/* ADD PAYMENT METHOD FORM */}
                 {showAddPayment && (
-                    <div className="mt-4 bg-black/60 border border-purple-500/20 rounded-xl p-5 animate-in slide-in-from-top-2">
+                    <div className="mt-4 bg-black/60 border border-teal-500/20 rounded-xl p-5 animate-in slide-in-from-top-2">
                         <div className="flex items-center justify-between mb-4">
-                            <h4 className="text-xs font-black text-purple-400 uppercase tracking-widest flex items-center gap-2">
+                            <h4 className="text-xs font-black text-teal-400 uppercase tracking-widest flex items-center gap-2">
                                 <Sparkles size={12} /> Add Payment Method
                             </h4>
                             <button onClick={() => setShowAddPayment(false)} className="text-neutral-600 hover:text-white">
@@ -364,12 +340,12 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
                                         key={method}
                                         onClick={() => setNewMethod(method)}
                                         className={`p-3 rounded-xl border text-center transition-all active:scale-95 ${isSelected
-                                            ? 'border-purple-500 bg-purple-500/10 shadow-lg shadow-purple-500/10'
+                                            ? 'border-teal-500 bg-teal-500/10 shadow-lg shadow-teal-500/10'
                                             : 'border-neutral-800 bg-neutral-900 hover:border-neutral-700'
                                             }`}
                                     >
                                         <span className="text-xl block mb-1">{config.emoji}</span>
-                                        <span className={`text-[9px] font-bold uppercase tracking-wider ${isSelected ? 'text-purple-400' : 'text-neutral-500'}`}>
+                                        <span className={`text-[9px] font-bold uppercase tracking-wider ${isSelected ? 'text-teal-400' : 'text-neutral-500'}`}>
                                             {method}
                                         </span>
                                     </button>
@@ -398,14 +374,14 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
                                                 newMethod === PaymentMethod.Bank ? 'Routing # / Account #' :
                                                     'Enter your details...'
                                 }
-                                className="w-full bg-black border border-neutral-700 rounded-xl px-4 py-3 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-purple-500/50"
+                                className="w-full bg-black border border-neutral-700 rounded-xl px-4 py-3 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-teal-500/50"
                             />
                         </div>
 
                         <button
                             onClick={addPaymentMethod}
                             disabled={!newDetails.trim()}
-                            className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-black py-3 rounded-xl font-black uppercase tracking-widest text-sm hover:from-purple-400 hover:to-pink-400 transition-all disabled:opacity-30 flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 active:scale-95"
+                            className="w-full bg-gradient-to-r from-teal-600 to-cyan-500 text-black py-3 rounded-xl font-black uppercase tracking-widest text-sm hover:from-teal-400 hover:to-cyan-400 transition-all disabled:opacity-30 flex items-center justify-center gap-2 shadow-lg shadow-teal-500/20 active:scale-95"
                         >
                             <CreditCard size={14} /> Add {newMethod} 💸
                         </button>
@@ -413,58 +389,8 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
                 )}
             </div>
 
-            {/* CONTACT INFO */}
-            <div className="bg-neutral-900/80 backdrop-blur-sm border border-neutral-800 rounded-2xl p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-purple-400 flex items-center gap-2">
-                        <User size={14} /> Contact Info
-                    </h3>
-                    {!editMode ? (
-                        <button onClick={() => setEditMode(true)} className="text-[10px] font-bold text-purple-400 hover:text-purple-300 bg-purple-500/10 px-3 py-1.5 rounded-lg flex items-center gap-1">
-                            <Edit3 size={8} /> Edit
-                        </button>
-                    ) : (
-                        <button onClick={handleSave} className="text-[10px] font-bold text-black bg-emerald-500 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-emerald-400 active:scale-95 transition-all">
-                            <Save size={8} /> Save Changes
-                        </button>
-                    )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest block mb-1.5" htmlFor="profile-email">Email</label>
-                        {editMode ? (
-                            <input id="profile-email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                                className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50" />
-                        ) : (
-                            <p className="text-sm text-white bg-black/50 rounded-xl px-3 py-2.5 border border-neutral-800">{creator.email || '✏️ Not set'}</p>
-                        )}
-                    </div>
-                    <div>
-                        <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest block mb-1.5" htmlFor="profile-handle">Handle</label>
-                        {editMode ? (
-                            <input id="profile-handle" value={form.handle} onChange={e => setForm(f => ({ ...f, handle: e.target.value }))}
-                                className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50" />
-                        ) : (
-                            <p className="text-sm text-white bg-black/50 rounded-xl px-3 py-2.5 border border-neutral-800">{creator.handle || '✏️ Not set'}</p>
-                        )}
-                    </div>
-                </div>
-
-                <div>
-                    <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest block mb-1.5" htmlFor="profile-address">Shipping Address</label>
-                    {editMode ? (
-                        <textarea id="profile-address" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
-                            rows={2} className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50 resize-none"
-                            placeholder="Your shipping address for product seedings..." />
-                    ) : (
-                        <p className="text-sm text-white bg-black/50 rounded-xl px-3 py-2.5 border border-neutral-800">{creator.address || '✏️ Not set — add for product seedings'}</p>
-                    )}
-                </div>
-            </div>
-
             {/* ACCOUNT INFO */}
-            <div className="bg-neutral-900/80 backdrop-blur-sm border border-neutral-800 rounded-2xl p-5">
+            <div className="bg-neutral-900/40 backdrop-blur-[80px] border border-teal-500/[0.08] rounded-2xl p-5 shadow-[0_8px_40px_rgba(127,181,181,0.06),inset_0_1px_0_rgba(255,255,255,0.06)]">
                 <h3 className="text-sm font-black uppercase tracking-widest text-neutral-500 mb-3 flex items-center gap-2">
                     <Shield size={14} /> Account
                 </h3>
@@ -488,6 +414,80 @@ const CreatorProfile: React.FC<Props> = ({ creator, onUpdate }) => {
                         <p className="text-xs text-white">{creator.notificationsEnabled ? '🔔 Enabled' : '🔕 Disabled'}</p>
                     </div>
                 </div>
+            </div>
+
+            {/* PROFILE THEME */}
+            <div className="bg-neutral-900/40 backdrop-blur-[80px] border border-teal-500/[0.08] rounded-2xl p-5 shadow-[0_8px_40px_rgba(127,181,181,0.06),inset_0_1px_0_rgba(255,255,255,0.06)]">
+                <h3 className="text-sm font-black uppercase tracking-widest text-teal-400 flex items-center gap-2 mb-4">
+                    <Sparkles size={14} /> Profile Theme
+                </h3>
+                <p className="text-[9px] text-neutral-500 font-bold uppercase tracking-widest mb-3">Accent Color</p>
+                <div className="flex flex-wrap gap-2">
+                    {[
+                        { id: '#7fb5b5', label: 'Teal' },
+                        { id: '#8cc5c5', label: 'Pink' },
+                        { id: '#06b6d4', label: 'Cyan' },
+                        { id: '#10b981', label: 'Emerald' },
+                        { id: '#f59e0b', label: 'Amber' },
+                        { id: '#ef4444', label: 'Red' },
+                        { id: '#3b82f6', label: 'Blue' },
+                        { id: '#5a9e9e', label: 'Violet' },
+                        { id: '#f97316', label: 'Orange' },
+                        { id: '#14b8a6', label: 'Teal' },
+                    ].map(color => {
+                        const isActive = (creator.profileTheme?.accent || '#a855f7') === color.id;
+                        return (
+                            <button
+                                key={color.id}
+                                title={color.label}
+                                onClick={() => onUpdate({ profileTheme: { ...(creator.profileTheme || {}), accent: color.id } })}
+                                className={`w-8 h-8 rounded-xl border-2 transition-all active:scale-90 ${
+                                    isActive ? 'border-white scale-110 shadow-lg' : 'border-transparent hover:scale-105'
+                                }`}
+                                style={{ background: color.id, boxShadow: isActive ? `0 0 16px ${color.id}50` : 'none' }}
+                            />
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* ACHIEVEMENTS GALLERY — pushed to bottom */}
+            <div className="bg-neutral-900/40 backdrop-blur-[80px] border border-teal-500/[0.08] rounded-2xl p-5 shadow-[0_8px_40px_rgba(127,181,181,0.06),inset_0_1px_0_rgba(255,255,255,0.06)]">
+                <h3 className="text-sm font-black uppercase tracking-widest text-teal-400 flex items-center gap-2 mb-4">
+                    <Trophy size={14} /> Achievements
+                </h3>
+                {categories.map(cat => {
+                    const catAchievements = ACHIEVEMENTS.filter(a => a.category === cat);
+                    return (
+                        <div key={cat} className="mb-4 last:mb-0">
+                            <p className="text-[9px] font-black text-neutral-500 uppercase tracking-widest mb-2">{cat}</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {catAchievements.map(ach => {
+                                    const unlocked = earnedSet.has(ach.id);
+                                    return (
+                                        <div
+                                            key={ach.id}
+                                            className={`rounded-xl p-3 border transition-all ${
+                                                unlocked
+                                                    ? 'bg-teal-500/10 border-teal-500/20'
+                                                    : 'bg-black/30 border-neutral-800 opacity-50'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="text-lg">{unlocked ? ach.emoji : '🔒'}</span>
+                                                <span className={`text-[10px] font-black ${unlocked ? 'text-white' : 'text-neutral-500'}`}>
+                                                    {ach.name}
+                                                </span>
+                                            </div>
+                                            <p className="text-[9px] text-neutral-500 leading-relaxed">{ach.description}</p>
+                                            <p className="text-[8px] font-bold text-teal-400 mt-1">+{ach.xpReward} XP</p>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
 
             {/* SAVED TOAST */}

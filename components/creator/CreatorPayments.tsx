@@ -184,7 +184,7 @@ const CreatorPayments: React.FC<Props> = ({ creator, contentItems, onRequestPaym
                     <p className="text-[9px] text-neutral-600 font-bold uppercase">Total Earned</p>
                 </div>
                 <div className="bg-neutral-900/80 backdrop-blur-sm rounded-2xl p-4 border border-neutral-800 text-center">
-                    <Video size={16} className="text-purple-400 mx-auto mb-2" />
+                    <Video size={16} className="text-teal-400 mx-auto mb-2" />
                     <p className="text-xl font-black text-white">{videosPaidCount}</p>
                     <p className="text-[9px] text-neutral-600 font-bold uppercase">Videos Paid</p>
                 </div>
@@ -199,10 +199,10 @@ const CreatorPayments: React.FC<Props> = ({ creator, contentItems, onRequestPaym
             {myContent.length > 0 && creator.paymentStatus !== PaymentStatus.Paid && (
                 <div className="bg-neutral-900/80 backdrop-blur-sm border border-neutral-800 rounded-2xl p-5 space-y-3">
                     <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-black uppercase tracking-widest text-purple-400 flex items-center gap-2">
+                        <h3 className="text-sm font-black uppercase tracking-widest text-teal-400 flex items-center gap-2">
                             <Sparkles size={14} /> Select Videos
                         </h3>
-                        <button onClick={selectAll} className="text-[10px] text-purple-400 font-bold hover:text-purple-300 bg-purple-500/10 px-3 py-1.5 rounded-lg">
+                        <button onClick={selectAll} className="text-[10px] text-teal-400 font-bold hover:text-teal-300 bg-teal-500/10 px-3 py-1.5 rounded-lg">
                             {selectedIds.size === myContent.length ? 'Deselect All' : 'Select All'}
                         </button>
                     </div>
@@ -215,11 +215,11 @@ const CreatorPayments: React.FC<Props> = ({ creator, contentItems, onRequestPaym
                                     key={content.id}
                                     onClick={() => toggleSelect(content.id)}
                                     className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${isSelected
-                                        ? 'bg-purple-500/10 border border-purple-500/30'
+                                        ? 'bg-teal-500/10 border border-teal-500/30'
                                         : 'bg-black/50 border border-neutral-800 hover:border-neutral-700'
                                         }`}
                                 >
-                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${isSelected ? 'bg-purple-500 text-black' : 'bg-neutral-800 text-neutral-600'
+                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${isSelected ? 'bg-teal-500 text-black' : 'bg-neutral-800 text-neutral-600'
                                         }`}>
                                         {isSelected ? <Check size={14} /> : (content.type === 'Video' ? <Video size={14} /> : <Image size={14} />)}
                                     </div>
@@ -249,7 +249,7 @@ const CreatorPayments: React.FC<Props> = ({ creator, contentItems, onRequestPaym
                             <button
                                 onClick={handleRequest}
                                 disabled={justRequested || creator.paymentStatus === PaymentStatus.Processing}
-                                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-black uppercase tracking-widest text-sm hover:from-purple-400 hover:to-pink-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 active:scale-95"
+                                className="w-full bg-gradient-to-r from-teal-600 to-cyan-500 text-white py-4 rounded-xl font-black uppercase tracking-widest text-sm hover:from-teal-400 hover:to-cyan-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-teal-500/20 active:scale-95"
                             >
                                 {justRequested ? (
                                     <><CheckCircle size={16} /> Request Sent! 🎉</>
@@ -292,11 +292,11 @@ const CreatorPayments: React.FC<Props> = ({ creator, contentItems, onRequestPaym
             {/* PAYMENT METHODS */}
             {creator.paymentOptions && creator.paymentOptions.length > 0 && (
                 <div className="bg-neutral-900/80 backdrop-blur-sm border border-neutral-800 rounded-2xl p-5">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-purple-400 mb-3">Payment Methods</h3>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-teal-400 mb-3">Payment Methods</h3>
                     <div className="space-y-2">
                         {creator.paymentOptions.map((po, i) => (
                             <div key={i} className="flex items-center gap-3 bg-black/50 rounded-lg p-3 border border-neutral-800">
-                                <CreditCard size={14} className="text-purple-400" />
+                                <CreditCard size={14} className="text-teal-400" />
                                 <span className="text-sm text-white font-bold">{po.method}</span>
                                 <span className="text-neutral-600">•</span>
                                 <span className="text-sm text-neutral-400 truncate">{po.details}</span>
