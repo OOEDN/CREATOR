@@ -40,7 +40,7 @@ export default defineConfig({
         outDir: 'dist-creator',
         emptyOutDir: true,
         rollupOptions: {
-            input: 'creator-index.html',
+            input: 'apps/creator/index.html',
         },
     },
 });

@@ -8,8 +8,8 @@
     "build": "vite build",
     "build:creator": "vite build --config vite.creator.config.ts",
     "gcp-build": "npm run build",
-    "start": "node server.js",
-    "dev:server": "node server.js",
+    "start": "node server/server.js",
+    "dev:server": "node server/server.js",
     "test": "node tests/smoke.test.js",
     "deploy": "gcloud run deploy ooedn-tracker --source . --region us-west1"
   },
